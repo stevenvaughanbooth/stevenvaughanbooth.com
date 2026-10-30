@@ -242,13 +242,18 @@ URL, asserting on the median run:
 
 | Assertion                          | Floor    |
 | ---------------------------------- | -------- |
-| Performance                        | ≥ 0.95   |
+| Performance                        | ≥ 0.90   |
 | Accessibility                      | 1        |
 | Best practices                     | ≥ 0.95   |
 | SEO                                | 1        |
 | JavaScript transfer                | ≤ 180 KB |
 | Total transfer                     | ≤ 600 KB |
 | Media requests (video before Play) | 0        |
+
+The performance floor sits below the local result on purpose. GitHub's runners measure the home
+page at 0.91–0.93 where a local build measures 0.95: simulated throttling charges the async
+framework scripts to LCP when they finish before the first paint, and slower runners pay more
+for them. Cutting initial JavaScript is the way to raise it back.
 
 **Measured** on 2026-10-30 with Lighthouse 12.6.1, using `lhci collect` and `lhci assert` with the
 repository's `lighthouserc.json` (emulated mobile, simulated throttling, 3 runs per page, median
