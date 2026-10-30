@@ -1,0 +1,34 @@
+/* Takes no width (negative margin) so typing never reflows the line. */
+.cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.2em;
+  margin-right: -0.55em;
+  vertical-align: -0.25em;
+  background: var(--green);
+}
+
+/* A few blinks, then solid: a cursor left waiting never animates for good. */
+.blink {
+  animation: blink 1.1s steps(1, end) 6;
+}
+
+/* One soft pulse when the reflex appears. */
+.matched {
+  animation: matched 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes matched {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--green) 40%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px color-mix(in oklab, var(--green) 0%, transparent);
+  }
+}

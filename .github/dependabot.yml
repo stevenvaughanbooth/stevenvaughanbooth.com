@@ -1,0 +1,45 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Framework packages move together, including majors.
+      next-react:
+        patterns:
+          - next
+          - eslint-config-next
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+          - babel-plugin-react-compiler
+      testing:
+        patterns:
+          - '@playwright/test'
+          - '@axe-core/playwright'
+          - '@lhci/cli'
+          - vitest
+          - '@vitejs/*'
+          - '@testing-library/*'
+          - jsdom
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ['*']

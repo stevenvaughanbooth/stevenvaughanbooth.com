@@ -1,0 +1,228 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens, each colour defined once as light-dark(light, dark). The document's color-scheme
+ * picks the side: the system preference by default, or the visitor's choice from the theme toggle
+ * (data-theme on <html>). src/lib/tokens.ts mirrors these values for places CSS can't reach.
+ * Components use the semantic Tailwind names below (bg-bg, text-muted, border-line, ...).
+ */
+:root {
+  color-scheme: light;
+  --bg: light-dark(#f7f7f4, #0b0d10);
+  --surface: light-dark(#ffffff, #111419);
+  --elevated: light-dark(#efefea, #181c23);
+  --line: light-dark(#e2e2dc, #232934);
+  --line-strong: light-dark(#cbcbc3, #353d4b);
+  --fg: light-dark(#121417, #eceef1);
+  --muted: light-dark(#4f5662, #a7aebb);
+  --subtle: light-dark(#676e7a, #808896);
+  --green: light-dark(#0d7546, #5fe3a1);
+  --amber: light-dark(#965700, #f2b553);
+  --lilac: light-dark(#5847c4, #b4a6ff);
+  --blue: light-dark(#0a5fa3, #7cc4ff);
+  --grid: light-dark(rgb(18 20 23 / 0.05), rgb(236 238 241 / 0.045));
+  --glow: light-dark(rgb(13 117 70 / 0.1), rgb(95 227 161 / 0.12));
+  --shadow:
+    0 1px 2px light-dark(rgb(18 20 23 / 0.04), rgb(0 0 0 / 0.3)),
+    0 8px 24px -12px light-dark(rgb(18 20 23 / 0.12), rgb(0 0 0 / 0.6));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
+  --color-lilac: var(--lilac);
+  --color-blue: var(--blue);
+  /* The fallbacks keep a sane stack where next/font's variables are absent (global-error). */
+  --font-sans: var(--font-dm-sans, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-plex-mono, ui-monospace), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --shadow-card: var(--shadow);
+}
+
+@theme {
+  /* The smallest text on the site: uppercase mono labels and chips. Nothing renders below this. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.4;
+  --text-display: clamp(2.75rem, 1.6rem + 5.2vw, 5.75rem);
+  --text-display--line-height: 0.98;
+  --text-display--letter-spacing: -0.045em;
+  --text-title: clamp(2rem, 1.45rem + 2.4vw, 3.5rem);
+  --text-title--line-height: 1.04;
+  --text-title--letter-spacing: -0.035em;
+  --container-page: 72rem;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scrollbar-gutter: stable;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Lock page scroll behind modal dialogs such as the Ask Steven palette. */
+  html:has(dialog[open]:modal) {
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--green) 28%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Uppercase mono label used for kickers, eyebrows and metadata. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--subtle);
+  }
+
+  .page {
+    margin-inline: auto;
+    width: 100%;
+    max-width: var(--container-page);
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 48rem) {
+    .page {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* A quiet engineering grid behind the hero. */
+  .bg-grid {
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 30%, transparent 75%);
+  }
+}
+
+/*
+ * Pill-shaped buttons and links: `pill` plus one look, `pill-solid` (the primary action),
+ * `pill-outline` or `pill-ghost`. `pill-sm` is the compact size used inside content. Sizes go
+ * through custom properties, so modifiers never depend on utility order. Transparent borders
+ * become visible in forced-colors mode, so the shape survives there.
+ */
+@utility pill {
+  @apply inline-flex shrink-0 items-center rounded-full border text-sm font-medium whitespace-nowrap transition;
+  height: var(--pill-h, 2.75rem);
+  gap: var(--pill-gap, 0.5rem);
+  padding-inline: var(--pill-x, 1rem);
+  @variant sm {
+    padding-inline: var(--pill-x, 1.25rem);
+  }
+}
+
+@utility pill-sm {
+  --pill-h: 2.25rem;
+  --pill-gap: 0.375rem;
+  --pill-x: 1rem;
+}
+
+@utility pill-solid {
+  @apply border-transparent bg-fg text-bg motion-safe:hover:-translate-y-0.5;
+}
+
+@utility pill-outline {
+  @apply border-line-strong hover:bg-elevated;
+}
+
+@utility pill-ghost {
+  @apply border-transparent text-muted hover:bg-elevated hover:text-fg;
+  --pill-x: 0.75rem;
+}
+
+/*
+ * Sections rise into place as they enter, using scroll-driven animation where supported. No JS.
+ * Movement only: text keeps full opacity at every scroll position, so contrast never dips.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+}
+
+@keyframes reveal {
+  from {
+    translate: 0 24px;
+  }
+}
+
+@media print {
+  .reveal {
+    animation: none;
+  }
+}

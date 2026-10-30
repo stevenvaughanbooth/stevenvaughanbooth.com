@@ -1,0 +1,262 @@
+/*
+ * Phase state for the server-rendered scenes. The view wraps the active scene in an element
+ * carrying data-phase (0–2). Parts carry data-at (the beat they belong to, emphasised while it is
+ * on show), data-lit (accented from that phase on), data-outcome (appears at the last phase) or
+ * data-pending (leaves at the last phase). Every transition is bounded: nothing loops.
+ */
+
+.scene {
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --tint: color-mix(in oklab, var(--lilac) 14%, var(--surface));
+}
+
+/* A story the tour moves to fades in; a story picked or restored appears at once. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-phase='0'] > .scene {
+    transition: opacity 0.4s var(--ease);
+  }
+
+  @starting-style {
+    [data-phase='0'] > .scene {
+      opacity: 0;
+    }
+  }
+}
+
+/* The outcome arrives at the last phase. The translate property composes with SVG transforms. */
+.scene :is([data-outcome], [data-pending]) {
+  transition:
+    opacity 0.6s var(--ease) var(--d, 0s),
+    translate 0.8s var(--ease) var(--d, 0s);
+}
+
+:is([data-phase='0'], [data-phase='1']) .scene [data-outcome],
+[data-phase='2'] .scene [data-pending] {
+  opacity: 0;
+  translate: var(--from, none);
+}
+
+/* Boxes: the beat on show gets an accent outline and a soft halo. */
+.frame {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+  transition: stroke 0.6s var(--ease);
+}
+
+.halo {
+  fill: none;
+  stroke: color-mix(in oklab, var(--lilac) 22%, transparent);
+  stroke-width: 6;
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+}
+
+[data-phase='0'] .scene [data-at='0'],
+[data-phase='1'] .scene [data-at='1'],
+[data-phase='2'] .scene [data-at='2'] {
+  & .frame {
+    stroke: var(--lilac);
+  }
+  & .halo {
+    opacity: 1;
+  }
+}
+
+/* Text. Sizes are in em of the <svg>'s font size, which steps with the card's width. */
+.title {
+  fill: var(--fg);
+  font-size: 1.04em;
+  font-weight: 600;
+}
+
+.value {
+  fill: var(--fg);
+  font-weight: 500;
+}
+
+.body {
+  fill: var(--muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  fill: var(--subtle);
+}
+
+.caps {
+  text-transform: uppercase;
+}
+
+.result {
+  fill: var(--fg);
+  font-size: 1.04em;
+  font-weight: 500;
+}
+
+.divider {
+  stroke: var(--line);
+}
+
+.skeleton {
+  fill: var(--line);
+}
+
+.check {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.placeholder {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-dasharray: 3 3;
+}
+
+.highlight {
+  fill: var(--tint);
+  stroke: color-mix(in oklab, var(--lilac) 45%, transparent);
+}
+
+/* Slots, and the accent badge that travels between them. */
+.slot {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-dasharray: 2 2;
+}
+
+.letter,
+.badge text {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  fill: var(--subtle);
+}
+
+.badge rect {
+  fill: var(--tint);
+  stroke: var(--lilac);
+}
+
+.badge text {
+  fill: var(--lilac);
+}
+
+.traveler {
+  transform: var(--t2);
+  transition: transform 1.1s var(--ease) var(--d, 0s);
+}
+
+[data-phase='0'] .traveler {
+  transform: var(--t0);
+}
+
+[data-phase='1'] .traveler {
+  transform: var(--t1);
+}
+
+/* Connectors, and the hub's steps, light up as data reaches them. */
+.connector,
+.arrowhead {
+  fill: none;
+  stroke: var(--lilac);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.5s var(--ease);
+}
+
+.tool,
+.pip {
+  fill: var(--lilac);
+  transition: fill 0.5s var(--ease) var(--d, 0s);
+}
+
+[data-phase='0'] .scene .tool {
+  fill: var(--subtle);
+}
+
+[data-phase='0'] .scene .pip {
+  fill: var(--line-strong);
+}
+
+[data-phase='0'] .scene [data-lit],
+[data-phase='1'] .scene [data-lit='2'] {
+  stroke: var(--line-strong);
+}
+
+/* Schema Evolution's ring and the migration lane draw once while their phase plays. */
+.track {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.ring,
+.lane {
+  fill: none;
+  stroke: var(--lilac);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1.6s var(--ease) 0.3s;
+}
+
+[data-phase='0'] .scene :is(.ring, .lane) {
+  stroke-dashoffset: 1;
+}
+
+.mark {
+  fill: none;
+  stroke: var(--lilac);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.arrowhead {
+  transition-delay: 1.4s;
+}
+
+.bullet {
+  fill: var(--line-strong);
+}
+
+/* The foundation grid fills out at scale. */
+.cell {
+  fill: color-mix(in oklab, var(--lilac) 18%, transparent);
+  stroke: color-mix(in oklab, var(--lilac) 45%, transparent);
+  transition:
+    fill 0.6s var(--ease) var(--d, 0s),
+    stroke 0.6s var(--ease) var(--d, 0s);
+}
+
+:is([data-phase='0'], [data-phase='1']) .scene .cell {
+  fill: transparent;
+  stroke: var(--line);
+}
+
+/* Auto-advance progress through a phase; the controller pauses it with animation-play-state. */
+.progress {
+  transform-origin: left;
+  animation: phase-progress linear forwards;
+}
+
+@keyframes phase-progress {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Under forced colours, keep the beat on show and the travelers distinguishable. */
+@media (forced-colors: active) {
+  [data-phase='0'] .scene [data-at='0'] .frame,
+  [data-phase='1'] .scene [data-at='1'] .frame,
+  [data-phase='2'] .scene [data-at='2'] .frame,
+  .badge rect {
+    stroke: Highlight;
+    stroke-width: 2;
+  }
+}

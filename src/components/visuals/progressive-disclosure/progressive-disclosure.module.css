@@ -1,0 +1,86 @@
+/*
+ * Step state for the server-rendered graph. Each part carries data-at, the step that reveals it;
+ * data-passed marks the siblings the agent looks at and then leaves. The panel's stage element
+ * carries data-step, the step on show, and parts read the custom properties below.
+ */
+
+/* Revealed earlier and followed. */
+.graph [data-at] {
+  --lit: 1;
+  --now: 0;
+  --stroke: var(--green);
+  --fill: var(--surface);
+  --ink: var(--fg);
+  --dash: none;
+  --track-dash: none;
+}
+
+/* Revealed earlier and passed over. */
+.graph [data-passed] {
+  --lit: 0;
+  --stroke: var(--line-strong);
+  --ink: var(--muted);
+}
+
+/* Not reached yet. */
+[data-step='0'] .graph :is([data-at='1'], [data-at='2']),
+[data-step='1'] .graph [data-at='2'] {
+  --lit: 0;
+  --stroke: var(--line-strong);
+  --ink: var(--subtle);
+  --dash: 3 3;
+  --track-dash: 2 4;
+}
+
+/* This step's focus. */
+[data-step='0'] .graph [data-at='0'],
+[data-step='1'] .graph [data-at='1'],
+[data-step='2'] .graph [data-at='2'] {
+  --lit: 1;
+  --now: 1;
+  --stroke: var(--green);
+  --fill: color-mix(in oklab, var(--green) 12%, var(--surface));
+  --ink: var(--fg);
+}
+
+.shape {
+  fill: var(--fill);
+  stroke: var(--stroke);
+  stroke-dasharray: var(--dash);
+}
+
+.ink {
+  fill: var(--ink);
+}
+
+.mark {
+  fill: var(--stroke);
+}
+
+.track {
+  stroke-dasharray: var(--track-dash);
+}
+
+/* A green stroke drawn along a connection (pathLength 1) once it is followed. */
+.trace {
+  stroke-dashoffset: calc(1 - var(--lit));
+  opacity: var(--lit);
+  transition-delay: calc(var(--lit) * var(--i, 0) * 80ms);
+}
+
+/* Shown only while its step is on show: the spotlight and the opened record's detail. */
+.current {
+  opacity: var(--now);
+}
+
+.placeholder {
+  opacity: calc(1 - var(--now));
+}
+
+/* Branches of a fan draw in one after another. */
+.fan > :nth-child(2) {
+  --i: 1;
+}
+.fan > :nth-child(3) {
+  --i: 2;
+}

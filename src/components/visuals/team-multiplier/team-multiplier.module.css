@@ -1,0 +1,105 @@
+/*
+ * Stage state for the server-rendered network. Each part carries data-at, the stage it first
+ * appears at; the panel's stage element carries data-step, the stage on show. Parts read the
+ * custom properties below. Without a data-step ancestor every part is lit: the final stage.
+ */
+.network [data-at] {
+  --lit: 1;
+  --now: 0;
+  --stroke: var(--amber);
+  --fill: color-mix(in oklab, var(--amber) 9%, var(--surface));
+  --dot: var(--amber);
+  --ink: var(--fg);
+  --accent-ink: var(--amber);
+  --dash: none;
+  --dot-dash: none;
+}
+
+/* Not reached yet. */
+[data-step='0'] .network :is([data-at='1'], [data-at='2'], [data-at='3']),
+[data-step='1'] .network :is([data-at='2'], [data-at='3']),
+[data-step='2'] .network [data-at='3'] {
+  --lit: 0;
+  --stroke: var(--line-strong);
+  --fill: var(--surface);
+  --dot: var(--surface);
+  --ink: var(--subtle);
+  --accent-ink: var(--subtle);
+  --dash: 3 3;
+  --dot-dash: 2 2;
+}
+
+/* The stage on show. */
+[data-step='0'] .network [data-at='0'],
+[data-step='1'] .network [data-at='1'],
+[data-step='2'] .network [data-at='2'],
+[data-step='3'] .network [data-at='3'] {
+  --now: 1;
+  --fill: color-mix(in oklab, var(--amber) 16%, var(--surface));
+}
+
+.shape {
+  fill: var(--fill);
+  stroke: var(--stroke);
+  stroke-dasharray: var(--dash);
+}
+
+.outline {
+  stroke: var(--stroke);
+}
+
+.dot {
+  fill: var(--dot);
+  stroke: var(--stroke);
+  stroke-dasharray: var(--dot-dash);
+}
+
+.ink {
+  fill: var(--ink);
+}
+
+.accentInk {
+  fill: var(--accent-ink);
+}
+
+/* An amber stroke drawn along a connection (pathLength 1) once its stage is reached. */
+.trace {
+  stroke-dashoffset: calc(1 - var(--lit));
+  opacity: var(--lit);
+}
+
+/* The loop's arrowhead lands as the stroke reaches the champion. */
+.arrow {
+  opacity: var(--lit);
+  transition-delay: calc(var(--lit) * 500ms);
+}
+
+.halo {
+  opacity: calc(var(--now) * 0.4);
+}
+
+/*
+ * Branches light in sequence: each child of a .cascade starts 70ms after the one before, from
+ * the group's --start. Parts go dark without a delay.
+ */
+.trace,
+.dot {
+  transition-delay: calc(var(--lit) * (var(--start, 0ms) + var(--i, 0) * 70ms));
+}
+.cascade > :nth-child(2) {
+  --i: 1;
+}
+.cascade > :nth-child(3) {
+  --i: 2;
+}
+.cascade > :nth-child(4) {
+  --i: 3;
+}
+
+.reach {
+  --start: 260ms;
+}
+
+.satellites {
+  --start: 420ms;
+}

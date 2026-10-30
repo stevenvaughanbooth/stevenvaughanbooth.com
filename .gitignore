@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.vercel/
+coverage/
+playwright-report/
+test-results/
+.lighthouseci/
+.DS_Store
+*.log
+.claude/
+
+# Throwaway review scripts
+.review-*

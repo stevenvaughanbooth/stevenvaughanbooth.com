@@ -1,0 +1,79 @@
+/*
+ * The end plate sits on the monitor glass in the film's last frame. The glass corners were measured
+ * on the 1280×720 frame and fitted as a CSS perspective transform; every value is relative to the
+ * frame (an inline-size container), so the plate stays registered at any width without JS.
+ */
+.screen {
+  position: absolute;
+  left: 7.727%;
+  top: 10.884%;
+  width: 74.715%;
+  height: 74.427%;
+  transform: perspective(93.75cqw) rotateX(1.58deg) rotateY(-15.07deg) rotateZ(1.82deg);
+  animation: power-on 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Typed lines: monospace, so 1ch is one character. Widths step from nothing to the full line. */
+.typed {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.greeting {
+  width: 24ch;
+  animation: type 0.95s steps(24, end) 0.45s both;
+}
+
+.command {
+  width: 7ch;
+  animation: type 0.55s steps(7, end) 1.75s both;
+}
+
+/* Solid while typing, then a few blinks; it finishes visible. */
+.cursor {
+  animation: blink 1s steps(1, end) 2.4s 4;
+}
+
+.result {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 2.55s both;
+}
+
+@keyframes power-on {
+  from {
+    opacity: 0;
+    filter: brightness(1.6);
+  }
+}
+
+@keyframes type {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 0.4em;
+  }
+}
+
+/* Reduced motion: the finished terminal, immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .greeting,
+  .command,
+  .cursor,
+  .result {
+    animation: none;
+  }
+}
