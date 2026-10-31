@@ -50,22 +50,25 @@ function ToolCall({ call, returns, rows }: Step) {
 export function ProgressiveDisclosure() {
   const names = steps.map((step) => step.name);
   return (
-    <ProgressiveDisclosureShell
-      id={id}
-      steps={names}
-      descriptions={steps.map((step) => step.diagram)}
-      announcements={steps.map((step) => `${step.name}: ${step.title}`)}
-      diagram={<Graph />}
-      calls={steps.map((step) => (
-        <ToolCall key={step.name} {...step} />
-      ))}
-      copy={steps.map((step) => (
-        <StepCopy key={step.name} title={step.title} body={step.copy} />
-      ))}
-      staticTabs={
-        <SegmentedTabs id={id} label={tablistLabel} items={names} selected={0} accent="green" />
-      }
-      staticFooter={<StepControls accent="green" {...stepControls(names, 0)} />}
-    />
+    // The card is drawn by the client shell; this server-rendered root is what X-ray labels.
+    <div data-component="progressive-disclosure" className="min-w-0">
+      <ProgressiveDisclosureShell
+        id={id}
+        steps={names}
+        descriptions={steps.map((step) => step.diagram)}
+        announcements={steps.map((step) => `${step.name}: ${step.title}`)}
+        diagram={<Graph />}
+        calls={steps.map((step) => (
+          <ToolCall key={step.name} {...step} />
+        ))}
+        copy={steps.map((step) => (
+          <StepCopy key={step.name} title={step.title} body={step.copy} />
+        ))}
+        staticTabs={
+          <SegmentedTabs id={id} label={tablistLabel} items={names} selected={0} accent="green" />
+        }
+        staticFooter={<StepControls accent="green" {...stepControls(names, 0)} />}
+      />
+    </div>
   );
 }

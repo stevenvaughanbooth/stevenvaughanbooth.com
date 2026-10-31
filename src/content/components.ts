@@ -20,8 +20,11 @@ export type ComponentId =
   | 'xray-toggle'
   | 'site-footer'
   | 'shortcuts'
+  | 'shortcuts-sheet'
+  | 'xray-overlay'
   | 'palette-loader'
   | 'ask-palette'
+  | 'error-boundary'
   // The home page
   | 'hero'
   | 'hero-ask-bar'
@@ -53,7 +56,11 @@ export interface SiteComponent {
   /** Repo-relative path of the main file. */
   file: string;
   kind: ComponentKind;
-  /** Client modules inside a server component, by file name, e.g. ['arrival-shell.tsx']. */
+  /**
+   * Client modules a server component renders inside its box, by file name, e.g.
+   * ['arrival-shell.tsx'], or by their path under src/components where names repeat
+   * ('visuals/team-multiplier/shell.tsx'). components.test.ts checks the list against the code.
+   */
   islands?: readonly string[];
   /** When its JavaScript loads, in a few words: 'No JavaScript', 'With the page', 'On intent', 'Near the viewport', 'After load and idle'. */
   loads: string;
@@ -86,12 +93,13 @@ export const siteComponents: readonly SiteComponent[] = [
   },
   {
     id: 'sections-menu',
-    name: 'MobileNav',
-    file: 'src/components/mobile-nav.tsx',
-    kind: 'client',
-    loads: 'With the page',
-    features: ['Popover API', 'React Compiler'],
-    why: 'The Popover API handles opening, light dismiss and Escape; the island only moves focus to the chosen section’s heading on the home page.',
+    name: 'SectionsMenu',
+    file: 'src/components/site-header.tsx',
+    kind: 'server',
+    islands: ['mobile-nav.tsx'],
+    loads: 'Island with the page',
+    features: ['Server Component', 'Popover API'],
+    why: 'A server-rendered button and popover that the Popover API opens, light-dismisses and closes on Escape; its one island, MobileNav, only moves focus to the chosen section’s heading on the home page.',
     onPage: true,
   },
   {
@@ -125,8 +133,8 @@ export const siteComponents: readonly SiteComponent[] = [
     file: 'src/components/xray/xray-toggle.tsx',
     kind: 'server',
     loads: 'On intent',
-    features: ['Server Component', 'View Transitions', 'dynamic import()'],
-    why: 'A plain button: the shortcuts listener handles its presses, and the overlay, the stats and the blueprint styles download only on hover, focus, a press or X.',
+    features: ['Server Component', 'Event delegation'],
+    why: 'A plain button with the build’s details written in at prerender: the shortcuts listener handles its presses, and the overlay, the stats and the blueprint styles download only on hover, focus, a press or X.',
     onPage: true,
   },
   {
@@ -148,6 +156,34 @@ export const siteComponents: readonly SiteComponent[] = [
     loads: 'With the page, its sheet on ?',
     features: ['Activity', 'import() on intent', '<dialog>', 'React Compiler'],
     why: 'One listener for /, T, X and ?, silent while you type or behind a dialog, which also hosts X-ray. Its sheet loads on first use, waits under <Activity>, and can turn single keys off (WCAG 2.1.4).',
+    onPage: false,
+  },
+  {
+    id: 'shortcuts-sheet',
+    name: 'ShortcutsSheet',
+    file: 'src/components/shortcuts/shortcuts-sheet.tsx',
+    kind: 'client',
+    loads: 'On intent',
+    features: ['<dialog>', 'Activity', 'useLayoutEffect', 'React Compiler'],
+    why: 'It loads on the first ? or press of Shortcuts, then waits under <Activity> with its state kept. A modal <dialog> makes the page inert while it is open, and its switch turns single keys off.',
+    onPage: false,
+  },
+  {
+    id: 'xray-overlay',
+    name: 'XrayOverlay',
+    file: 'src/components/xray/xray.tsx',
+    kind: 'client',
+    loads: 'On intent',
+    features: [
+      'import() on intent',
+      'Activity',
+      'View Transitions',
+      'flushSync',
+      'useEffectEvent',
+      'PerformanceObserver',
+      'React Compiler',
+    ],
+    why: 'The labels, cards, HUD and blueprint styles download on hover, focus, a press or X, and render inside the shortcuts listener under <Activity>. The peel is one view transition, and flushSync puts the overlay in its new snapshot.',
     onPage: false,
   },
   {
@@ -177,13 +213,24 @@ export const siteComponents: readonly SiteComponent[] = [
     onPage: false,
   },
   {
+    id: 'error-boundary',
+    name: 'ErrorPage',
+    file: 'src/app/error.tsx',
+    kind: 'client',
+    loads: 'With the page',
+    features: ['Error boundary', 'React Compiler'],
+    why: 'Next.js renders it in place of a page that fails, inside the header and footer, with a way to try again; global-error.tsx stands in if the layout itself fails.',
+    onPage: false,
+  },
+  {
     id: 'hero',
     name: 'Hero',
     file: 'src/components/sections/hero.tsx',
     kind: 'server',
-    loads: 'No JavaScript',
+    islands: ['hero-ask-bar.tsx', 'arrival-shell.tsx'],
+    loads: 'Islands with the page',
     features: ['Server Component', 'getImageProps'],
-    why: 'Name, tagline and portrait are in the first HTML, and the portrait is a plain <img> from getImageProps, so the largest paint waits on no script.',
+    why: 'Name, tagline and portrait are in the first HTML, and the portrait is a plain <img> from getImageProps, so the largest paint waits on no script; the ask bar and the film’s frame are its islands.',
     onPage: true,
   },
   {
@@ -229,8 +276,8 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'OpenSource',
     file: 'src/components/sections/open-source.tsx',
     kind: 'server',
-    islands: ['copy-button.tsx'],
-    loads: 'Island with the page',
+    islands: ['copy-button.tsx', 'visuals/reflex-demo/shell.tsx'],
+    loads: 'Islands with the page',
     features: ['Server Component', 'scroll-driven animation'],
     why: 'Adage’s evidence with its caveats, from profile.ts; the scroll-driven reveal moves the section without fading its text.',
     onPage: true,
@@ -240,7 +287,7 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'ReflexDemo',
     file: 'src/components/visuals/reflex-demo.tsx',
     kind: 'server',
-    islands: ['shell.tsx', 'controller.tsx'],
+    islands: ['visuals/reflex-demo/shell.tsx', 'visuals/reflex-demo/controller.tsx'],
     loads: 'Controller near the viewport',
     features: [
       'Server Component',
@@ -277,8 +324,13 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'Work',
     file: 'src/components/sections/work.tsx',
     kind: 'server',
-    islands: ['ask-button.tsx'],
-    loads: 'Island with the page',
+    islands: [
+      'ask-button.tsx',
+      'visuals/team-multiplier/shell.tsx',
+      'visuals/progressive-disclosure/shell.tsx',
+      'visuals/metadata-platform/shell.tsx',
+    ],
+    loads: 'Islands with the page',
     features: ['Server Component', 'ViewTransition', 'scroll-driven animation'],
     why: 'Each theme’s intro and diagram sit in named <ViewTransition>s matching its case study, so opening one morphs them into place with no client code.',
     onPage: true,
@@ -288,7 +340,7 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'TeamMultiplier',
     file: 'src/components/visuals/team-multiplier.tsx',
     kind: 'server',
-    islands: ['shell.tsx', 'controller.tsx'],
+    islands: ['visuals/team-multiplier/shell.tsx', 'visuals/team-multiplier/controller.tsx'],
     loads: 'Controller near the viewport',
     features: ['Server Component', 'React.lazy', 'useSyncExternalStore', 'useEffectEvent'],
     why: 'One server-rendered SVG with every stage drawn and CSS picking the current one; the controller adds tabs and a tour that runs only on screen.',
@@ -299,7 +351,10 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'ProgressiveDisclosure',
     file: 'src/components/visuals/progressive-disclosure.tsx',
     kind: 'server',
-    islands: ['shell.tsx', 'controller.tsx'],
+    islands: [
+      'visuals/progressive-disclosure/shell.tsx',
+      'visuals/progressive-disclosure/controller.tsx',
+    ],
     loads: 'Controller near the viewport',
     features: ['Server Component', 'React.lazy', 'startTransition'],
     why: 'Every step is rendered on the server into one grid cell, so the card never changes height; the controller only wakes the tabs and Next.',
@@ -310,7 +365,7 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'MetadataPlatform',
     file: 'src/components/visuals/metadata-platform.tsx',
     kind: 'server',
-    islands: ['shell.tsx', 'controller.tsx'],
+    islands: ['visuals/metadata-platform/shell.tsx', 'visuals/metadata-platform/controller.tsx'],
     loads: 'Controller near the viewport',
     features: ['Server Component', 'React.lazy', 'useEffectEvent'],
     why: 'Every scene of three stories is rendered on the server; the controller tours each phase once, holds on hover or focus, and stops when a visitor picks one.',
@@ -362,10 +417,16 @@ export const siteComponents: readonly SiteComponent[] = [
     name: 'CaseStudyArticle',
     file: 'src/components/case-study/case-study.tsx',
     kind: 'server',
-    islands: ['focus.tsx', 'ask-button.tsx'],
+    islands: [
+      'focus.tsx',
+      'ask-button.tsx',
+      'visuals/team-multiplier/shell.tsx',
+      'visuals/progressive-disclosure/shell.tsx',
+      'visuals/metadata-platform/shell.tsx',
+    ],
     loads: 'Islands with the page',
-    features: ['Server Component', 'generateStaticParams', 'ViewTransition'],
-    why: 'Prerendered per theme, with the Work section’s intro and diagram in identical markup so the two morph; the pager’s transition type hands a title to the next page.',
+    features: ['Server Component', 'ViewTransition'],
+    why: 'Prerendered per theme (the route’s generateStaticParams names them), with the Work section’s intro and diagram in identical markup so the two morph; the pager’s transition type hands a title to the next page.',
     onPage: true,
   },
   {
@@ -385,7 +446,7 @@ export const siteComponents: readonly SiteComponent[] = [
     kind: 'server',
     loads: 'No JavaScript',
     features: ['Server Component', 'Static prerendering'],
-    why: 'This list, the budgets and the versions are read at build time from the files X-ray mode, Lighthouse CI and the build use, so the page cannot drift.',
+    why: 'This list, the budgets and the versions are imported at build time from the files X-ray mode, Lighthouse CI and the build read, so those stay in step with the code. The measured scores and test counts are typed in from a dated run.',
     onPage: true,
   },
 ];

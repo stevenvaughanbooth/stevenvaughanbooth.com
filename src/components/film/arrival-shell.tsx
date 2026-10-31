@@ -42,7 +42,7 @@ interface ArrivalShellProps {
   unavailable: ReactNode;
   /** What the server hands the theater's player: its labels, poster and the end plate's name. */
   player: FilmContent;
-  /** The frame's place and size in the hero's grid. */
+  /** The frame's size, in the box arrival.tsx places in the hero's grid. */
   className: string;
 }
 
@@ -180,7 +180,6 @@ export function ArrivalShell({
     <div
       ref={frameRef}
       id="film"
-      data-component="arrival"
       className={`relative rounded-2xl border border-line bg-elevated shadow-card md:rounded-3xl ${className}`}
     >
       <Activity mode={open ? 'hidden' : 'visible'}>

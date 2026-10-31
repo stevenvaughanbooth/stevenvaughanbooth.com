@@ -17,24 +17,27 @@ const id = 'team-multiplier';
 export function TeamMultiplier() {
   const names = stages.map((stage) => stage.name);
   return (
-    <TeamMultiplierShell
-      id={id}
-      stages={names}
-      descriptions={stages.map((stage) => stage.diagram)}
-      diagram={<Network />}
-      copy={stages.map((stage) => (
-        <StepCopy key={stage.name} title={stage.title} body={stage.detail} />
-      ))}
-      staticTabs={
-        <SegmentedTabs
-          id={id}
-          label={tablistLabel}
-          items={names}
-          selected={names.length - 1}
-          accent="amber"
-        />
-      }
-      staticFooter={<StepControls accent="amber" live={false} {...tourControls('idle', false)} />}
-    />
+    // The card is drawn by the client shell; this server-rendered root is what X-ray labels.
+    <div data-component="team-multiplier" className="min-w-0">
+      <TeamMultiplierShell
+        id={id}
+        stages={names}
+        descriptions={stages.map((stage) => stage.diagram)}
+        diagram={<Network />}
+        copy={stages.map((stage) => (
+          <StepCopy key={stage.name} title={stage.title} body={stage.detail} />
+        ))}
+        staticTabs={
+          <SegmentedTabs
+            id={id}
+            label={tablistLabel}
+            items={names}
+            selected={names.length - 1}
+            accent="amber"
+          />
+        }
+        staticFooter={<StepControls accent="amber" live={false} {...tourControls('idle', false)} />}
+      />
+    </div>
   );
 }

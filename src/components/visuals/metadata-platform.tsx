@@ -46,50 +46,53 @@ export function MetadataPlatform() {
   const last = { story: stories.length - 1, phase: 2 };
 
   return (
-    <MetadataPlatformShell
-      id={id}
-      stories={names}
-      phases={phases}
-      descriptions={stories.map((story) => story.description)}
-      announcements={stories.flatMap((story) => story.phases.map((phase) => phase.copy))}
-      scenes={stories.map((story) => (
-        <Scene key={story.id} id={story.id} result={story.result} />
-      ))}
-      titles={stories.map((story) => (
-        <p key={story.id} className="font-semibold tracking-tight text-pretty text-fg">
-          {story.title}
-        </p>
-      ))}
-      narration={stories.flatMap((story) =>
-        story.phases.map((phase) => (
-          <p
-            key={`${story.id}-${phase.label}`}
-            className="text-sm leading-relaxed text-pretty text-muted"
-          >
-            {phase.copy}
+    // The card is drawn by the client shell; this server-rendered root is what X-ray labels.
+    <div data-component="metadata-platform" className="min-w-0">
+      <MetadataPlatformShell
+        id={id}
+        stories={names}
+        phases={phases}
+        descriptions={stories.map((story) => story.description)}
+        announcements={stories.flatMap((story) => story.phases.map((phase) => phase.copy))}
+        scenes={stories.map((story) => (
+          <Scene key={story.id} id={story.id} result={story.result} />
+        ))}
+        titles={stories.map((story) => (
+          <p key={story.id} className="font-semibold tracking-tight text-pretty text-fg">
+            {story.title}
           </p>
-        )),
-      )}
-      contributions={stories.map((story) => (
-        <Contribution key={story.id} story={story} />
-      ))}
-      staticControls={
-        <StepControls
-          accent="lilac"
-          live={false}
-          {...tourControls('idle', false, last.story, stories.length)}
-        />
-      }
-      staticTabs={
-        <SegmentedTabs
-          id={id}
-          label={tablistLabel}
-          items={names}
-          selected={last.story}
-          accent="lilac"
-        />
-      }
-      staticPhases={<PhaseSteps labels={phases} story={last.story} phase={last.phase} />}
-    />
+        ))}
+        narration={stories.flatMap((story) =>
+          story.phases.map((phase) => (
+            <p
+              key={`${story.id}-${phase.label}`}
+              className="text-sm leading-relaxed text-pretty text-muted"
+            >
+              {phase.copy}
+            </p>
+          )),
+        )}
+        contributions={stories.map((story) => (
+          <Contribution key={story.id} story={story} />
+        ))}
+        staticControls={
+          <StepControls
+            accent="lilac"
+            live={false}
+            {...tourControls('idle', false, last.story, stories.length)}
+          />
+        }
+        staticTabs={
+          <SegmentedTabs
+            id={id}
+            label={tablistLabel}
+            items={names}
+            selected={last.story}
+            accent="lilac"
+          />
+        }
+        staticPhases={<PhaseSteps labels={phases} story={last.story} phase={last.phase} />}
+      />
+    </div>
   );
 }

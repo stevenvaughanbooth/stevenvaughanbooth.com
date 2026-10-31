@@ -21,22 +21,25 @@ const id = 'reflex-demo';
  */
 export function ReflexDemo() {
   return (
-    <ReflexDemoShell
-      id={id}
-      steps={steps}
-      staticTerminal={<Terminal steps={steps} frame={finalFrame(steps)} />}
-      staticFooter={<StepControls accent="green" live={false} {...replayControls('idle')} />}
-      transcript={
-        <div className="sr-only">
-          <p>Transcript of the illustrative replay, based on the worked example in the README.</p>
-          <ol>
-            {transcript(steps).map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ol>
-        </div>
-      }
-      pipeline={<Pipeline id={id} stages={adage.pipeline} />}
-    />
+    // The card is drawn by the client shell; this server-rendered root is what X-ray labels.
+    <div data-component="reflex-demo" className="min-w-0">
+      <ReflexDemoShell
+        id={id}
+        steps={steps}
+        staticTerminal={<Terminal steps={steps} frame={finalFrame(steps)} />}
+        staticFooter={<StepControls accent="green" live={false} {...replayControls('idle')} />}
+        transcript={
+          <div className="sr-only">
+            <p>Transcript of the illustrative replay, based on the worked example in the README.</p>
+            <ol>
+              {transcript(steps).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ol>
+          </div>
+        }
+        pipeline={<Pipeline id={id} stages={adage.pipeline} />}
+      />
+    </div>
   );
 }

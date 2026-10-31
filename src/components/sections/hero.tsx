@@ -76,25 +76,14 @@ export function Hero() {
           className="col-start-1 row-start-2 mt-4 size-22 md:col-start-2 md:row-start-1 md:mt-0 md:aspect-[4/5] md:h-auto md:w-full"
         />
 
-        {/*
-         * The proof strip spans both columns, under the text and the portrait, so the two above it
-         * balance. Each term is the figure and its description the context, so each is read once.
-         */}
-        <dl
-          data-component="proof-strip"
-          className="col-span-2 mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line md:mt-16 lg:grid-cols-4"
-        >
-          {highlights.map((item) => (
-            <div key={item.value} className="bg-bg p-4 md:p-5">
-              <dt className="text-xl font-semibold tracking-tight md:text-2xl">{item.value}</dt>
-              <dd className="mt-1 text-sm leading-snug text-muted">{item.label}</dd>
-            </div>
-          ))}
-        </dl>
+        <ProofStrip />
         {/* A quiet way into the story of how the site was built, for readers who came for that. */}
         <p className="col-span-2 mt-4 md:mt-5">
+          {/* No prefetch: in view, it would preload Under the hood's stylesheet on every visit to
+              the home page, and the browser would warn that it went unused. */}
           <Link
             href="/colophon"
+            prefetch={false}
             className="group inline-flex min-h-6 items-center gap-2 font-mono text-xs text-muted transition-colors hover:text-fg"
           >
             Under the hood
@@ -107,5 +96,25 @@ export function Hero() {
         </p>
       </div>
     </section>
+  );
+}
+
+/**
+ * The proof strip spans both columns, under the text and the portrait, so the two above it
+ * balance. Each term is the figure and its description the context, so each is read once.
+ */
+function ProofStrip() {
+  return (
+    <dl
+      data-component="proof-strip"
+      className="col-span-2 mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line md:mt-16 lg:grid-cols-4"
+    >
+      {highlights.map((item) => (
+        <div key={item.value} className="bg-bg p-4 md:p-5">
+          <dt className="text-xl font-semibold tracking-tight md:text-2xl">{item.value}</dt>
+          <dd className="mt-1 text-sm leading-snug text-muted">{item.label}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
