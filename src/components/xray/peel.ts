@@ -279,7 +279,11 @@ export async function startCurl({ lifting, update, from }: CurlOptions): Promise
     lost,
     to(next) {
       point = constrain(width, next);
-      motion = null;
+      // Taking the corner from a motion ends it, so whoever awaits that run is never left waiting.
+      if (motion) {
+        motion = null;
+        arrive?.();
+      }
       schedule();
     },
     run(next) {

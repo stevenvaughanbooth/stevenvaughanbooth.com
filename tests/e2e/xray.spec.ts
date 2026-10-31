@@ -537,6 +537,37 @@ test.describe('the dog-ear', () => {
     expect(await xrayOn(page)).toBe(false);
   });
 
+  test('a click on it, then moving away, leaves the page as it was', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'a mouse click and a pointer that keeps moving');
+    const box = (await ear(page).boundingBox())!;
+    await page.mouse.move(box.x + box.width - 5, box.y + 5);
+    await page.mouse.down();
+    await page.mouse.up();
+    // The hand moves on at once, while the corner is still settling.
+    for (let i = 1; i <= 12; i++) {
+      await page.mouse.move(box.x - i * 40, box.y + i * 30);
+      await page.waitForTimeout(20);
+    }
+    await transitionOver(page);
+    expect(await xrayOn(page)).toBe(false);
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await transitionOver(page);
+  });
+
+  test('moves after letting go never take the corner back', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'a mouse that keeps moving after the button is up');
+    await pull(page, isMobile, [0.85, 0.2]);
+    const { width, height } = page.viewportSize()!;
+    for (let i = 1; i <= 12; i++) {
+      await page.mouse.move(width * (0.8 - i * 0.05), height * (0.2 + i * 0.05));
+      await page.waitForTimeout(20);
+    }
+    await transitionOver(page);
+    expect(await xrayOn(page)).toBe(false);
+    await expect(ear(page)).toBeVisible();
+  });
+
   test('takes no focus and stays out of the keyboard’s way', async ({ page }) => {
     const focusable = await ear(page).evaluate(
       (element) =>

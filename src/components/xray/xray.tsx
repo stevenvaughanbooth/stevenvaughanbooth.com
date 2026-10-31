@@ -123,6 +123,10 @@ function pressed(on: boolean) {
   }
 }
 
+/** However a let-go corner moves, the page has settled by then and the transition ends. */
+const SETTLE_MS = 2000;
+const settleBy = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /**
  * Pulls the page's corner by hand, from the dog-ear (xray-toggle.tsx). The corner follows the
  * pointer; on release the page either peels away into X-ray, heading the way it was pulled, or
@@ -150,7 +154,8 @@ export async function drag(down: PointerEvent, show: (view: XrayView) => void = 
   const released = new Promise<void>((resolve) => (letGo = resolve));
 
   const onMove = (event: PointerEvent) => {
-    if (event.pointerId !== id) return;
+    // Once let go, the corner is the spring's: a later move must not take it back.
+    if (event.pointerId !== id || hold.outcome !== 'held') return;
     point = [event.clientX, event.clientY];
     samples.push({ time: event.timeStamp, point });
     if (samples.length > 32) samples.shift();
@@ -203,10 +208,18 @@ export async function drag(down: PointerEvent, show: (view: XrayView) => void = 
       remember(true);
       pressed(true);
       const gone = (at: Point) => poseFor(width, height, at).page.length === 0;
-      await Promise.race([curl.run(spring(point, velocity, away, 9, now, gone)), curl.lost]);
+      await Promise.race([
+        curl.run(spring(point, velocity, away, 9, now, gone)),
+        curl.lost,
+        settleBy(SETTLE_MS),
+      ]);
     } else {
       const home = cornerOf(width);
-      await Promise.race([curl.run(spring(point, velocity, home, 16, now)), curl.lost]);
+      await Promise.race([
+        curl.run(spring(point, velocity, home, 16, now)),
+        curl.lost,
+        settleBy(SETTLE_MS),
+      ]);
       // Flat again: the page as it was goes back under the snapshot of itself.
       render(false, show);
     }
