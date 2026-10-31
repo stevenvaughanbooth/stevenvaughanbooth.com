@@ -230,6 +230,21 @@ describe('measured', () => {
     expect(measured.pages.map((page) => page.path)).toEqual(audited);
     expect(Number.isNaN(Date.parse(measured.date))).toBe(false);
   });
+
+  it('asserts every budget on the median run, as Under the hood says', () => {
+    const assertions: Record<string, unknown[]> = lighthouse.ci.assert.assertions;
+    for (const [id, [, options]] of Object.entries(assertions)) {
+      expect((options as { aggregationMethod?: string }).aggregationMethod, id).toBe('median-run');
+    }
+  });
+});
+
+describe('Under the hood', () => {
+  it('names the model the route handler calls', () => {
+    const model = /const MODEL = '([^']+)'/.exec(read('src/lib/ask/answer.ts'))?.[1];
+    expect(model).toBeDefined();
+    expect(read('src/app/colophon/page.tsx')).toContain(`version: '${model}'`);
+  });
 });
 
 describe('Results', () => {

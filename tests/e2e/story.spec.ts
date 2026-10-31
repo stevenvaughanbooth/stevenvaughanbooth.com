@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { fraction, homeMeasurement, measured } from '@/components/story/measured';
 import { siteComponents } from '@/content/components';
 import { person } from '@/content/profile';
+import { hydrated } from './helpers';
 
 // The floor CI enforces, read from the same file Lighthouse CI uses.
 const lighthouse = JSON.parse(readFileSync('lighthouserc.json', 'utf8'));
@@ -92,15 +93,34 @@ test('the prerendered HTML holds every component on the map', async ({ page, req
   }
 });
 
-test('“Peel back this page” is a button X-ray mode can pick up', async ({ page }) => {
+test('“Peel back this page” turns X-ray on and off, and says whether it is on', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/colophon');
+  await hydrated(page);
   const button = page.locator('article header').getByRole('button', {
     name: 'Peel back this page',
+  });
+  const header = page.getByRole('banner').getByRole('button', {
+    name: 'Under the hood',
+    exact: true,
   });
   await expect(button).toBeVisible();
   await expect(button).toHaveAttribute('type', 'button');
   // X-ray mode's listener picks up presses on any element with the attribute, whatever its value.
   await expect(button).toHaveAttribute('data-xray-toggle');
+  // Its name stays the same; the pressed state, kept in step with the header's toggle, says it all.
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+
+  await button.press('Enter');
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await expect(header).toHaveAttribute('aria-pressed', 'true');
+  await expect(button).toHaveAccessibleName('Peel back this page');
+
+  await button.press('Enter');
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await expect(header).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('the results show the measured numbers and the floor from lighthouserc.json', async ({

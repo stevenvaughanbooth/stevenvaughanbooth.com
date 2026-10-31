@@ -233,7 +233,8 @@ on desktop Chrome and an emulated Pixel 7. They check that:
   causes no layout shift, and the shortcuts sheet, its switch and its keys behave as listed
 - Under the hood leads with the components, holds every entry of `components.ts` in its
   prerendered HTML, numbers its sections as its navigation does, and its results match
-  `measured.ts` and `lighthouserc.json`
+  `measured.ts` and `lighthouserc.json`; its "Peel back this page" button turns X-ray on and off,
+  its `aria-pressed` in step with the header's toggle
 - pages log no console errors; `/profile.json`, `/llms.txt`, robots, sitemap and the OG image
   respond with the right types; unknown routes return a `noindex` 404
 - axe reports no serious or critical violations on `/`, `/colophon` and each case study in light
@@ -267,29 +268,28 @@ never plays by itself there, and no video downloads until the visitor presses Pl
 does not see the wider frame. From `md` up the frame plays its 451 KB 4:5 cut once the
 page has loaded and gone idle; the end-to-end suite checks that it starts after the load event
 and that the portrait stays the LCP element. With Lighthouse's desktop preset the home page still
-scores 100, with the portrait as LCP at 0.66 s, and the cut counted in its total transfer.
+scores 100, with the portrait as LCP at 0.67 s, and the cut counted in its total transfer.
 
 The performance floor sits below the local result on purpose. GitHub's runners measured the home
 page at 0.91–0.93 when a local build measured 0.95: simulated throttling charges the async
 framework scripts to LCP when they finish before the first paint, and slower runners pay more
 for them. Cutting initial JavaScript is the way to raise it back.
 
-The targets above the floors are 100 in every category, CLS 0 and total blocking time under
-100 ms. Last measured on 2026-10-30 with Lighthouse 12.6.1, running `lhci collect` and
-`lhci assert` with this config (emulated mobile, simulated throttling, median of 3 runs) against a
-local production build. Every assertion passed:
+The targets above the floors are, on mobile, 95 for performance and 100 in the other three
+categories, CLS 0 and total blocking time under 100 ms. Last measured on 2026-10-30 with the
+Lighthouse 12.6.1 CLI and this config's settings (emulated mobile, simulated throttling, 3 runs per
+page, the median of each figure shown) against a local production build. Every figure is within
+the budgets:
 
 | Page        | Performance | Accessibility | Best practices | SEO | LCP    | TBT   | CLS | JavaScript | Total     |
 | ----------- | ----------- | ------------- | -------------- | --- | ------ | ----- | --- | ---------- | --------- |
-| `/`         | 94          | 100           | 100            | 100 | 3.08 s | 22 ms | 0   | 168,263 B  | 300,616 B |
-| `/colophon` | 98          | 100           | 100            | 100 | 2.48 s | 11 ms | 0   | 157,980 B  | 266,691 B |
-| `/work/mcp` | 96          | 100           | 100            | 100 | 2.78 s | 19 ms | 0   | 178,123 B  | 311,536 B |
+| `/`         | 95          | 100           | 100            | 100 | 2.93 s | 12 ms | 0   | 166,873 B  | 324,674 B |
+| `/colophon` | 97          | 100           | 100            | 100 | 2.63 s | 19 ms | 0   | 156,811 B  | 265,402 B |
+| `/work/mcp` | 96          | 100           | 100            | 100 | 2.78 s | 19 ms | 0   | 177,190 B  | 310,807 B |
 
-The home page's LCP element is the hero's tagline paragraph. Its score is a point below the
-previous round's 95: the hero's ask bar, the film frame and the shortcuts added about 5.6 KB to
-the two app chunks Lighthouse's simulation counts against LCP (see
-[architecture](docs/architecture.md#performance)). On the same day, Lighthouse's desktop preset
-scored all three pages 100 in every category.
+The home page's LCP element is the hero's tagline paragraph; why its score turns on the size of
+the two app chunks is in [architecture](docs/architecture.md#performance). On the same day, with
+the same build, Lighthouse's desktop preset scored all three pages 100 in every category.
 To run Lighthouse locally after a build: `pnpm exec lhci collect && pnpm exec lhci assert`.
 
 **GitHub Actions** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pushes to

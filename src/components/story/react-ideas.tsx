@@ -27,8 +27,9 @@ export const reactIdeas: readonly ReactIdea[] = [
     body: (
       <>
         Sections, header, footer and case studies render on the server.{' '}
-        <Code>&apos;use client&apos;</Code> marks only the leaves a visitor touches, and each gets
-        just what it needs: the ask bar three strings, the palette’s loader one email address.
+        <Code>&apos;use client&apos;</Code> marks only the parts that need the browser, and
+        server-rendered markup passes through them as props. Each gets just what it needs: the ask
+        bar three suggested questions, the palette’s loader one email address.
       </>
     ),
     why: 'Static content costs no JavaScript, and the HTML is complete before any script runs.',
@@ -40,8 +41,9 @@ export const reactIdeas: readonly ReactIdea[] = [
     body: (
       <>
         <Code>React.lazy</Code> and <Code>import()</Code> hold the heavy parts back: the palette
-        until an Ask button is pointed at, the shortcuts sheet until <Code>?</Code>, the film’s
-        player until its chip is reached, a diagram’s controller until its card nears view.
+        until a pointer or focus reaches an Ask control or <Code>⌘K</Code> is pressed, the shortcuts
+        sheet until <Code>?</Code> or its footer button, the film’s player until a pointer or focus
+        reaches its chip, a diagram’s controller until its card nears view.
       </>
     ),
     why: 'Lighthouse charges early JavaScript to the largest paint, so code the first read does not need waits.',
@@ -69,7 +71,7 @@ export const reactIdeas: readonly ReactIdea[] = [
         <Code>&lt;Activity&gt;</Code> hides without unmounting: effects off, state kept.
       </>
     ),
-    why: 'React starts the view transition from the commit that changes the page, so nothing animates elements by hand.',
+    why: 'React starts each morph from the commit that changes the page, so the morphs need no animation code. Only the theme switch and X-ray’s peel call startViewTransition themselves; the peel draws its fold with the Web Animations API.',
     features: ['ViewTransition', 'Activity'],
     uses: ['work', 'case-study', 'arrival', 'shortcuts'],
   },
@@ -77,9 +79,11 @@ export const reactIdeas: readonly ReactIdea[] = [
     title: 'The prerender is the still frame',
     body: (
       <>
-        Hooks that read the browser use <Code>useSyncExternalStore</Code>, whose server snapshot is
-        the safe answer: motion reduced, page hidden, out of view, theme unknown.{' '}
-        <Code>useEffectEvent</Code> spares observers from subscribing again.
+        Hooks that read the browser start from the safe answer. With{' '}
+        <Code>useSyncExternalStore</Code>, the server snapshot says motion reduced, page hidden,
+        theme unknown; <Code>useInView</Code> says out of view until its IntersectionObserver
+        reports. <Code>useEffectEvent</Code> lets an observer call the latest callback without
+        subscribing again.
       </>
     ),
     why: 'The prerendered HTML is the finished, still state, and nothing moves until the browser says it may.',
@@ -91,12 +95,13 @@ export const reactIdeas: readonly ReactIdea[] = [
     body: (
       <>
         Scroll-driven animations raise sections, draw the signal line and mark the section being
-        read; <Code>timeline-trigger</Code> counts figures up. Popover,{' '}
-        <Code>&lt;details name&gt;</Code> and <Code>&lt;dialog&gt;</Code> run the menu, the roles
-        and the modals.
+        read; <Code>timeline-trigger</Code> counts figures up. The Popover API opens and dismisses
+        the menu, and <Code>&lt;details name&gt;</Code> keeps one role open at a time. Each modal is
+        a <Code>&lt;dialog&gt;</Code> opened from script, which makes the rest of the page inert and
+        closes on Escape.
       </>
     ),
-    why: 'None of it needs a script, and where the scroll effects are missing the page shows their end state.',
+    why: 'The scroll effects, opening the menu and the roles need no script, and where the scroll effects are missing the page shows their end state.',
     features: [
       'scroll-driven animation',
       'timeline-trigger',

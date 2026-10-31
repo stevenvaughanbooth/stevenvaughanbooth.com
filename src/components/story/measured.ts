@@ -2,9 +2,10 @@
  * The site's measured results: the one place to update after re-measuring. The story's results
  * and the colophon's "Last measured" tiles both read from here, so they always agree.
  *
- * Lighthouse figures come from `lhci collect` and `lhci assert` with this repository's
- * lighthouserc.json against a local production build. Test counts are what Vitest and Playwright
- * report for a full run. Playwright counts each project, desktop and Pixel 7, separately, and
+ * Lighthouse figures are typed in by hand from a run with lighthouserc.json's settings (emulated
+ * mobile, simulated throttling, 3 runs per page) against a local production build: each figure is
+ * the median of its page's 3 runs, and all of a page's figures come from the same 3 runs. Test
+ * counts are what Vitest and Playwright report for a full run. Playwright counts each project, desktop and Pixel 7, separately, and
  * reports the tests a project skips apart from the ones that ran.
  */
 
@@ -33,27 +34,27 @@ export const measured = {
   pages: [
     {
       path: '/',
-      performance: 94,
+      performance: 95,
       accessibility: 100,
       bestPractices: 100,
       seo: 100,
-      fcp: 1.21,
-      lcp: 3.08,
-      tbt: 22,
+      fcp: 1.2,
+      lcp: 2.93,
+      tbt: 12,
       cls: 0,
-      script: 168_263,
+      script: 166_873,
     },
     {
       path: '/colophon',
-      performance: 98,
+      performance: 97,
       accessibility: 100,
       bestPractices: 100,
       seo: 100,
-      fcp: 0.9,
-      lcp: 2.48,
-      tbt: 11,
+      fcp: 1.05,
+      lcp: 2.63,
+      tbt: 19,
       cls: 0,
-      script: 157_980,
+      script: 156_811,
     },
     {
       path: '/work/mcp',
@@ -65,7 +66,7 @@ export const measured = {
       lcp: 2.78,
       tbt: 19,
       cls: 0,
-      script: 178_123,
+      script: 177_190,
     },
   ] satisfies readonly PageMeasurement[],
   /** What the home page's largest contentful paint was in that run. */

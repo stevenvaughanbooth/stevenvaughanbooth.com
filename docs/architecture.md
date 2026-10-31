@@ -117,9 +117,12 @@ this visit's FCP, LCP, CLS and INP, the JavaScript transferred, and the build's 
 
 [`src/content/components.ts`](../src/content/components.ts) describes each of these components and
 the server ones around them: its kind, when its code loads, the React and platform features it
-relies on, and why it is built that way. Under the hood (`/colophon`) renders it as a map, and a
-unit test checks each entry's kind against its file, so the list cannot claim a client component
-is server-rendered.
+relies on, and why it is built that way. Under the hood (`/colophon`) renders it as a map. Unit
+tests check that each entry names a real file, that an entry is `client` exactly when that file
+starts with `'use client'` or a client entry's file imports it on demand, and that only server
+entries list islands, each a real module. They do not check which element carries each
+`data-component`, or that a server entry lists every client module it renders; review keeps those
+true.
 
 The diagrams follow one pattern, documented in
 [`src/components/visuals/shared/README.md`](../src/components/visuals/shared/README.md): the SVG,
@@ -329,8 +332,9 @@ origin.
 
 ## Performance
 
-**Targets** (design goals, not enforced): Lighthouse 100 in every category on mobile, CLS 0 and
-total blocking time under 100 ms.
+**Targets** (design goals, not enforced): on mobile, Lighthouse performance 95 and 100 in the other
+three categories, CLS 0 and total blocking time under 100 ms. `measured.performanceTarget` holds the
+95, and Under the hood reads it from there.
 
 **Floors** (enforced: [`lighthouserc.json`](../lighthouserc.json) fails CI). Lighthouse audits `/`,
 `/colophon` and `/work/mcp` on the production build, with mobile emulation and simulated throttling,
@@ -353,42 +357,46 @@ idle period (see [Rendering and loading](#rendering-and-loading)). That behaviou
 end-to-end suite instead: the film starts after the load event, the portrait is the LCP element,
 and nothing plays under reduced motion, with Save-Data or below `md`. With Lighthouse's desktop
 preset (2026-10-30, 3 runs) the home page scores 100 in all four categories, with the portrait as
-LCP at 0.66 s and the cut counted in its total transfer.
+LCP at 0.67 s and the cut counted in its total transfer.
 
 The performance floor sits below the local result on purpose. GitHub's runners measured the home
 page at 0.91–0.93 when a local build measured 0.95: simulated throttling charges the async
 framework scripts to LCP when they finish before the first paint, and slower runners pay more
 for them. Cutting initial JavaScript is the way to raise it back.
 
-**Measured** on 2026-10-30 with Lighthouse 12.6.1, using `lhci collect` and `lhci assert` with the
-repository's `lighthouserc.json` (emulated mobile, simulated throttling, 3 runs per page, median
-shown) against a local production build. Every assertion passed.
+**Measured** on 2026-10-30 with the Lighthouse 12.6.1 CLI and the settings in the repository's
+`lighthouserc.json` (emulated mobile, simulated throttling, 3 runs per page, the median of each
+figure shown) against a local production build. Every figure is within the budgets.
+[`measured.ts`](../src/components/story/measured.ts) holds the same numbers for Under the hood and
+the X-ray HUD; they are typed in by hand after each run.
 
 | Page        | Performance | Accessibility | Best practices | SEO | FCP    | LCP    | TBT   | CLS | JavaScript | Total     |
 | ----------- | ----------- | ------------- | -------------- | --- | ------ | ------ | ----- | --- | ---------- | --------- |
-| `/`         | 94          | 100           | 100            | 100 | 1.21 s | 3.08 s | 22 ms | 0   | 168,263 B  | 300,616 B |
-| `/colophon` | 98          | 100           | 100            | 100 | 0.90 s | 2.48 s | 11 ms | 0   | 157,980 B  | 266,691 B |
-| `/work/mcp` | 96          | 100           | 100            | 100 | 1.05 s | 2.78 s | 19 ms | 0   | 178,123 B  | 311,536 B |
+| `/`         | 95          | 100           | 100            | 100 | 1.20 s | 2.93 s | 12 ms | 0   | 166,873 B  | 324,674 B |
+| `/colophon` | 97          | 100           | 100            | 100 | 1.05 s | 2.63 s | 19 ms | 0   | 156,811 B  | 265,402 B |
+| `/work/mcp` | 96          | 100           | 100            | 100 | 1.05 s | 2.78 s | 19 ms | 0   | 177,190 B  | 310,807 B |
 
 On every page the largest contentful paint is a text paragraph (on `/`, the hero's tagline), and
 most of it is render delay in Lighthouse's simulation. `/work/mcp` loads its diagram's controller
 at once, because the diagram is in view, so it carries the most JavaScript. With Lighthouse's
 desktop preset (same day), all three pages score 100 in all four categories, with an LCP of
-0.68 s on `/` (the portrait), 0.59 s on `/colophon` and 0.58 s on `/work/mcp`.
+0.67 s on `/` (the portrait), 0.59 s on `/colophon` and 0.58 s on `/work/mcp`.
 
-**Why the home page measures 94, not 95.** Lighthouse's simulation counts a script against LCP
-when it finished downloading and started running before the first paint in the unthrottled trace,
-and the framework's async scripts always do. Each of the two app chunks (the layout's and the
-page's, about 10 KB each) is then worth about 165 ms of simulated LCP: blocking either one in a
-diagnostic run cuts LCP to 2.92 s, while blocking a 1–2 KB chunk changes nothing. This round's
-hero ask bar, film frame and shortcuts grew those chunks by about 5.6 KB, from 16 KB to 21.6 KB
-compressed. Measured and not kept: graph CSS chunking (it split the CSS into three files),
+**Why the home page measured 94 earlier in this round.** Lighthouse's simulation counts a script
+against LCP when it finished downloading and started running before the first paint in the
+unthrottled trace, and the framework's async scripts always do. Each of the two app chunks (the
+layout's and the page's, about 10 KB each) is then worth about 165 ms of simulated LCP: blocking
+either one in a diagnostic run cuts LCP to 2.92 s, while blocking a 1–2 KB chunk changes nothing.
+This round's hero ask bar, film frame and shortcuts grew those chunks by about 5.6 KB, from 16 KB to
+21.6 KB compressed. Measured and not kept: graph CSS chunking (it split the CSS into three files),
 Turbopack's `priorityRoutes` chunking (no change), `content-visibility: auto` on the offscreen
 sections (no change, and axe can no longer check contrast inside them), and deferring the ask bar
 and film frame behind `lazy()` (95, but the prerendered HTML then holds those islands in
 script-swapped templates, which breaks HTML first). What did help: the case-study morph CSS moved
 into `globals.css` (one fewer stylesheet), and the signal line moved from the root layout to the
 home page, which brought FCP on `/` back from 1.35 s to 1.21 s and the colophon back from 96 to 98.
+After X-ray mode and Under the hood landed, the home page measured 95 again (LCP 2.93 s), with
+1.4 KB less JavaScript than at 94; which change gave the point back has not been isolated.
 
 **Considered and not enabled:** `experimental.inlineCss`, measured the same way. It doubled the home
 page's document transfer (48 KB to 94 KB) and more than doubled the colophon's (23 KB to 61 KB),
