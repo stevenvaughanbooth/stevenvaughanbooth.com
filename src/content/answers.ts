@@ -568,7 +568,7 @@ export const topics: Topic[] = [
       exhausted: `Ask Steven answers preset topics instantly from curated notes. Other questions go to Claude through a rate-limited server route, ${VISITOR_LIMIT} a day per visitor, and this browser has used its share for now. The API key never reaches the browser.`,
     },
     links: [
-      { label: 'How I built this', href: '/colophon' },
+      { label: 'Under the hood', href: '/colophon' },
       { label: 'Source on GitHub', href: site.repo },
     ],
     names: ['colophon', 'this site', 'this website', 'ask steven'],
@@ -656,7 +656,7 @@ export const promptAnswer: CuratedAnswer = {
   ],
   links: [
     { label: 'Read prompt.ts', href: `${site.repo}/blob/main/src/lib/ask/prompt.ts` },
-    { label: 'How I built this', href: '/colophon' },
+    { label: 'Under the hood', href: '/colophon' },
   ],
 };
 

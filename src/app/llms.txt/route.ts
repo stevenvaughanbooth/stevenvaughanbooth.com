@@ -108,7 +108,7 @@ ${list(caseStudies.map((study) => link(study.theme.title, caseStudyPath(study.id
 
 ## Optional
 
-- [How I built this](${url('/colophon')}): How the site was rebuilt with Claude Code, then its stack, budgets and security model.
+- [Under the hood](${url('/colophon')}): The site's React components, when each one's code loads and why, then its stack, budgets and security model.
 - [Source code for this site](${site.repo})
 ${publicReferences.map((ref) => `- [${ref.label}](${ref.href}): Public reference for product terminology.`).join('\n')}
 `;

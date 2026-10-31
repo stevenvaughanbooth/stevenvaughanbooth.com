@@ -1,7 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { componentById, siteComponents } from '@/content/components';
 import lighthouse from '../../../lighthouserc.json';
-import { Findings } from './findings';
+import { componentGroups, mappedIds } from './component-groups';
+import { cardId, ComponentMap, KindLegend, kindLabel } from './component-map';
 import {
   fraction,
   homeMeasurement,
@@ -12,10 +16,197 @@ import {
   otherCategories,
   seconds,
 } from './measured';
+import { ReactIdeas, reactIdeas } from './react-ideas';
 import { Results } from './results';
-import { Roles } from './roles';
-import { afterLaunch, findings, timeline } from './story';
-import { formatDay, Timeline } from './timeline';
+
+const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
+
+/** Every file under src, by name, to find the islands a component lists. */
+function filesUnder(dir: string): string[] {
+  return readdirSync(join(process.cwd(), dir), { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? filesUnder(join(dir, entry.name)) : [entry.name],
+  );
+}
+
+describe('siteComponents', () => {
+  it('has exactly the ids X-ray mode and this page share, once each', () => {
+    expect(siteComponents.map((component) => component.id)).toEqual([
+      'site-header',
+      'sections-menu',
+      'theme-toggle',
+      'ask-button',
+      'xray-toggle',
+      'site-footer',
+      'shortcuts',
+      'palette-loader',
+      'ask-palette',
+      'hero',
+      'hero-ask-bar',
+      'arrival',
+      'proof-strip',
+      'open-source',
+      'reflex-demo',
+      'copy-button',
+      'count-up',
+      'work',
+      'team-multiplier',
+      'progressive-disclosure',
+      'metadata-platform',
+      'experience',
+      'career-timeline',
+      'contact',
+      'signal',
+      'case-study',
+      'case-study-focus',
+      'colophon',
+    ]);
+    expect(componentById('arrival')?.name).toBe('Arrival');
+    expect(componentById('nope')).toBeUndefined();
+  });
+
+  it('marks only the listeners and the lazily opened dialogs as having no box of their own', () => {
+    expect(siteComponents.filter((c) => !c.onPage).map((c) => c.id)).toEqual([
+      'shortcuts',
+      'palette-loader',
+      'ask-palette',
+      'case-study-focus',
+    ]);
+  });
+
+  it('names a real file for each, and calls it client only when it runs in the browser', () => {
+    const saysUseClient = (source: string) => /^'use client';/.test(source);
+    // Client modules that load others on demand: a module they import() is client code too.
+    const loaders = siteComponents
+      .filter((component) => component.kind === 'client')
+      .map((component) => read(component.file))
+      .filter(saysUseClient);
+    for (const component of siteComponents) {
+      const source = read(component.file);
+      const name = component.file
+        .split('/')
+        .at(-1)!
+        .replace(/\.tsx?$/, '');
+      const loaded = loaders.some((loader) => loader.includes(`import('./${name}')`));
+      expect(saysUseClient(source) || loaded, component.id).toBe(component.kind === 'client');
+    }
+  });
+
+  it('lists islands only for server components, and each one is a real module', () => {
+    const files = new Set(filesUnder('src/components'));
+    for (const component of siteComponents) {
+      if (!component.islands) continue;
+      expect(component.kind, component.id).toBe('server');
+      for (const island of component.islands) expect(files, island).toContain(island);
+    }
+  });
+
+  it('gives every component a load time, features and a why of one or two sentences', () => {
+    for (const component of siteComponents) {
+      expect(component.loads, component.id).not.toBe('');
+      expect(component.features.length, component.id).toBeGreaterThan(0);
+      const sentences = component.why.split(/(?<=[.!?])\s+(?=[A-Z<“#])/);
+      expect(sentences.length, component.id).toBeLessThanOrEqual(2);
+      // Client code always loads at some point; only server and CSS components can ship none.
+      if (component.loads === 'No JavaScript') expect(component.kind).not.toBe('client');
+    }
+  });
+});
+
+describe('ComponentMap', () => {
+  it('places every component exactly once', () => {
+    const ids = mappedIds();
+    expect(new Set(ids).size).toBe(ids.length);
+    expect([...ids].sort()).toEqual(siteComponents.map((component) => component.id).sort());
+  });
+
+  it('is one sheet per group, each named by its heading and holding its components', () => {
+    render(<ComponentMap />);
+    for (const group of componentGroups) {
+      const sheet = screen.getByRole('region', { name: group.title });
+      expect(sheet).toHaveTextContent(group.where);
+      for (const node of group.tree) {
+        expect(sheet.querySelector(`#${cardId(node.id)}`)).not.toBeNull();
+      }
+    }
+  });
+
+  it('shows each component’s name, kind, file, load time and features', () => {
+    const { container } = render(<ComponentMap />);
+    for (const component of siteComponents) {
+      const card = container.querySelector<HTMLElement>(`#${cardId(component.id)}`)!;
+      // The brackets are for the eye: the card is named by the component alone.
+      expect(card).toHaveAccessibleName(component.name);
+      const heading = within(card).getAllByRole('heading')[0]!;
+      expect(heading).toHaveTextContent(`<${component.name} />`);
+      expect(card).toHaveTextContent(kindLabel[component.kind]);
+      expect(card).toHaveTextContent(component.file);
+      expect(card).toHaveTextContent(component.loads);
+      expect(card).toHaveTextContent(component.why);
+      const features = within(card).getAllByRole('list', { name: 'Features' })[0]!;
+      expect(
+        within(features)
+          .getAllByRole('listitem')
+          .map((item) => item.textContent),
+      ).toEqual([...component.features]);
+    }
+  });
+
+  it('draws the components a component renders inside its card', () => {
+    const { container } = render(<ComponentMap />);
+    // The children's rows follow their parent's, in a list inside the parent's item.
+    const hero = container.querySelector(`#${cardId('hero')}`)!.closest('li')!;
+    const inside = within(hero).getByRole('list', { name: 'Inside Hero' });
+    for (const id of ['hero-ask-bar', 'arrival', 'proof-strip'] as const) {
+      expect(inside.querySelector(`#${cardId(id)}`)).not.toBeNull();
+    }
+    // Real components carry data-component; the cards that describe them must not.
+    expect(container.querySelector('[data-component]')).toBeNull();
+  });
+
+  it('counts each kind in the legend, adding up to the whole list', () => {
+    render(<KindLegend />);
+    const counts = screen
+      .getAllByRole('term')
+      .map((term) => Number(term.textContent?.match(/\d+/)));
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBe(siteComponents.length);
+  });
+});
+
+describe('ReactIdeas', () => {
+  it('links each idea only to components that list what it is about', () => {
+    for (const idea of reactIdeas) {
+      for (const id of idea.uses) {
+        const features = componentById(id)?.features ?? [];
+        expect(
+          features.some((feature) => idea.features.includes(feature)),
+          `${idea.title}: ${id}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('says the compiler covers the client components, which all list it, and nothing else does', () => {
+    for (const component of siteComponents) {
+      expect(component.features.includes('React Compiler'), component.id).toBe(
+        component.kind === 'client',
+      );
+    }
+  });
+
+  it('points every link at a card on the map', () => {
+    const { container } = render(
+      <>
+        <ReactIdeas />
+        <ComponentMap />
+      </>,
+    );
+    const links = [...container.querySelectorAll<HTMLAnchorElement>('ol a[href^="#"]')];
+    expect(links).toHaveLength(reactIdeas.reduce((sum, idea) => sum + idea.uses.length, 0));
+    for (const link of links) {
+      expect(container.querySelector(link.getAttribute('href')!), link.href).not.toBeNull();
+    }
+  });
+});
 
 describe('measured', () => {
   it('formats each figure the way the page shows it', () => {
@@ -38,90 +229,6 @@ describe('measured', () => {
     const audited = lighthouse.ci.collect.url.map((url) => new URL(url).pathname);
     expect(measured.pages.map((page) => page.path)).toEqual(audited);
     expect(Number.isNaN(Date.parse(measured.date))).toBe(false);
-  });
-});
-
-describe('Roles', () => {
-  it('is a figure named by its caption, with both sides and the hand-offs in words', () => {
-    render(<Roles />);
-    const figure = screen.getByRole('figure', { name: 'Who did what' });
-    expect(figure).toHaveTextContent('Steven Booth');
-    expect(figure).toHaveTextContent('Claude Opus 5.5');
-    // The arrows are decoration; the direction of each hand-off is spelled out for screen readers.
-    expect(figure).toHaveTextContent('From Me to Claude Code: Goal and calls');
-    expect(figure).toHaveTextContent('From Claude Code to Me: A preview to approve');
-    const stages = within(figure).getByRole('list', { name: 'The agents it ran' });
-    expect(
-      within(stages)
-        .getAllByRole('listitem')
-        .map((item) => item.firstChild?.textContent),
-    ).toEqual(['Build', 'Review', 'Fix']);
-  });
-});
-
-describe('Timeline', () => {
-  it('is an ordered list with one entry per step and a heading for each', () => {
-    const { container } = render(<Timeline />);
-    const list = container.querySelector('ol');
-    expect(list).not.toBeNull();
-    expect(list!.children).toHaveLength(timeline.length);
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(
-      timeline.map((entry) => entry.title),
-    );
-  });
-
-  it('gives every date a machine-readable datetime, in order', () => {
-    const { container } = render(<Timeline />);
-    const times = [...container.querySelectorAll('time')].map((time) =>
-      Date.parse(time.getAttribute('datetime') ?? ''),
-    );
-    expect(times.length).toBe(timeline.filter((entry) => entry.at).length);
-    times.forEach((time) => expect(Number.isNaN(time)).toBe(false));
-    expect([...times].sort((a, b) => a - b)).toEqual(times);
-  });
-
-  it('formats a date or a local date-time as the day it was written', () => {
-    expect(formatDay('2026-10-14')).toBe('14 Oct 2026');
-    expect(formatDay('2026-10-29T13:50')).toBe('29 Oct 2026');
-  });
-
-  it('names each group of chips', () => {
-    render(<Timeline />);
-    expect(screen.getByRole('list', { name: 'Branches' })).toHaveTextContent('command-palette');
-    expect(screen.getByRole('list', { name: 'Areas' })).toHaveTextContent('Accessibility');
-  });
-
-  it('ends the day at launch, and keeps what came after it in a group of its own', () => {
-    expect(timeline.at(-1)?.phase).toBe('Ship');
-    expect(afterLaunch.map((entry) => entry.phase)).toEqual(['Round two']);
-    const launch = Date.parse(timeline.at(-1)?.at ?? '');
-    for (const entry of afterLaunch) {
-      expect(Date.parse(entry.at ?? '')).toBeGreaterThanOrEqual(launch);
-    }
-  });
-
-  it('can take its entries a level down, under a heading of their own', () => {
-    render(<Timeline entries={afterLaunch} heading="h4" />);
-    expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
-    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(
-      afterLaunch.map((entry) => entry.title),
-    );
-    expect(screen.getByRole('list', { name: 'Features' }).children).toHaveLength(6);
-  });
-});
-
-describe('Findings', () => {
-  it('groups findings by area, and labels both halves of each in text, not only colour', () => {
-    render(<Findings />);
-    for (const group of findings) {
-      const region = screen.getByRole('region', { name: group.area });
-      const items = within(region).getAllByRole('listitem');
-      expect(items).toHaveLength(group.items.length);
-      items.forEach((item, i) => {
-        expect(item).toHaveTextContent(`Found${group.items[i]!.found}`);
-        expect(item).toHaveTextContent(`Now${group.items[i]!.now}`);
-      });
-    }
   });
 });
 

@@ -1,0 +1,206 @@
+/*
+ * The component map, drawn as a blueprint. Each sheet lies on a fine grid in the blue token, and
+ * its components form a tree-table on a solid surface, so no text is set on the grid. The left
+ * column draws the tree: a component's children hang from it on blue lines, as X-ray mode
+ * outlines them inside it on the page.
+ */
+
+.sheet {
+  --blueprint-minor: color-mix(in oklab, var(--blue) 8%, transparent);
+  --blueprint-major: color-mix(in oklab, var(--blue) 16%, transparent);
+  --tree-line: color-mix(in oklab, var(--blue) 50%, var(--line-strong));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--bg);
+}
+
+.body {
+  padding: 0.5rem;
+  background-image:
+    linear-gradient(var(--blueprint-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-major) 1px, transparent 1px),
+    linear-gradient(var(--blueprint-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-minor) 1px, transparent 1px);
+  background-size:
+    96px 96px,
+    96px 96px,
+    16px 16px,
+    16px 16px;
+  background-position: -1px -1px;
+}
+
+.table {
+  --pad-x: 1rem;
+  --pad-y: 1rem;
+  --indent: 1.25rem;
+  /* The tree's trunk runs in the left padding; a name's centre line sits --tick into its row. */
+  --trunk: calc(var(--pad-x) / 2);
+  --tick: calc(var(--pad-y) + 0.75rem);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.table > li + li,
+.children > li {
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  padding: var(--pad-y) var(--pad-x);
+}
+
+/*
+ * Children step in under their parent: the whole row on phones, and from md, where the columns
+ * sit side by side, only the left one, so every why starts at the same line.
+ */
+.children .row {
+  padding-left: calc(var(--pad-x) + var(--indent));
+}
+
+@media (min-width: 48rem) {
+  .body {
+    padding: 1rem;
+  }
+
+  .table {
+    --pad-x: 1.25rem;
+    --pad-y: 1.125rem;
+    --indent: 1.5rem;
+  }
+
+  .row {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+
+  .children .row {
+    padding-left: var(--pad-x);
+  }
+
+  .children .spec {
+    padding-left: var(--indent);
+  }
+}
+
+@media (min-width: 64rem) {
+  .row {
+    grid-template-columns: 19rem minmax(0, 1fr);
+  }
+}
+
+/*
+ * The tree, in the rows' left padding: a parent's name joins a trunk that runs down through its
+ * children's rows, with a branch into each child's name. The last branch ends the trunk.
+ */
+.row[data-parent]::before,
+.row[data-parent]::after,
+.children > li::before,
+.children > li::after {
+  content: '';
+  position: absolute;
+  left: var(--trunk);
+  border: 0 solid var(--tree-line);
+  pointer-events: none;
+}
+
+.row[data-parent]::before {
+  top: var(--tick);
+  width: calc(var(--pad-x) - var(--trunk) - 0.25rem);
+  border-top-width: 1px;
+}
+
+.row[data-parent]::after {
+  top: var(--tick);
+  bottom: 0;
+  border-left-width: 1px;
+}
+
+.children > li {
+  position: relative;
+}
+
+.children > li::before {
+  top: 0;
+  bottom: 0;
+  border-left-width: 1px;
+}
+
+.children > li:last-child::before {
+  bottom: auto;
+  height: var(--tick);
+}
+
+.children > li::after {
+  top: var(--tick);
+  width: calc(var(--pad-x) + var(--indent) - var(--trunk) - 0.25rem);
+  border-top-width: 1px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid color-mix(in oklab, var(--kind) 35%, transparent);
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--kind) 8%, var(--surface));
+  padding: 0.0625rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--kind);
+}
+
+.badge[data-kind='server'] {
+  --kind: var(--green);
+}
+
+.badge[data-kind='client'] {
+  --kind: var(--amber);
+}
+
+.badge[data-kind='css'] {
+  --kind: var(--lilac);
+}
+
+.dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  padding: 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.25rem;
+  color: var(--muted);
+}
+
+/* Forced colours drop the grid and the tints; the lines, borders and words still carry it all. */
+@media (forced-colors: active) {
+  .body {
+    background-image: none;
+  }
+
+  .sheet {
+    --tree-line: CanvasText;
+  }
+
+  .badge {
+    border-color: CanvasText;
+    color: CanvasText;
+  }
+}

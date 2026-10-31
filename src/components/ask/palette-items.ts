@@ -35,7 +35,7 @@ export const goToItems: GoToItem[] = [
   })),
   {
     id: 'colophon',
-    label: 'Colophon · How I built this',
+    label: 'Colophon · Under the hood',
     href: '/colophon',
     keywords: ['stack', 'source', 'nextjs', 'website', 'claude code'],
   },

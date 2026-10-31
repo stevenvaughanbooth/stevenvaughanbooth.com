@@ -41,6 +41,7 @@ src/
     profile.ts            Single source of truth for every fact on the site, including `sections`
     answers.ts            The palette's curated answers and question matcher, built from profile.ts
     case-studies.ts       The three case studies, from profile.ts and the diagrams' own step copy
+    components.ts         Every component: kind, when its code loads, features and why
   components/
     sections/             Server Components, one per page section
     visuals/              Server-rendered diagrams; each controller loads as its card nears view
@@ -50,7 +51,7 @@ src/
     case-study/           The case-study page, its shared-element morph and focus helper
     signal/               The signal line and its nodes (CSS only)
     shortcuts/            The / T ? listener and the shortcuts sheet (loaded on demand)
-    story/                How I built this: the story's parts and the measured results
+    story/                Under the hood: the component map, the React ideas, the measured results
     ui/                   Small shared primitives: icons, headings, copy button, error notice
   lib/
     ask/                  Server-only: system prompt, visitor cookie, rate limits, Anthropic client
@@ -78,8 +79,8 @@ tests/e2e/                Playwright specs
 
 ## Rendering and loading
 
-Every page is prerendered at build time. Sections, the header (with its Sections menu, a Popover API popover), the footer, the case studies and How
-I built this are Server Components; the signal line is CSS only; the career timeline is server-only
+Every page is prerendered at build time. Sections, the header (with its Sections menu, a Popover API popover), the footer, the case studies and
+Under the hood are Server Components; the signal line is CSS only; the career timeline is server-only
 too, built on native `<details name>` disclosures. These modules are the whole `'use client'`
 surface:
 
@@ -103,6 +104,12 @@ on intent, meaning a hover, focus or use of the hero's ask bar or any Ask button
 `/` once the bar is out of view. Nothing fetches it at idle. If the chunk fails to load or the
 palette throws, the loader's boundary keeps the page up and shows "Ask Steven couldn’t load." with
 Try again and Email Steven.
+
+[`src/content/components.ts`](../src/content/components.ts) describes each of these components and
+the server ones around them: its kind, when its code loads, the React and platform features it
+relies on, and why it is built that way. Under the hood (`/colophon`) renders it as a map, and a
+unit test checks each entry's kind against its file, so the list cannot claim a client component
+is server-rendered.
 
 The diagrams follow one pattern, documented in
 [`src/components/visuals/shared/README.md`](../src/components/visuals/shared/README.md): the SVG,
@@ -146,7 +153,7 @@ POST to `/api/ask` carries BotID's challenge; the challenge script loads with th
 ## UX
 
 The home page, in the order of `sections` in `profile.ts`, after the hero; then a case study per
-Work theme at `/work/<theme>`, and How I built this at `/colophon`:
+Work theme at `/work/<theme>`, and Under the hood at `/colophon`:
 
 1. **Hero:** name, role, one-line positioning, the Ask bar with three suggested questions, the
    contact links (Email, GitHub, LinkedIn), the portrait, and a proof strip from `highlights`

@@ -6,15 +6,15 @@ The personal site of Steven Booth, Principal Software Engineer at Salesforce.
 **Live: [stevenvaughanbooth.com](https://stevenvaughanbooth.com)**
 
 A statically prerendered home page that covers who Steven is, what he builds and how to reach
-him, a case study for each theme of his work, and the story of how the site was built. It has
-**Ask Steven**: an ask bar in the hero and a ⌘K palette that answer questions about his work from
-curated notes and, when live answers are on, from Claude within a small per-visitor allowance.
-An answer can also show the visitor the place on the site it is about.
+him, a case study for each theme of his work, and a tour of the React components it is made of.
+It has **Ask Steven**: an ask bar in the hero and a ⌘K palette that answer questions about his
+work from curated notes and, when live answers are on, from Claude within a small per-visitor
+allowance. An answer can also show the visitor the place on the site it is about.
 
 The repository is meant to be read as a work sample: typed content, a small client surface,
 end-to-end and accessibility tests, a documented security model, and performance floors that fail
-the build. [How I built this](https://stevenvaughanbooth.com/colophon) is the reader-friendly
-tour of the same material.
+the build. [Under the hood](https://stevenvaughanbooth.com/colophon) is the reader-friendly tour
+of the same material: every component, when its code loads, and why it is built that way.
 
 ## Stack
 
@@ -90,6 +90,7 @@ src/
     profile.ts            Single source of truth for every fact on the site
     answers.ts            The palette's curated answers and question matcher
     case-studies.ts       The three case studies, built from profile.ts and the diagrams' steps
+    components.ts         Every component: kind, when its code loads, features and why
   components/
     sections/             Server Components, one per page section
     visuals/              Server-rendered diagrams; each controller loads as its card nears view
@@ -99,7 +100,7 @@ src/
     case-study/           The case-study page, its shared-element morph and focus helper
     signal/               The signal line and its nodes (CSS only)
     shortcuts/            The / T ? listener and the shortcuts sheet (loaded on demand)
-    story/                How I built this: the story's parts and the measured results
+    story/                Under the hood: the component map, the React ideas, the measured results
     ui/                   Small shared primitives
   lib/
     ask/                  Server-only: system prompt, visitor cookie, rate limits, Anthropic client
@@ -229,8 +230,9 @@ on desktop Chrome and an emulated Pixel 7. They check that:
   drawn under reduced motion, and is absent on phones, in print and in forced colours
 - the theme reveal grows from the toggle, the header marks the section being read, the count-up
   causes no layout shift, and the shortcuts sheet, its switch and its keys behave as listed
-- How I built this lists its parts in order, and its results match `measured.ts` and
-  `lighthouserc.json`
+- Under the hood leads with the components, holds every entry of `components.ts` in its
+  prerendered HTML, numbers its sections as its navigation does, and its results match
+  `measured.ts` and `lighthouserc.json`
 - pages log no console errors; `/profile.json`, `/llms.txt`, robots, sitemap and the OG image
   respond with the right types; unknown routes return a `noindex` 404
 - axe reports no serious or critical violations on `/`, `/colophon` and each case study in light
