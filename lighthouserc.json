@@ -25,9 +25,18 @@
           { "minScore": 0.95, "aggregationMethod": "median-run" }
         ],
         "categories:seo": ["error", { "minScore": 1, "aggregationMethod": "median-run" }],
-        "resource-summary:script:size": ["error", { "maxNumericValue": 184320 }],
-        "resource-summary:total:size": ["error", { "maxNumericValue": 614400 }],
-        "resource-summary:media:count": ["error", { "maxNumericValue": 0 }]
+        "resource-summary:script:size": [
+          "error",
+          { "maxNumericValue": 184320, "aggregationMethod": "median-run" }
+        ],
+        "resource-summary:total:size": [
+          "error",
+          { "maxNumericValue": 614400, "aggregationMethod": "median-run" }
+        ],
+        "resource-summary:media:count": [
+          "error",
+          { "maxNumericValue": 0, "aggregationMethod": "median-run" }
+        ]
       }
     },
     "upload": {

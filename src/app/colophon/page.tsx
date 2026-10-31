@@ -30,7 +30,8 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title, description },
 };
 
-// Budgets and versions are read from the files CI and the build use, so this page cannot drift.
+// Budgets and package versions are read from the files CI and the build use, so they always match
+// what CI enforces and what was installed. The measured results are typed into measured.ts by hand.
 function budget(id: string, key: 'minScore' | 'maxNumericValue'): number {
   const assertions: Record<string, unknown[] | undefined> = lighthouse.ci.assert.assertions;
   const value = (assertions[id]?.[1] as Record<string, unknown> | undefined)?.[key];
@@ -100,7 +101,7 @@ const stack: StackRow[] = [
     concern: 'Styling',
     choice: 'Tailwind CSS with design tokens',
     version: version('tailwindcss'),
-    why: 'Each colour is defined once, with light-dark(), for both themes.',
+    why: 'Each colour token is defined once, with light-dark(), for both themes.',
   },
   {
     concern: 'Fonts',
@@ -116,7 +117,7 @@ const stack: StackRow[] = [
     concern: 'Live answers',
     choice: 'Route Handler → Anthropic Messages API',
     version: 'claude-haiku-5-5',
-    why: 'Claude Haiku 5.5, streamed as text. The key stays on the server.',
+    why: 'Claude Haiku 5.5, streamed as it is written. The key stays on the server.',
   },
   {
     concern: 'Tests',
@@ -187,7 +188,7 @@ const accessibility = [
   },
   {
     title: 'Motion',
-    body: 'Under reduced motion nothing animates: tours and the replay show their end state, the signal line is drawn in full, and the film never plays by itself.',
+    body: 'Under reduced motion nothing moves: the theme switch and the peel happen at once, tours and the replay show their end state, the signal line is drawn in full, and the film never plays by itself.',
   },
   {
     title: 'Meaning',
@@ -208,10 +209,10 @@ const security = [
     ],
   },
   {
-    title: 'Only real visitors, only valid requests',
+    title: 'Only valid requests, only real visitors',
     points: [
-      'Vercel BotID checks each request before anything else, and fails closed.',
-      'Same origin, JSON under 16 KB, validated with zod. Follow-ups send earlier questions, never answers.',
+      'First the cheap checks: same origin, JSON of at most 16 KB, validated with zod. Follow-ups send earlier questions, never answers.',
+      'Then Vercel BotID, before the rate limits or the model, failing closed.',
     ],
   },
   {
@@ -247,8 +248,17 @@ export default function ColophonPage() {
             <a href={source.repo} className="pill pill-solid">
               <GitHub /> Source on GitHub
             </a>
-            {/* X-ray mode's code, loaded with every page, picks up presses on this button. */}
-            <button type="button" data-xray-toggle className="pill pill-outline">
+            {/*
+             * The shortcuts listener, loaded with every page, picks up presses on this button and
+             * loads X-ray, which keeps aria-pressed in step with the header's toggle. The name
+             * stays the same in both states; pressed means the page is peeled back.
+             */}
+            <button
+              type="button"
+              data-xray-toggle
+              aria-pressed="false"
+              className="pill pill-outline aria-pressed:border-green aria-pressed:bg-elevated"
+            >
               <Layers /> Peel back this page
             </button>
           </div>
@@ -306,7 +316,7 @@ export default function ColophonPage() {
           <Section
             id="stack"
             title="Standard tools, each with a reason."
-            lede="Versions on this page are read from package.json at build time."
+            lede="Package versions on this page are read from package.json at build time."
           >
             <dl className="grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-2 lg:grid-cols-3">
               {stack.map((row) => (
@@ -350,7 +360,8 @@ export default function ColophonPage() {
               ))}
             </dl>
             <p className="mt-6 max-w-2xl text-sm leading-relaxed text-pretty text-muted">
-              The goal is higher: 100 everywhere, no layout shift and under 100 ms of blocking time.
+              The targets sit above the floors: {measured.performanceTarget} for performance, 100 in
+              the other three categories, no layout shift and under 100 ms of blocking time.
             </p>
 
             <h3 className="label mt-12">Last measured</h3>
