@@ -50,7 +50,8 @@ src/
     ask/                  The ⌘K palette (loaded on intent), the hero's ask bar, the Ask buttons
     case-study/           The case-study page, its shared-element morph and focus helper
     signal/               The signal line and its nodes (CSS only)
-    shortcuts/            The / T ? listener and the shortcuts sheet (loaded on demand)
+    shortcuts/            The / T X ? listener and the shortcuts sheet (loaded on demand)
+    xray/                 X-ray mode: the toggle, the peel, the blueprint labels and the stats (on intent)
     story/                Under the hood: the component map, the React ideas, the measured results
     ui/                   Small shared primitives: icons, headings, copy button, error notice
   lib/
@@ -84,19 +85,19 @@ Under the hood are Server Components; the signal line is CSS only; the career ti
 too, built on native `<details name>` disclosures. These modules are the whole `'use client'`
 surface:
 
-| Module                                                                                     | Its job                                                      | When its code loads                                                                                                 |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `theme-toggle.tsx`                                                                         | Switches theme, exposes `aria-pressed`                       | With the page                                                                                                       |
-| `mobile-nav.tsx`                                                                           | Moves focus to the section heading from the Sections menu    | With the page                                                                                                       |
-| `ui/copy-button.tsx`                                                                       | Copies Adage's install command                               | With the page                                                                                                       |
-| `ask/ask-button.tsx`, `ask/ask-shortcut.tsx`                                               | Ask buttons; the ⌘K or Ctrl K hint                           | With the page                                                                                                       |
-| `ask/hero-ask-bar.tsx`                                                                     | The hero's ask bar and its suggestions; hands questions on   | With the home page; it warms the palette's code on hover or focus                                                   |
-| `shortcuts/shortcuts.tsx`                                                                  | The `/`, `T` and `?` listener, and the footer's sheet button | With the page; the sheet on `?`, or on hover, focus or press of the footer button                                   |
-| `ask/palette-loader.tsx`                                                                   | ⌘K listener, error boundary, the palette's live region       | With the page (root layout)                                                                                         |
-| `visuals/{team-multiplier,progressive-disclosure,metadata-platform,reflex-demo}/shell.tsx` | Show the server-rendered card, then swap in its controller   | Shell with the page; controller when the card is within 200 px of the viewport, or on first focus or pointer inside |
-| `film/arrival-shell.tsx`                                                                   | The hero's film frame: its chip, autoplay policy and theater | With the page                                                                                                       |
-| `case-study/focus.tsx`                                                                     | Focus on arrival, and back on the link after Back            | With the case-study pages only                                                                                      |
-| `app/error.tsx`, `app/global-error.tsx`                                                    | Error boundaries (themed, with a retry)                      | With the page                                                                                                       |
+| Module                                                                                     | Its job                                                                         | When its code loads                                                                                                 |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `theme-toggle.tsx`                                                                         | Switches theme, exposes `aria-pressed`                                          | With the page                                                                                                       |
+| `mobile-nav.tsx`                                                                           | Moves focus to the section heading from the Sections menu                       | With the page                                                                                                       |
+| `ui/copy-button.tsx`                                                                       | Copies Adage's install command                                                  | With the page                                                                                                       |
+| `ask/ask-button.tsx`, `ask/ask-shortcut.tsx`                                               | Ask buttons; the ⌘K or Ctrl K hint                                              | With the page                                                                                                       |
+| `ask/hero-ask-bar.tsx`                                                                     | The hero's ask bar and its suggestions; hands questions on                      | With the home page; it warms the palette's code on hover or focus                                                   |
+| `shortcuts/shortcuts.tsx`                                                                  | The `/`, `T`, `X` and `?` listener, the footer's sheet button, and X-ray's host | With the page; the sheet on `?`, or on hover, focus or press of the footer button; X-ray on intent                  |
+| `ask/palette-loader.tsx`                                                                   | ⌘K listener, error boundary, the palette's live region                          | With the page (root layout)                                                                                         |
+| `visuals/{team-multiplier,progressive-disclosure,metadata-platform,reflex-demo}/shell.tsx` | Show the server-rendered card, then swap in its controller                      | Shell with the page; controller when the card is within 200 px of the viewport, or on first focus or pointer inside |
+| `film/arrival-shell.tsx`                                                                   | The hero's film frame: its chip, autoplay policy and theater                    | With the page                                                                                                       |
+| `case-study/focus.tsx`                                                                     | Focus on arrival, and back on the link after Back                               | With the case-study pages only                                                                                      |
+| `app/error.tsx`, `app/global-error.tsx`                                                    | Error boundaries (themed, with a retry)                                         | With the page                                                                                                       |
 
 The palette itself (`ask-palette.tsx` with `use-ask`, `conversation`, `search`, `lib/ask-client` and
 `lib/page-actions`) is client code only by reachability: `palette-loader.tsx` imports it dynamically
@@ -104,6 +105,15 @@ on intent, meaning a hover, focus or use of the hero's ask bar or any Ask button
 `/` once the bar is out of view. Nothing fetches it at idle. If the chunk fails to load or the
 palette throws, the loader's boundary keeps the page up and shows "Ask Steven couldn’t load." with
 Try again and Email Steven.
+
+**X-ray mode** peels the page back into a blueprint of its components. The header's "Under the
+hood" button (a Server Component), the `X` key or any `<button data-xray-toggle>` turns it on; the
+always-loaded part is a few listeners in `shortcuts.tsx` and a small INP recorder, and
+`xray/xray.tsx` with its stylesheet downloads on hover, focus or press of a toggle, or on `X`. The
+peel is one typed view transition: the old page is clipped along a 45° fold that sweeps from the
+top-right corner while a shaded flap folds back over it; under reduced motion it switches at once.
+Every element with `data-component` is outlined and labelled from `components.ts`, and a HUD shows
+this visit's FCP, LCP, CLS and INP, the JavaScript transferred, and the build's measured results.
 
 [`src/content/components.ts`](../src/content/components.ts) describes each of these components and
 the server ones around them: its kind, when its code loads, the React and platform features it

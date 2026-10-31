@@ -99,7 +99,8 @@ src/
     ask/                  The ⌘K palette (loaded on intent), the hero's ask bar, the Ask buttons
     case-study/           The case-study page, its shared-element morph and focus helper
     signal/               The signal line and its nodes (CSS only)
-    shortcuts/            The / T ? listener and the shortcuts sheet (loaded on demand)
+    shortcuts/            The / T X ? listener and the shortcuts sheet (loaded on demand)
+    xray/                 X-ray mode: the toggle, the peel, the blueprint labels and the stats (on intent)
     story/                Under the hood: the component map, the React ideas, the measured results
     ui/                   Small shared primitives
   lib/
