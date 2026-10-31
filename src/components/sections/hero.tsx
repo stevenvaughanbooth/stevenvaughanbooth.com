@@ -20,7 +20,11 @@ export function Hero() {
   });
 
   return (
-    <section aria-labelledby="hero-title" className="relative isolate overflow-hidden">
+    <section
+      data-component="hero"
+      aria-labelledby="hero-title"
+      className="relative isolate overflow-hidden"
+    >
       <div aria-hidden className="bg-grid absolute inset-0 -z-10" />
       <div
         aria-hidden
@@ -76,7 +80,10 @@ export function Hero() {
          * The proof strip spans both columns, under the text and the portrait, so the two above it
          * balance. Each term is the figure and its description the context, so each is read once.
          */}
-        <dl className="col-span-2 mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line md:mt-16 lg:grid-cols-4">
+        <dl
+          data-component="proof-strip"
+          className="col-span-2 mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line md:mt-16 lg:grid-cols-4"
+        >
           {highlights.map((item) => (
             <div key={item.value} className="bg-bg p-4 md:p-5">
               <dt className="text-xl font-semibold tracking-tight md:text-2xl">{item.value}</dt>
@@ -90,7 +97,7 @@ export function Hero() {
             href="/colophon"
             className="group inline-flex min-h-6 items-center gap-2 font-mono text-xs text-muted transition-colors hover:text-fg"
           >
-            How I built this site with Claude Code
+            Under the hood
             <ArrowRight
               width={14}
               height={14}

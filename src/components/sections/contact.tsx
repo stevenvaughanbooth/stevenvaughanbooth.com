@@ -12,6 +12,7 @@ export function Contact() {
   return (
     <section
       id="contact"
+      data-component="contact"
       aria-labelledby="contact-title"
       className="reveal relative isolate overflow-clip border-t border-line py-24 md:py-36"
     >

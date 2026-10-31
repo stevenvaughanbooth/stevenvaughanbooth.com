@@ -32,6 +32,7 @@ export function CopyButton({ value, label, icon, copiedIcon, className }: CopyBu
   return (
     <button
       type="button"
+      data-component="copy-button"
       onClick={copy}
       aria-label={copied ? 'Copied' : label}
       className={className}

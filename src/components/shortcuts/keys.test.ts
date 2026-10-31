@@ -26,20 +26,24 @@ afterEach(() => {
 });
 
 describe('shortcutFor', () => {
-  it('maps / to a question, ? to the sheet and T to the theme', () => {
+  it('maps / to a question, ? to the sheet, T to the theme and X to X-ray', () => {
     expect(press({ key: '/' })).toBe('ask');
     expect(press({ key: '?', shiftKey: true })).toBe('sheet');
     expect(press({ key: 't' })).toBe('theme');
+    expect(press({ key: 'x' })).toBe('xray');
     // Caps Lock gives a capital without Shift.
     expect(press({ key: 'T' })).toBe('theme');
-    expect(press({ key: 'x' })).toBeNull();
+    expect(press({ key: 'X' })).toBe('xray');
+    expect(press({ key: 'q' })).toBeNull();
   });
 
-  it('ignores modifiers, Shift+T, held keys and composition', () => {
+  it('ignores modifiers, Shift+T, Shift+X, held keys and composition', () => {
     expect(press({ key: '?', metaKey: true })).toBeNull();
     expect(press({ key: '?', ctrlKey: true })).toBeNull();
     expect(press({ key: 't', altKey: true })).toBeNull();
     expect(press({ key: 'T', shiftKey: true })).toBeNull();
+    expect(press({ key: 'X', shiftKey: true })).toBeNull();
+    expect(press({ key: 'x', metaKey: true })).toBeNull();
     expect(press({ key: '?', repeat: true })).toBeNull();
     expect(press({ key: '?', isComposing: true })).toBeNull();
   });

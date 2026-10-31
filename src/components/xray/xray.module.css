@@ -1,0 +1,708 @@
+/*
+ * X-ray mode: the real page, redrawn as a blueprint. This stylesheet arrives with the overlay, on
+ * intent; while X-ray is on, the overlay puts `on` (with data-xray) on <html>.
+ *
+ * The page is built on colour tokens (globals.css), so most of the redraw is new values for them:
+ * the background turns blueprint blue under a fine and a major grid, surfaces turn translucent,
+ * lines and text turn to white and cyan strokes, and images are toned to the paper. Nothing here
+ * changes a box's size or place, so the labels can be measured in the same frame. The same
+ * blueprint serves both themes, a shade deeper in dark.
+ */
+
+:global(html).on {
+  --xr-paper: #15457f;
+  --xr-minor: rgb(190 222 255 / 0.075);
+  --xr-major: rgb(190 222 255 / 0.17);
+  --xr-panel: #0b2c57;
+  --xr-ink: #eef7ff;
+  --xr-dim: #a9cbec;
+  --xr-rule: rgb(176 216 255 / 0.5);
+  /* What each label and outline says about its component's code. */
+  --xr-server: #d4eaff;
+  --xr-client: #ffc160;
+  --xr-css: #6ff2c6;
+
+  color-scheme: dark;
+  --bg: var(--xr-paper);
+  --surface: rgb(3 20 46 / 0.3);
+  --elevated: rgb(176 216 255 / 0.1);
+  --line: rgb(176 216 255 / 0.42);
+  --line-strong: rgb(196 228 255 / 0.68);
+  --fg: var(--xr-ink);
+  --muted: #c6def5;
+  --subtle: var(--xr-dim);
+  --green: #8fe4ff;
+  --amber: #d2ebff;
+  --lilac: #bcdcff;
+  --blue: #8fd2ff;
+  --grid: transparent;
+  --glow: transparent;
+  --shadow: none;
+}
+
+:global(html[data-theme='dark']).on {
+  --xr-paper: #0a2548;
+  --xr-panel: #071c38;
+  --xr-minor: rgb(160 205 255 / 0.06);
+  --xr-major: rgb(160 205 255 / 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme='light'])).on {
+    --xr-paper: #0a2548;
+    --xr-panel: #071c38;
+    --xr-minor: rgb(160 205 255 / 0.06);
+    --xr-major: rgb(160 205 255 / 0.14);
+  }
+}
+
+/* The paper: a fine grid every 24px and a major one every 120px, scrolling with the page. */
+.on :global(body) {
+  background-color: var(--xr-paper);
+  background-image:
+    linear-gradient(var(--xr-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--xr-major) 1px, transparent 1px),
+    linear-gradient(var(--xr-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--xr-minor) 1px, transparent 1px);
+  background-size:
+    120px 120px,
+    120px 120px,
+    24px 24px,
+    24px 24px;
+}
+
+/* Dialogs and popovers sit over the page in the top layer, so their panels stay solid. */
+.on :global(:is(dialog, [popover])) {
+  --surface: var(--xr-panel);
+  --elevated: #123b6e;
+}
+
+/* Photographs and the film as cyanotypes: their light parts glow on the blue. */
+.on :global(:is(main, footer) :is(img, video)) {
+  filter: grayscale(1) contrast(1.08) brightness(1.06);
+  mix-blend-mode: screen;
+}
+
+/* Solid primary buttons become outlines, like everything else on the drawing. */
+.on :global(.pill-solid) {
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--fg);
+}
+
+/*
+ * Every component draws its own dashed outline, in the colour of its kind (the overlay maps ids to
+ * kinds from the manifest). Top-level ones are inset, so their edges show at the screen's edges.
+ */
+.on :global([data-component]) {
+  --xr-kind: var(--xr-server);
+  outline: 1px dashed var(--xr-kind);
+  outline-offset: -1px;
+}
+
+.on :global([data-component]:not([data-component] *)) {
+  outline-offset: -6px;
+}
+
+.on :global([data-component]:focus-visible) {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+/* A vignette over the paper, under the page. */
+.overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 90% 70% at 50% 35%, transparent 55%, rgb(2 12 30 / 0.32));
+  pointer-events: none;
+}
+
+/*
+ * The overlay. Its own box is empty at the document's origin, so labels are placed in page
+ * coordinates and scroll with the page, with no work per frame; those of the fixed header ride a
+ * fixed layer. Page labels pass under the header, header labels and the HUD over it.
+ */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  font-family: var(--font-mono);
+  color: var(--xr-ink);
+}
+
+.labels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  /* Placed by the overlay before first paint; until then, out of sight. */
+  translate: -200vw 0;
+}
+
+.item[data-fixed] {
+  position: fixed;
+  z-index: 45;
+}
+
+.item[data-active] {
+  z-index: 36;
+}
+
+.item[data-fixed][data-active] {
+  z-index: 47;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  /* 24px: the smallest target WCAG 2.5.8 allows beside its neighbours. */
+  height: 1.5rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--xr-kind);
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--xr-panel) 94%, transparent);
+  font-size: var(--text-micro);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--xr-ink);
+  cursor: help;
+  transition: background-color 0.15s;
+}
+
+.item[data-compact] .loads {
+  display: none;
+}
+
+.rail {
+  position: fixed;
+  right: 0;
+  left: 0;
+  z-index: 41;
+  border-bottom: 1px solid var(--xr-rule);
+  background: color-mix(in oklab, var(--xr-paper) 70%, transparent);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.item[data-vertical] .label {
+  height: auto;
+  padding: 0.45rem 0;
+  width: 1.5rem;
+  writing-mode: vertical-rl;
+}
+
+.label:hover,
+.item[data-active] .label {
+  background: color-mix(in oklab, var(--xr-kind) 22%, var(--xr-panel));
+}
+
+.label:focus-visible {
+  outline: 2px solid var(--xr-ink);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+:is(.item, .focus, .key)[data-kind='client'] {
+  --xr-kind: var(--xr-client);
+}
+
+:is(.item, .focus, .key)[data-kind='css'] {
+  --xr-kind: var(--xr-css);
+}
+
+:is(.item, .focus, .key)[data-kind='server'] {
+  --xr-kind: var(--xr-server);
+}
+
+.name {
+  font-weight: 500;
+}
+
+.punct {
+  color: var(--xr-dim);
+}
+
+.kind {
+  color: var(--xr-kind);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.loads {
+  color: var(--xr-dim);
+}
+
+.chip::before {
+  content: attr(data-letter);
+}
+
+.chip {
+  display: none;
+  min-width: 0.95rem;
+  padding: 0.1rem 0.2rem;
+  border-radius: 2px;
+  background: var(--xr-kind);
+  color: var(--xr-panel);
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+}
+
+/* From a label pushed aside to the corner it names. */
+.leader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  background: color-mix(in oklab, var(--xr-kind) 75%, transparent);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+.leader::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--xr-kind);
+}
+
+/* The component a label belongs to, while its label is pointed at, focused or open. */
+.focus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 29;
+  border: 1.5px solid var(--xr-kind);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--xr-kind) 7%, transparent);
+  pointer-events: none;
+}
+
+.focus[data-fixed] {
+  position: fixed;
+  z-index: 44;
+}
+
+.size {
+  position: absolute;
+  right: -1px;
+  bottom: calc(100% + 3px);
+  padding: 0 0.3rem;
+  background: var(--xr-kind);
+  color: var(--xr-panel);
+  font-size: var(--text-micro);
+  line-height: 1.45;
+  white-space: nowrap;
+  border-radius: 2px;
+}
+
+/* The details card. */
+.card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(23rem, calc(100vw - 1rem));
+  padding: 0.95rem 1rem 1rem;
+  border: 1px solid var(--xr-kind);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--xr-panel) 97%, transparent);
+  box-shadow: 0 18px 40px -16px rgb(0 8 24 / 0.7);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--xr-ink);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+}
+
+.cardName {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--xr-dim);
+  text-decoration: underline;
+  text-decoration-color: rgb(169 203 236 / 0.4);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.file:hover {
+  color: var(--xr-ink);
+  text-decoration-color: currentColor;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4rem 0.9rem;
+  margin: 0.85rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--xr-rule);
+}
+
+.facts dt {
+  padding-top: 0.1rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--xr-dim);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chips li {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--xr-rule);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.why {
+  margin: 0.8rem 0 0;
+  text-wrap: pretty;
+  color: var(--muted);
+}
+
+/*
+ * The HUD: a drawing's title block, docked at the bottom right. On phones it is a sheet across the
+ * bottom that opens from its title row.
+ */
+.hud {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  width: min(44rem, calc(100vw - 2rem));
+  border: 1px solid var(--xr-rule);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--xr-panel) 93%, transparent);
+  box-shadow: 0 18px 50px -20px rgb(0 8 24 / 0.8);
+  backdrop-filter: blur(10px);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+}
+
+.hudHead {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  padding: 0 0.35rem 0 0.85rem;
+  border-bottom: 1px solid var(--xr-rule);
+}
+
+.hud[data-collapsed] .hudHead {
+  border-bottom: 0;
+}
+
+.hudTitle {
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--xr-dim);
+}
+
+.legend,
+.legendBody {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+  color: var(--xr-dim);
+}
+
+.legendBody {
+  display: none;
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.key::before {
+  content: '';
+  width: 0.75rem;
+  height: 0;
+  border-top: 1.5px dashed var(--xr-kind);
+}
+
+.hudButton {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 4px;
+  color: var(--xr-ink);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hudButton:hover {
+  background: rgb(176 216 255 / 0.12);
+}
+
+.hudButton:focus-visible {
+  outline: 2px solid var(--xr-ink);
+  outline-offset: -2px;
+}
+
+.chevron {
+  transition: rotate 0.2s;
+}
+
+.hud[data-collapsed] .chevron {
+  rotate: 180deg;
+}
+
+.hud[data-collapsed] .hudBody {
+  display: none;
+}
+
+.caption {
+  margin: 0;
+  padding: 0.5rem 0.85rem 0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--xr-dim);
+}
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0.35rem 0.85rem 0.6rem;
+  gap: 0.55rem 1rem;
+}
+
+.cells + .caption {
+  border-top: 1px solid var(--xr-rule);
+}
+
+.cell {
+  min-width: 0;
+}
+
+.cell dt {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--xr-dim);
+}
+
+.cell[data-wide] {
+  grid-column: span 2;
+}
+
+.cell[data-wide] .note {
+  white-space: normal;
+}
+
+.cell dd {
+  display: flex;
+  flex-direction: column;
+  margin: 0.15rem 0 0;
+}
+
+.value {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--xr-ink);
+}
+
+.note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--xr-dim);
+}
+
+.rating {
+  flex: none;
+  align-self: center;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #6ff2c6;
+}
+
+.rating[data-rating='needs improvement'] {
+  background: #ffc160;
+}
+
+.rating[data-rating='poor'] {
+  background: #ff8a7a;
+}
+
+.caption a {
+  color: var(--xr-ink);
+  text-decoration: underline;
+  text-decoration-color: rgb(169 203 236 / 0.5);
+  text-underline-offset: 3px;
+  text-transform: none;
+}
+
+.caption a:hover {
+  text-decoration-color: currentColor;
+}
+
+@media (width < 48rem) {
+  .hud {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: min(70dvh, 34rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-width: 1px 0 0;
+    border-radius: 10px 10px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .legend {
+    display: none;
+  }
+
+  .legendBody {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0.6rem 0.85rem 0;
+  }
+
+  .label .kind {
+    display: none;
+  }
+
+  .chip {
+    display: inline-block;
+  }
+
+  .key::before {
+    display: none;
+  }
+
+  .path {
+    margin-right: auto;
+  }
+
+  .cells {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .label {
+    gap: 0.3rem;
+    padding: 0 0.35rem;
+  }
+
+  .loads {
+    display: none;
+  }
+}
+
+/*
+ * The peel (peel.ts). The page as it was is the old snapshot, lifted off above the blueprint; laid
+ * back down, the restored page is the new one, on top. The browser's cross-fade is off, and the
+ * helpers carry no animation of their own: peel.ts drives every part with one easing.
+ */
+/* One rule per pseudo-element: a selector list of them would be merged into :is(), which can't
+   hold pseudo-elements, and dropped. */
+:global(:root:active-view-transition-type(xray)::view-transition-old(root)) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:global(:root:active-view-transition-type(xray)::view-transition-new(root)) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:global(:root:active-view-transition-type(xray-lift)::view-transition-old(root)) {
+  z-index: 1;
+}
+
+/* The flap casts its own shadow on the page under it. Its group is drawn at a quarter size. */
+:global(::view-transition-group(xray-flap)) {
+  z-index: 3;
+  animation: none;
+  filter: drop-shadow(-2px 2px 3px rgb(2 10 24 / 0.28));
+}
+
+:global(::view-transition-new(xray-flap)) {
+  animation: none;
+}
+
+:global(::view-transition-group(xray-shade)) {
+  z-index: 2;
+  animation: none;
+}
+
+:global(::view-transition-new(xray-shade)) {
+  animation: none;
+}
+
+/* Colours change at once underneath, so the new snapshot is the finished blueprint. */
+:global(:root:active-view-transition-type(xray) *) {
+  transition: none !important;
+}

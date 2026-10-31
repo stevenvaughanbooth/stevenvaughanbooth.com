@@ -8,7 +8,7 @@ import styles from './signal.module.css';
  */
 export function Signal() {
   return (
-    <div aria-hidden data-signal="line" className={styles.signal}>
+    <div aria-hidden data-signal="line" data-component="signal" className={styles.signal}>
       <div className={styles.intro}>
         <div className={styles.trace} />
       </div>

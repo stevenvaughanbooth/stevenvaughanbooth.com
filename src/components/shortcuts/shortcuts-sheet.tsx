@@ -57,6 +57,7 @@ export function ShortcutsSheet({ request, onClose }: ShortcutsSheetProps) {
     { label: 'Ask Steven', keys: ask },
     { label: 'Type a question', keys: '/', single: true },
     { label: 'Switch theme', keys: 'T', single: true },
+    { label: 'Under the hood', keys: 'X', single: true },
     { label: 'Show these shortcuts', keys: '?', single: true },
     { label: 'Close a dialog or menu', keys: 'Esc' },
   ];
@@ -118,7 +119,7 @@ export function ShortcutsSheet({ request, onClose }: ShortcutsSheetProps) {
               Single-key shortcuts
             </p>
             <p id={`${switchId}-hint`} className="mt-0.5 text-xs leading-relaxed text-muted">
-              Turn off /, T and ? if they get in the way of speech input or other tools.
+              Turn off /, T, X and ? if they get in the way of speech input or other tools.
             </p>
           </div>
           <button

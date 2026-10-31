@@ -23,7 +23,7 @@ test('the footer’s “How I built this” link opens the story', async ({ page
 test('the hero’s line under the proof strip opens the story too', async ({ page }) => {
   await page.goto('/');
   const hero = page.getByRole('region', { name: person.name });
-  const link = hero.getByRole('link', { name: 'How I built this site with Claude Code' });
+  const link = hero.getByRole('link', { name: 'Under the hood' });
   await expect(link).toBeVisible();
   // Below the proof strip, and still in the hero rather than crowding the text above it.
   const strip = await hero.locator('dl').boundingBox();
