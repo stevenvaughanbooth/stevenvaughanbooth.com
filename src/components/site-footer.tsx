@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { disclaimer, person, site } from '@/content/profile';
+import { ShortcutsButton } from './shortcuts/shortcuts';
 
 export function SiteFooter() {
   return (
@@ -15,7 +16,7 @@ export function SiteFooter() {
           <ul className="grid grid-cols-2 gap-x-10 gap-y-2.5">
             <li>
               <Link href="/colophon" className="hover:text-fg">
-                How this site is built
+                How I built this
               </Link>
             </li>
             <li>
@@ -46,9 +47,20 @@ export function SiteFooter() {
           </ul>
         </nav>
       </div>
-      <div className="page flex justify-between border-t border-line py-6 text-xs text-subtle">
+      <div className="page flex items-center justify-between gap-4 border-t border-line py-6 text-xs text-subtle">
         <span>© {person.name}</span>
-        <span>{site.domain}</span>
+        <span className="flex items-center gap-5">
+          <ShortcutsButton className="group hidden min-h-6 items-center gap-2 transition-colors hover:text-fg sm:inline-flex">
+            Keyboard shortcuts
+            <kbd
+              aria-hidden
+              className="inline-grid size-5 place-items-center rounded-md border border-line bg-elevated font-mono text-micro text-muted group-hover:text-fg"
+            >
+              ?
+            </kbd>
+          </ShortcutsButton>
+          <span>{site.domain}</span>
+        </span>
       </div>
     </footer>
   );

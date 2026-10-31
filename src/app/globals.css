@@ -226,3 +226,154 @@
     animation: none;
   }
 }
+
+/*
+ * The theme switch reveals the new theme in a circle growing from the toggle, which sets
+ * --reveal-x and --reveal-y (theme-toggle.tsx). Only view transitions of type "theme" are
+ * restyled; any other keeps the browser's cross-fade. The old snapshot stays put underneath, and
+ * a 150% radius reaches the farthest corner from any origin. Reduced motion skips the transition.
+ */
+:root:active-view-transition-type(theme)::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root:active-view-transition-type(theme)::view-transition-new(root) {
+  animation: theme-reveal 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  mix-blend-mode: normal;
+}
+
+/* Colours change at once underneath: a fade would show the old theme inside the circle. */
+:root:active-view-transition-type(theme) * {
+  transition: none !important;
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--reveal-x) var(--reveal-y));
+  }
+  to {
+    clip-path: circle(150% at var(--reveal-x) var(--reveal-y));
+  }
+}
+
+/*
+ * The fixed header stays above page transitions: without a name of its own it is part of the
+ * page's snapshot, and the case study's gliding and fading groups would draw over it. Captured on
+ * its own, it simply shows its new state on top. The theme reveal and the film's theater animate
+ * the page as a whole, so for those it stays in the page snapshot.
+ */
+:root:not(:active-view-transition-type(theme, arrival)) .site-header {
+  view-transition-name: site-header;
+}
+
+::view-transition-group(site-header) {
+  z-index: 100;
+  animation: none;
+}
+
+::view-transition-old(site-header) {
+  display: none;
+}
+
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+/*
+ * The case-study transition (morph.tsx). The shared elements glide between the home page and a
+ * case study while the rest of the page fades through: out quickly, then in, so the two pages
+ * never sit on top of each other. The easing is --ease-out-expo, written out because these
+ * pseudo-elements sit outside @theme.
+ */
+::view-transition-group(.case-study-morph) {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::view-transition-old(.case-study-morph),
+::view-transition-new(.case-study-morph) {
+  animation-duration: 0.3s;
+}
+
+/* Ends of different sizes (pagerTransition): hand over from old to new, never overlapping. */
+::view-transition-old(.case-study-resize) {
+  animation: case-study-fade-out 0.12s ease-in both;
+}
+
+::view-transition-new(.case-study-resize) {
+  animation: case-study-fade-in 0.25s ease-out 0.08s both;
+}
+
+::view-transition-old(.case-study-fade) {
+  animation: case-study-fade-out 0.15s ease-in both;
+}
+
+::view-transition-new(.case-study-fade) {
+  animation: case-study-fade-in 0.3s ease-out 0.1s both;
+}
+
+@keyframes case-study-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes case-study-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * Reduced motion: every view transition finishes at once, so the new page simply replaces the
+ * old one. React starts a transition for each navigation into a page with a <ViewTransition>,
+ * and the global rule for animations does not reach these pseudo-elements.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/*
+ * Section timelines for the reading marks in the nav (reading.module.css). Each nav
+ * section's view timeline is narrowed to a 10rem band around a reading line 30% down the screen,
+ * so one section's exit and the next one's entry are the same stretch of scroll. The last
+ * section also has an untrimmed timeline: on tall screens the page ends before it reaches the
+ * line, so it takes over as it comes fully into view. timeline-scope lifts every name to <body>,
+ * where the header can see them. reading.test.ts keeps this list in step with the nav.
+ */
+@supports (timeline-scope: --a) {
+  body {
+    timeline-scope: --read-open-source, --read-work, --read-experience, --read-contact, --read-end;
+  }
+
+  #open-source {
+    view-timeline-name: --read-open-source;
+  }
+
+  #work {
+    view-timeline-name: --read-work;
+  }
+
+  #experience {
+    view-timeline-name: --read-experience;
+  }
+
+  #contact {
+    view-timeline-name: --read-contact, --read-end;
+  }
+
+  :is(#open-source, #work, #experience) {
+    view-timeline-inset: calc(30% - 5rem) calc(70% - 5rem);
+  }
+
+  #contact {
+    view-timeline-inset:
+      calc(30% - 5rem) calc(70% - 5rem),
+      0 0;
+  }
+}

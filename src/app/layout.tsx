@@ -58,7 +58,14 @@ async function Analytics() {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+    // data-scroll-behavior: Next.js turns globals.css's smooth scrolling off while it changes
+    // routes, so a new page starts at its top at once, where its view transition is measured.
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable}`}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <head>
         {/* Without a saved choice, CSS follows the system theme. */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

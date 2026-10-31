@@ -150,7 +150,6 @@ export const experience: Role[] = [
 export const sections = [
   { id: 'open-source', label: 'Open source', nav: true },
   { id: 'work', label: 'Work', nav: true },
-  { id: 'film', label: 'Film', nav: false },
   { id: 'experience', label: 'Experience', nav: true },
   { id: 'contact', label: 'Contact', nav: true },
 ] as const;
@@ -423,12 +422,16 @@ export const publicReferences: Link[] = [
 export const disclaimer =
   'High-level career statements supplied by Steven Booth. Product terminology is aligned with public Salesforce documentation. Diagrams illustrate concepts, not an internal system design.';
 
-/** The optional inline film. */
+const filmSeconds = 16;
+
+/**
+ * The film that opens the hero: it plays once inside the portrait frame and lands on the
+ * portrait, and replays in full from the frame's chip.
+ */
 export const film = {
   title: 'Arrival',
-  kicker: 'Interlude',
-  heading: 'Follow the signal.',
+  seconds: filmSeconds,
   body: 'From the city. Into the workspace.',
-  duration: '16 seconds · soundless',
+  duration: `${filmSeconds} seconds · soundless`,
   note: 'An illustrative, AI-generated San Francisco journey. The tower and skyline are not faithful architectural footage.',
 } as const;

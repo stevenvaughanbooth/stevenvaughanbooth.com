@@ -5,14 +5,16 @@
 The personal site of Steven Booth, Principal Software Engineer at Salesforce.
 **Live: [stevenvaughanbooth.com](https://stevenvaughanbooth.com)**
 
-A single, statically prerendered page that covers who Steven is, what he builds and how to reach
-him. It has **Ask Steven**, a ⌘K palette that answers questions about his work from curated notes
-and, when live answers are on, from Claude within a small per-visitor allowance.
+A statically prerendered home page that covers who Steven is, what he builds and how to reach
+him, a case study for each theme of his work, and the story of how the site was built. It has
+**Ask Steven**: an ask bar in the hero and a ⌘K palette that answer questions about his work from
+curated notes and, when live answers are on, from Claude within a small per-visitor allowance.
+An answer can also show the visitor the place on the site it is about.
 
 The repository is meant to be read as a work sample: typed content, a small client surface,
 end-to-end and accessibility tests, a documented security model, and performance floors that fail
-the build. The [colophon](https://stevenvaughanbooth.com/colophon) is the reader-friendly tour of
-the same material.
+the build. [How I built this](https://stevenvaughanbooth.com/colophon) is the reader-friendly
+tour of the same material.
 
 ## Stack
 
@@ -23,7 +25,7 @@ the same material.
 | Language     | TypeScript (`strict`, `noUncheckedIndexedAccess`, `typedRoutes`)                     |
 | Styling      | Tailwind CSS v4 over CSS custom properties, each colour set once with `light-dark()` |
 | Fonts/images | `next/font` (DM Sans, IBM Plex Mono); `next/image`'s `getImageProps()`               |
-| Live answers | Route Handler → Anthropic Messages API (`claude-haiku-5-5`), streaming text          |
+| Live answers | Route Handler → Anthropic Messages API (`claude-haiku-5-5`), streaming NDJSON        |
 | Abuse limits | Upstash Redis (`@upstash/ratelimit`), Vercel BotID                                   |
 | Tests        | Vitest + Testing Library, Playwright + axe-core, Lighthouse CI                       |
 | Hosting      | Vercel, with Speed Insights (bundled only in builds that run on Vercel)              |
@@ -36,18 +38,40 @@ model and the full `/api/ask` contract. In short:
 - **One source of truth.** Every fact lives in [`src/content/profile.ts`](src/content/profile.ts),
   including the list of page sections. The page, the navigation, the palette's curated answers,
   the Claude system prompt, JSON-LD, `/profile.json` and `/llms.txt` all read from it.
-- **HTML first.** Sections are Server Components. The diagrams and the film player render on the
-  server too; a small `'use client'` shell shows each one and loads its controller only as it nears
-  the viewport. The career timeline ships no JavaScript at all. The other client modules are the
-  theme toggle, the mobile Sections menu, a copy button, the Ask buttons and the palette loader,
-  the "Scene by scene" dialog and the error boundaries.
-- **The palette loads on intent.** Ask buttons reach the palette's loader through a small event
-  bus ([`ask-events.ts`](src/components/ask/ask-events.ts)), and the loader listens for ⌘K /
-  Ctrl+K itself. The palette's code downloads when a visitor points at, focuses or presses an Ask
-  button, or presses the shortcut; never at idle. If it fails to load, an error boundary keeps the
-  page up and offers Try again and email.
-- **Motion in CSS.** Scroll-driven reveals move sections without fading their text, and the theme
-  switch uses a View Transition. Everything stands down under `prefers-reduced-motion`.
+- **HTML first.** Sections are Server Components. The diagrams render on the server too; a small
+  `'use client'` shell shows each one and loads its controller only as it nears the viewport. The
+  career timeline and the signal line ship no JavaScript at all. The other client modules are the
+  theme toggle, the mobile Sections menu, the keyboard shortcuts, a copy button, the hero's ask
+  bar, the Ask buttons and the palette loader, the hero's film frame, the "Scene by scene" dialog,
+  the case studies' focus helper and the error boundaries.
+- **The film waits for the portrait.** _Arrival_ opens the hero inside the portrait frame. The
+  headshot paints first (on desktop it is the page's LCP element); only after the load event and
+  an idle period, and only from `md` up, with the frame on screen, motion welcome and no
+  Save-Data, does the frame play a 451 KB 4:5 cut, once a visit, with a pause control. On phones
+  it never plays by itself. Its chip opens the full film in a theater whose player loads on intent.
+- **The palette loads on intent.** The hero's ask bar and the Ask buttons reach the palette's
+  loader through a small event bus ([`ask-events.ts`](src/components/ask/ask-events.ts)), and the
+  loader listens for ⌘K / Ctrl+K itself. The palette's code downloads when a visitor points at,
+  focuses or uses the ask bar or an Ask button, or presses a shortcut; never at idle. If it fails
+  to load, an error boundary keeps the page up and offers Try again and email.
+- **Answers can show the page.** Every place an answer may point to (a section, a Work theme, a
+  career role, the awards or a case study) is on one allowlist,
+  [`page-targets.ts`](src/lib/page-targets.ts), built from `profile.ts`. A curated answer offers
+  "Show me…" buttons; "show me…" and "take me to…" questions move at once. The page scrolls
+  under the header, focus lands on the place's heading, and an accent ring marks it.
+- **Case studies.** `/work/devtools`, `/work/mcp` and `/work/platform` are prerendered from
+  [`case-studies.ts`](src/content/case-studies.ts). Each theme's kicker, title, lede and diagram
+  morph between the Work section and its case study with React's `<ViewTransition>`.
+- **Keyboard shortcuts.** `/` types a question (the ask bar while it is in view, Ask Steven
+  elsewhere), `T` switches the theme and `?` lists them. A switch in that sheet turns the
+  single-key shortcuts off (WCAG 2.1.4).
+- **Motion in CSS.** Scroll-driven reveals move sections without fading their text. A green
+  signal line, placed with CSS anchor positioning and drawn by scroll-driven animations, runs from
+  the hero's status dot down the gutter to the email address, lighting a node at each section
+  label; the header marks the section being read; Adage's figures count up once. The theme switch
+  reveals the new theme in a circle from the toggle (a typed View Transition), and React's
+  `<ViewTransition>` morphs the film's frame into its theater and the Work themes into their case
+  studies. Everything stands down under `prefers-reduced-motion`.
 - **Locked-down headers.** [`next.config.ts`](next.config.ts) sets a Content Security Policy that
   allows only this origin. It permits inline scripts, because Next.js streams its payload through
   them and the site uses no nonce, and blocks inline event handlers with `script-src-attr 'none'`.
@@ -58,23 +82,31 @@ model and the full `/api/ask` contract. In short:
 
 ```
 src/
-  app/                    Routes and metadata: /, /colophon, /api/ask, /profile.json, /llms.txt,
-                          Open Graph and icon images, sitemap, robots, manifest, error and 404 pages
+  app/                    Routes and metadata: /, /work/[slug], /colophon, /api/ask, /profile.json,
+                          /llms.txt, Open Graph and icon images, sitemap, robots, manifest, error
+                          and 404 pages
   assets/                 Headshot, Salesforce logo, TTF fonts for the next/og images
   content/
     profile.ts            Single source of truth for every fact on the site
     answers.ts            The palette's curated answers and question matcher
+    case-studies.ts       The three case studies, built from profile.ts and the diagrams' steps
   components/
     sections/             Server Components, one per page section
     visuals/              Server-rendered diagrams; each controller loads as its card nears view
       shared/             The shared visuals system (see its README)
-    film/                 The film: server-rendered player and scene list, lazily loaded controller
-    ask/                  The ⌘K palette (loaded on intent) and the buttons that open it
+    film/                 Arrival: the hero's frame and theater, the 4:5 and 16:9 players, scene list
+    ask/                  The ⌘K palette (loaded on intent), the hero's ask bar, the Ask buttons
+    case-study/           The case-study page, its shared-element morph and focus helper
+    signal/               The signal line and its nodes (CSS only)
+    shortcuts/            The / T ? listener and the shortcuts sheet (loaded on demand)
+    story/                How I built this: the story's parts and the measured results
     ui/                   Small shared primitives
   lib/
     ask/                  Server-only: system prompt, visitor cookie, rate limits, Anthropic client
     ask-client/           Browser client for /api/ask
     ask-contract.ts       Limits, types and error codes shared by both sides
+    page-targets.ts       The allowlist of places an answer may show
+    page-actions.ts       Scrolls to, focuses and marks a place (loaded with the palette)
     tokens.ts             Colour tokens for next/og images, the theme colour and the manifest
     structured-data.ts    JSON-LD for the home page and /profile.json
   test/                   Shared test helpers (browser API fakes)
@@ -147,14 +179,18 @@ control fails. The full model and the `/api/ask` contract are in
 6. **Kill switches.** `ASK_ENABLED` or a Redis flag turns live answers off; so does spending the
    day's cap. The palette falls back to curated answers.
 7. **Output is bounded.** Claude Haiku 5.5 at low effort, `max_tokens` 2048, a 25-second deadline,
-   and answers rendered as plain text, never HTML.
+   and answers rendered as plain text, never HTML. Claude has one tool, `show_on_page`, whose
+   only input is an enum of the page-target allowlist; no result is sent back, so it costs no
+   second request. The route and then the browser check the target against the allowlist, and
+   the page moves by itself only when the visitor asked to be shown something.
 8. **The prompt has no secrets.** The system prompt is built from the public profile and lives in
    [`src/lib/ask/prompt.ts`](src/lib/ask/prompt.ts).
 
 **Cookies.** The site's code sets one first-party cookie, `__Host-ask`, and only when live answers
 are configured. It holds a random id used only for the Ask allowance, with a signed hint of the
-questions left, and lasts 2 days. The theme choice stays in `localStorage`. Vercel BotID's
-challenge, which loads only when a question is sent to Claude, may store its own state.
+questions left, and lasts 2 days. The theme choice and whether single-key shortcuts are off stay
+in `localStorage`, and whether the hero's film has played this visit in `sessionStorage`. Vercel
+BotID's challenge, which loads only when a question is sent to Claude, may store its own state.
 
 The end-to-end suite guards this. It fails if any file under `.next/static`, or any page's HTML,
 contains an Anthropic key, the SDK's API host, or the names of the server secrets. It checks that
@@ -178,13 +214,28 @@ on desktop Chrome and an emulated Pixel 7. They check that:
   Try again
 - the palette's live, used-up, busy and curated states render as designed, against mocked and real
   `/api/ask` responses
-- "Scene by scene" is a modal dialog, the film requests no video before Play, the metadata tour
-  never moves the selected tab under keyboard focus, and the career roles are exclusive
-  disclosures
+- the hero's film starts only after the load event, only from `md` up, and never under reduced
+  motion or with Save-Data; the portrait stays the LCP element; the film pauses, lands on the
+  portrait and plays once a visit
+- the film's theater is a modal dialog that morphs from the frame, keeps focus and returns it, and
+  "Scene by scene" opens over it as a modal of its own
+- the metadata tour never moves the selected tab under keyboard focus, and the career roles are
+  exclusive disclosures
+- the hero's ask bar asks, and `/` focuses it; every allowlisted page target exists; "Show me"
+  moves, focuses and marks the place, and a live answer's action outside the allowlist is dropped
+- each case study renders its four parts and metadata, morphs from the Work section and back,
+  and puts keyboard focus on arrival and back on the link after the browser's Back
+- the signal line runs from the status dot to the email, lights each node as it is reached, stays
+  drawn under reduced motion, and is absent on phones, in print and in forced colours
+- the theme reveal grows from the toggle, the header marks the section being read, the count-up
+  causes no layout shift, and the shortcuts sheet, its switch and its keys behave as listed
+- How I built this lists its parts in order, and its results match `measured.ts` and
+  `lighthouserc.json`
 - pages log no console errors; `/profile.json`, `/llms.txt`, robots, sitemap and the OG image
   respond with the right types; unknown routes return a `noindex` 404
-- axe reports no serious or critical violations on `/` and `/colophon` in light and dark, on the
-  open palette, and on each section while its scroll reveal is still moving
+- axe reports no serious or critical violations on `/`, `/colophon` and each case study in light
+  and dark, on the open palette, theater and shortcuts sheet, and on each section while its scroll
+  reveal is still moving
 - the security guards described above hold, and the CSP includes `script-src-attr 'none'`
 
 ```sh
@@ -194,22 +245,29 @@ BASE_URL=https://<preview-url> pnpm test:e2e    # test a deployment instead of a
 pnpm exec playwright show-report                # open the last HTML report
 ```
 
-**Lighthouse CI** ([`lighthouserc.json`](lighthouserc.json)) audits `/` and `/colophon` on the
-production server, with mobile emulation and simulated throttling, 3 runs per URL, asserting on
-the median run. These floors fail the build:
+**Lighthouse CI** ([`lighthouserc.json`](lighthouserc.json)) audits `/`, `/colophon` and
+`/work/mcp` on the production server, with mobile emulation and simulated throttling, 3 runs per
+URL, asserting on the median run. These floors fail the build:
 
-| Assertion                          | Floor    |
-| ---------------------------------- | -------- |
-| Performance                        | ≥ 0.90   |
-| Accessibility                      | 1        |
-| Best practices                     | ≥ 0.95   |
-| SEO                                | 1        |
-| JavaScript transfer                | ≤ 180 KB |
-| Total transfer                     | ≤ 600 KB |
-| Media requests (video before Play) | 0        |
+| Assertion               | Floor    |
+| ----------------------- | -------- |
+| Performance             | ≥ 0.90   |
+| Accessibility           | 1        |
+| Best practices          | ≥ 0.95   |
+| SEO                     | 1        |
+| JavaScript transfer     | ≤ 180 KB |
+| Total transfer          | ≤ 600 KB |
+| Media requests (mobile) | 0        |
 
-The performance floor sits below the local result on purpose. GitHub's runners measure the home
-page at 0.91–0.93 where a local build measures 0.95: simulated throttling charges the async
+The media floor states a design rule: on a phone the portrait is an 88 px avatar, so the film
+never plays by itself there, and no video downloads until the visitor presses Play. This audit
+does not see the wider frame. From `md` up the frame plays its 451 KB 4:5 cut once the
+page has loaded and gone idle; the end-to-end suite checks that it starts after the load event
+and that the portrait stays the LCP element. With Lighthouse's desktop preset the home page still
+scores 100, with the portrait as LCP at 0.66 s, and the cut counted in its total transfer.
+
+The performance floor sits below the local result on purpose. GitHub's runners measured the home
+page at 0.91–0.93 when a local build measured 0.95: simulated throttling charges the async
 framework scripts to LCP when they finish before the first paint, and slower runners pay more
 for them. Cutting initial JavaScript is the way to raise it back.
 
@@ -220,11 +278,15 @@ local production build. Every assertion passed:
 
 | Page        | Performance | Accessibility | Best practices | SEO | LCP    | TBT   | CLS | JavaScript | Total     |
 | ----------- | ----------- | ------------- | -------------- | --- | ------ | ----- | --- | ---------- | --------- |
-| `/`         | 95          | 100           | 100            | 100 | 2.93 s | 21 ms | 0   | 162,659 B  | 290,418 B |
-| `/colophon` | 98          | 100           | 100            | 100 | 2.48 s | 10 ms | 0   | 155,448 B  | 248,570 B |
+| `/`         | 94          | 100           | 100            | 100 | 3.08 s | 22 ms | 0   | 168,263 B  | 300,616 B |
+| `/colophon` | 98          | 100           | 100            | 100 | 2.48 s | 11 ms | 0   | 157,980 B  | 266,691 B |
+| `/work/mcp` | 96          | 100           | 100            | 100 | 2.78 s | 19 ms | 0   | 178,123 B  | 311,536 B |
 
-The home page's LCP element is the hero's headline paragraph, and its performance score sits on
-the floor. On the same day, Lighthouse's desktop preset scored both pages 100 in every category.
+The home page's LCP element is the hero's tagline paragraph. Its score is a point below the
+previous round's 95: the hero's ask bar, the film frame and the shortcuts added about 5.6 KB to
+the two app chunks Lighthouse's simulation counts against LCP (see
+[architecture](docs/architecture.md#performance)). On the same day, Lighthouse's desktop preset
+scored all three pages 100 in every category.
 To run Lighthouse locally after a build: `pnpm exec lhci collect && pnpm exec lhci assert`.
 
 **GitHub Actions** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pushes to

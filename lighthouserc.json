@@ -4,7 +4,11 @@
       "startServerCommand": "pnpm start -p 4329",
       "startServerReadyPattern": "Ready",
       "startServerReadyTimeout": 60000,
-      "url": ["http://localhost:4329/", "http://localhost:4329/colophon"],
+      "url": [
+        "http://localhost:4329/",
+        "http://localhost:4329/colophon",
+        "http://localhost:4329/work/mcp"
+      ],
       "numberOfRuns": 3,
       "settings": {
         "formFactor": "mobile",

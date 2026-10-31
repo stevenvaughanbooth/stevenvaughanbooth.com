@@ -1,0 +1,45 @@
+/*
+ * The hero's frame. While the film plays over the portrait, the portrait waits a touch closer;
+ * as the film fades out it eases back, so the film lands on it rather than cutting to it.
+ */
+.media > img {
+  transition: scale 1.6s var(--ease-out-expo);
+}
+
+.media:has(> video[data-shown]) > img {
+  scale: 1.04;
+}
+
+/*
+ * The chip's icon. At rest it is Play. While the film plays in the frame, whose own control plays
+ * and pauses it there, the chip shows Expand instead: it opens the full film in the theater.
+ */
+.expand,
+.media:has(> video[data-shown]) ~ * .play {
+  display: none;
+}
+
+.media:has(> video[data-shown]) ~ * .expand {
+  display: block;
+}
+
+/*
+ * The morph between the frame (4:5) and the theater's screen (16:9). Both snapshots fill the
+ * moving box and crop to it, as the live elements do, so neither one stretches on the way.
+ */
+:global(::view-transition-group(.arrival-morph)) {
+  animation-duration: 0.5s;
+  animation-timing-function: var(--ease-out-expo);
+  border-radius: 1rem;
+  overflow: clip;
+}
+
+:global(::view-transition-old(.arrival-morph)) {
+  height: 100%;
+  object-fit: cover;
+}
+
+:global(::view-transition-new(.arrival-morph)) {
+  height: 100%;
+  object-fit: cover;
+}

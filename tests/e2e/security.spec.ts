@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ANSWER_CONTENT_TYPE } from '@/lib/ask-contract';
+import { askTrigger, hydrated, palette } from './helpers';
 
 /**
  * Guards for the Ask Steven security model (docs/architecture.md). The Anthropic key and the
@@ -128,4 +130,42 @@ test.describe('/api/ask', () => {
     });
     expect([403, 503]).toContain(response.status());
   });
+});
+
+test('a live answer cannot send the page anywhere outside the allowlist', async ({ page }) => {
+  await page.route('**/api/ask', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ json: { enabled: true, limit: 3, remaining: 3 } })
+      : route.fulfill({
+          contentType: ANSWER_CONTENT_TYPE,
+          body: [
+            { type: 'text', text: 'Somewhere else.' },
+            { type: 'action', target: 'javascript:alert(document.domain)' },
+            { type: 'action', target: '//attacker.example' },
+            { type: 'action', target: 'film' },
+          ]
+            .map((event) => `${JSON.stringify(event)}\n`)
+            .join(''),
+        }),
+  );
+  const dialogs: string[] = [];
+  page.on('dialog', (dialog) => {
+    dialogs.push(dialog.message());
+    void dialog.dismiss();
+  });
+  await page.goto('/');
+  await hydrated(page);
+  await askTrigger(page).click();
+  const input = page.getByRole('combobox', { name: 'Ask a question or search' });
+  // A request to be shown something, so a valid action would move the page.
+  await input.fill('Show me something surprising');
+  await input.press('Enter');
+
+  const reply = palette(page).getByRole('article', { name: 'Show me something surprising' });
+  await expect(reply).toContainText('Somewhere else.');
+  await expect(reply.getByRole('list', { name: 'On this site' })).toHaveCount(0);
+  await expect(palette(page)).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/');
+  expect(new URL(page.url()).hash).toBe('');
+  expect(dialogs).toEqual([]);
 });

@@ -1,6 +1,7 @@
 import 'server-only';
 import { checkBotId } from 'botid/server';
 import {
+  ANSWER_CONTENT_TYPE,
   ASK_ERRORS,
   type AskErrorCode,
   type AskStatus,
@@ -8,7 +9,7 @@ import {
   REMAINING_HEADER,
   VISITOR_LIMIT,
 } from '@/lib/ask-contract';
-import { startAnswer } from '@/lib/ask/answer';
+import { type AnswerFormat, startAnswer } from '@/lib/ask/answer';
 import { getAskConfig } from '@/lib/ask/config';
 import { logAsk, logAskError } from '@/lib/ask/log';
 import { isSameOrigin } from '@/lib/ask/origin';
@@ -35,6 +36,18 @@ const limitHeaders = (remaining: number) => ({
   [LIMIT_HEADER]: String(VISITOR_LIMIT),
 });
 
+/**
+ * The answer's format, by the request's Accept header. The client from before page actions sends
+ * `Accept: text/plain` and shows the body exactly as it arrives, so a tab still running it gets
+ * the plain text it expects; the current client accepts NDJSON. Drop the plain-text answer once
+ * tabs from that release have aged out.
+ */
+function answerFormat(request: Request): AnswerFormat {
+  return request.headers.get('accept')?.includes('application/x-ndjson') ? 'ndjson' : 'text';
+}
+
+const PLAIN_TEXT = 'text/plain; charset=utf-8';
+
 /** `__Host-` and Secure everywhere but `next dev`, which may be reached over plain HTTP. */
 const secureCookies = () => process.env.NODE_ENV !== 'development';
 
@@ -58,7 +71,11 @@ export async function GET(request: Request): Promise<Response> {
   );
 }
 
-/** Streams a grounded answer as plain text. See docs/architecture.md for the contract. */
+/**
+ * Streams a grounded answer as newline-delimited JSON: its text, then at most one allowlisted
+ * place on the site to show. A client that does not accept NDJSON gets the text alone, as plain
+ * text. See docs/architecture.md for the contract.
+ */
 export async function POST(request: Request): Promise<Response> {
   // Cheapest checks first; nothing below runs, and no money is spent, unless all of them pass.
   // Origin and validation come before configuration so they hold (and are testable) everywhere.
@@ -123,9 +140,15 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  const format = answerFormat(request);
   let body: ReadableStream<Uint8Array>;
   try {
-    body = await startAnswer({ apiKey: config.apiKey, ...parsed.data, signal: request.signal });
+    body = await startAnswer({
+      apiKey: config.apiKey,
+      ...parsed.data,
+      signal: request.signal,
+      format,
+    });
   } catch (err) {
     // Claude failed before answering, so the question does not count against the visitor, their
     // network or the day. A visitor who disconnected keeps the cost: refunding that would let a
@@ -140,7 +163,7 @@ export async function POST(request: Request): Promise<Response> {
   visitor = { ...visitor, remaining: decision.remaining, issuedAt: now };
   return new Response(body, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Type': format === 'ndjson' ? ANSWER_CONTENT_TYPE : PLAIN_TEXT,
       ...NO_STORE,
       ...withVisitor(limitHeaders(decision.remaining)),
     },

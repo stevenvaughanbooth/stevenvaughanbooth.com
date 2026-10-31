@@ -1,19 +1,18 @@
-import { ArrowDown } from '@/components/ui/icons';
-import { person, sections } from '@/content/profile';
-import styles from './arrival-film.module.css';
-
-const filmIndex = sections.findIndex((section) => section.id === 'film');
-
-/** The section after the film on the page, where the end plate's link continues. */
-export const nextSection = filmIndex === -1 ? undefined : sections[filmIndex + 1];
+import { ArrowRight } from '@/components/ui/icons';
+import styles from './player.module.css';
+import { closesTheater } from './theater';
 
 /*
  * Text on the plate is set in container units with a 12px floor: the plate leans away from the
  * viewer, and its far edge renders about 7% smaller, so 12px keeps every line at 11px or more.
  */
 
-/** The old intro's last beat: the monitor wakes into a terminal, which leads on down the page. */
-export function EndPlate() {
+/**
+ * The old intro's last beat: the monitor wakes into a terminal. Its last line closes the theater,
+ * which carries the film back into the hero's frame, onto the portrait. Part of the player, so it
+ * and its styles arrive with the theater's code rather than in every page load.
+ */
+export function EndPlate({ name }: { name: string }) {
   return (
     <div className={styles.screen}>
       <div className="flex size-full flex-col overflow-hidden rounded-[0.8cqw] border border-line-strong bg-surface font-mono text-fg shadow-[0_0_5cqw_var(--glow)]">
@@ -43,24 +42,23 @@ export function EndPlate() {
               className={`${styles.cursor} ml-[0.08em] inline-block h-[1.05em] w-[0.5em] bg-green`}
             />
           </p>
-          {nextSection ? (
-            <p className={`${styles.result} mt-[1.2cqw]`}>
-              <a
-                href={`#${nextSection.id}`}
-                className="-mx-1 inline-flex min-h-6 items-center gap-1 rounded px-1 text-[clamp(12px,2.4cqw,19px)] text-green underline-offset-4 hover:underline"
-              >
-                Continue to {nextSection.label}
-                <ArrowDown width="1em" height="1em" />
-              </a>
-            </p>
-          ) : null}
+          <p className={`${styles.result} mt-[1.2cqw]`}>
+            <button
+              type="button"
+              {...closesTheater}
+              className="-mx-1 inline-flex min-h-6 cursor-pointer items-center gap-1 rounded px-1 text-[clamp(12px,2.4cqw,19px)] text-green underline-offset-4 hover:underline"
+            >
+              Continue to the site
+              <ArrowRight width="1em" height="1em" />
+            </button>
+          </p>
         </div>
 
         <div
           aria-hidden
           className="hidden justify-between border-t border-line px-[2.6cqw] py-[1.1cqw] text-[clamp(12px,1.2cqw,13px)] tracking-[0.14em] text-subtle uppercase @md:flex"
         >
-          <span>{person.name}</span>
+          <span>{name}</span>
           <span>Engineer / Builder</span>
         </div>
       </div>

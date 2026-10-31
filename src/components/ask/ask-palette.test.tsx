@@ -9,7 +9,10 @@ import { AskLauncher } from './ask-launcher';
 import { AskPalette, type AskPaletteHandle } from './ask-palette';
 
 const push = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+  usePathname: () => window.location.pathname,
+}));
 
 // jsdom implements <dialog> without the modal API.
 beforeAll(() => {
@@ -41,6 +44,14 @@ function stream(text: string[], headers: Record<string, string>) {
   );
 }
 
+/** A 200 answer as the route sends it: one JSON event per line. */
+function answerStream(events: unknown[], headers: Record<string, string> = {}) {
+  return stream(
+    events.map((event) => `${JSON.stringify(event)}\n`),
+    { 'Content-Type': 'application/x-ndjson; charset=utf-8', ...headers },
+  );
+}
+
 function json(status: number, body: unknown, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers });
 }
@@ -63,7 +74,7 @@ function posts(fetchMock: ReturnType<typeof mockApi>) {
 
 const announce = vi.fn();
 
-async function openPalette(detail?: { prompt?: string }) {
+async function openPalette(detail?: { prompt?: string; question?: string }) {
   const ref = createRef<AskPaletteHandle>();
   render(<AskPalette ref={ref} announce={announce} />);
   await act(async () => ref.current?.open(detail));
@@ -87,6 +98,8 @@ function activeOption() {
 beforeEach(() => {
   push.mockReset();
   announce.mockReset();
+  // Page actions scroll the window, which jsdom does not implement.
+  vi.stubGlobal('scrollTo', vi.fn());
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -542,6 +555,207 @@ describe('AskPalette live answers', () => {
     const view = await thread();
     expect(view.getByText(/covers only the career and project details/)).toBeInTheDocument();
     expect(posts(fetchMock)).toHaveLength(0);
+  });
+});
+
+describe('AskPalette page actions', () => {
+  /** The parts of the home page the actions below point at. */
+  function renderPage() {
+    window.history.replaceState(null, '', '/');
+    const page = document.createElement('div');
+    page.innerHTML = `
+      <section id="open-source"><h2 tabindex="-1">Learn the repeatable parts.</h2></section>
+      <div id="recognition"><h3 tabindex="-1">Recognition</h3></div>`;
+    document.body.append(page);
+    return {
+      openSource: page.querySelector('#open-source h2'),
+      awards: page.querySelector('#recognition h3'),
+      remove: () => page.remove(),
+    };
+  }
+
+  const dialog = () => screen.getByRole('dialog', { hidden: true });
+
+  it('offers the place an answer is about as a button, and moves only when it is pressed', async () => {
+    const page = renderPage();
+    const fetchMock = mockApi();
+    await openPalette({ prompt: 'What awards has Steven won?' });
+    const view = await thread();
+    const actions = view.getByRole('list', { name: 'On this site' });
+    expect(dialog()).toHaveAttribute('open');
+    expect(document.activeElement).not.toBe(page.awards);
+
+    await userEvent
+      .setup()
+      .click(within(actions).getByRole('button', { name: 'Show me the awards' }));
+    expect(dialog()).not.toHaveAttribute('open');
+    expect(page.awards).toHaveFocus();
+    expect(window.location.hash).toBe('#recognition');
+    expect(posts(fetchMock)).toHaveLength(0);
+    page.remove();
+  });
+
+  it('shows the place straight away for an explicit request typed in the palette', async () => {
+    const page = renderPage();
+    mockApi();
+    const ref = await openPalette();
+    const user = userEvent.setup();
+    await user.type(combobox(), 'Take me to his awards');
+    await user.keyboard('{Enter}');
+    expect(dialog()).not.toHaveAttribute('open');
+    expect(page.awards).toHaveFocus();
+
+    // The request stays in the conversation, with its answer and the way back to the place.
+    await act(async () => ref.current?.open());
+    const view = await thread();
+    expect(view.getByRole('heading', { name: 'Take me to his awards' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Show me the awards' })).toBeInTheDocument();
+    page.remove();
+  });
+
+  it('moves the page for a request from the hero without opening over it', async () => {
+    const page = renderPage();
+    mockApi();
+    await openPalette({ question: 'Show me Adage' });
+    expect(dialog()).not.toHaveAttribute('open');
+    expect(page.openSource).toHaveFocus();
+    page.remove();
+  });
+
+  it('answers any other question from the hero in the palette', async () => {
+    mockApi();
+    await openPalette({ question: 'What is Adage?' });
+    expect(dialog()).toHaveAttribute('open');
+    expect(await screen.findByRole('heading', { name: 'What is Adage?' })).toBeInTheDocument();
+  });
+
+  it('opens a case study through the router', async () => {
+    mockApi();
+    const mcp = themes.find((theme) => theme.id === 'mcp');
+    await openPalette({ prompt: mcp?.prompt });
+    const link = (await thread()).getByRole('link', { name: /Read the MCP case study/ });
+    expect(link).toHaveAttribute('href', '/work/mcp');
+    await userEvent.setup().click(link);
+    expect(push).toHaveBeenCalledWith('/work/mcp');
+    expect(dialog()).not.toHaveAttribute('open');
+  });
+
+  /** The head of the MCP case study: its title and the diagram beside it. */
+  function renderCaseStudy() {
+    window.history.replaceState(null, '', '/work/mcp');
+    const page = document.createElement('div');
+    page.innerHTML = `
+      <h1 id="case-study-title" tabindex="-1">Context, one useful step at a time.</h1>
+      <div id="diagram" style="border-top-left-radius: 16px"><div role="group">Diagram</div></div>`;
+    document.body.append(page);
+    return {
+      title: page.querySelector('#case-study-title'),
+      diagram: page.querySelector('#diagram'),
+      remove: () => {
+        page.remove();
+        window.history.replaceState(null, '', '/');
+      },
+    };
+  }
+
+  it('on a case study, shows its own diagram and never links to the page itself', async () => {
+    const page = renderCaseStudy();
+    mockApi();
+    const mcp = themes.find((theme) => theme.id === 'mcp');
+    await openPalette({ prompt: mcp?.prompt });
+    const view = await thread();
+    expect(view.queryByText(/Work section/)).not.toBeInTheDocument();
+    const actions = view.getByRole('list', { name: 'On this site' });
+    expect(within(actions).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(actions).queryByRole('link')).not.toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .click(within(actions).getByRole('button', { name: 'Show me the MCP diagram' }));
+    expect(dialog()).not.toHaveAttribute('open');
+    expect(page.diagram).toHaveFocus();
+    expect(`${window.location.pathname}${window.location.hash}`).toBe('/work/mcp#diagram');
+    expect(push).not.toHaveBeenCalled();
+    page.remove();
+  });
+
+  it('on a case study, a request to be shown it lands on its title', async () => {
+    const page = renderCaseStudy();
+    mockApi();
+    const ref = await openPalette();
+    const user = userEvent.setup();
+    await user.type(combobox(), 'Show me the MCP case study');
+    await user.keyboard('{Enter}');
+    expect(dialog()).not.toHaveAttribute('open');
+    expect(page.title).toHaveFocus();
+    expect(push).not.toHaveBeenCalled();
+
+    // Its answer offers the diagram, not the page the visitor is on.
+    await act(async () => ref.current?.open());
+    const actions = (await thread()).getByRole('list', { name: 'On this site' });
+    expect(within(actions).getByRole('button', { name: 'Show me the MCP diagram' })).toBeVisible();
+    expect(within(actions).queryByRole('link')).not.toBeInTheDocument();
+    page.remove();
+  });
+
+  it('offers the place a live answer points to, without moving the page for a question', async () => {
+    const page = renderPage();
+    mockApi({
+      post: () =>
+        answerStream(
+          [
+            { type: 'text', text: 'Adage learns reflexes.' },
+            { type: 'action', target: 'open-source' },
+          ],
+          { 'X-Ask-Remaining': '2' },
+        ),
+    });
+    await openPalette();
+    const user = userEvent.setup();
+    await user.type(combobox(), 'What would Steven enjoy building next?');
+    await user.keyboard('{Enter}');
+    const view = await thread();
+    expect(await view.findByText('Adage learns reflexes.')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Show me the Adage demo' })).toBeInTheDocument();
+    expect(dialog()).toHaveAttribute('open');
+    expect(page.openSource).not.toHaveFocus();
+    page.remove();
+  });
+
+  it('moves the page after a live answer only when the visitor asked to be shown something', async () => {
+    const page = renderPage();
+    mockApi({
+      post: () =>
+        answerStream([
+          { type: 'text', text: 'Here is a surprise.' },
+          { type: 'action', target: 'open-source' },
+        ]),
+    });
+    await openPalette();
+    const user = userEvent.setup();
+    await user.type(combobox(), 'Show me something surprising');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(dialog()).not.toHaveAttribute('open'));
+    expect(page.openSource).toHaveFocus();
+    page.remove();
+  });
+
+  it('drops a live action outside the allowlist', async () => {
+    mockApi({
+      post: () =>
+        answerStream([
+          { type: 'text', text: 'Somewhere.' },
+          { type: 'action', target: 'javascript:alert(1)' },
+        ]),
+    });
+    await openPalette();
+    const user = userEvent.setup();
+    await user.type(combobox(), 'Show me something surprising');
+    await user.keyboard('{Enter}');
+    const view = await thread();
+    expect(await view.findByText('Somewhere.')).toBeInTheDocument();
+    expect(view.queryByRole('list', { name: 'On this site' })).not.toBeInTheDocument();
+    expect(dialog()).toHaveAttribute('open');
   });
 });
 

@@ -5,6 +5,10 @@ import { mockIntersectionObserver, mockReducedMotion } from '@/test/browser-mock
 import { MetadataPlatform } from '../metadata-platform';
 import { type StoryId, stories } from './stories';
 
+// The controller's first dynamic import is transformed on demand, which can take over a second
+// when the whole suite runs in parallel.
+const controllerLoad = { timeout: 5000 };
+
 const dwellMs = 6000;
 
 let page: ReturnType<typeof mockIntersectionObserver>;
@@ -24,7 +28,7 @@ const tick = (ms: number) => {
 async function loadController() {
   const staticTabs = screen.getByRole('tablist');
   page.show(0, { near: true });
-  await waitFor(() => expect(staticTabs).not.toBeInTheDocument());
+  await waitFor(() => expect(staticTabs).not.toBeInTheDocument(), controllerLoad);
 }
 
 function story(id: StoryId) {

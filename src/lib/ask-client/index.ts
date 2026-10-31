@@ -12,14 +12,20 @@ import {
   QUESTION_MAX,
   REMAINING_HEADER,
 } from '@/lib/ask-contract';
+import { isPageTargetId, type PageTargetId } from '@/lib/page-targets';
 
 const STATUS_TIMEOUT_MS = 6000;
 const RESPONSE_TIMEOUT_MS = 30000;
+/** Far longer than any line the route writes (one text delta); a longer one means a broken stream. */
+const LINE_MAX = 64 * 1024;
+
+/** An answer event once the browser has checked it: text, or an allowlisted place to show. */
+export type AnswerEvent = { type: 'text'; text: string } | { type: 'action'; target: PageTargetId };
 
 export type AskOutcome =
   | {
       kind: 'stream';
-      chunks: AsyncGenerator<string>;
+      events: AsyncGenerator<AnswerEvent>;
       remaining: number | null;
       limit: number | null;
     }
@@ -94,6 +100,48 @@ export async function* readText(body: ReadableStream<Uint8Array>): AsyncGenerato
   }
 }
 
+/**
+ * One line of the answer stream. Unknown event types and targets outside the allowlist are
+ * skipped; a line that is not JSON throws, which reads as an answer cut off.
+ */
+export function parseEvent(line: string): AnswerEvent | null {
+  if (!line.trim()) return null;
+  const value: unknown = JSON.parse(line);
+  if (!value || typeof value !== 'object') return null;
+  const { type, text, target } = value as Record<string, unknown>;
+  if (type === 'text' && typeof text === 'string') return { type, text };
+  if (type === 'action' && isPageTargetId(target)) return { type, target };
+  return null;
+}
+
+/**
+ * Reads an answer's events as they arrive: newline-delimited JSON, or, from a server that
+ * predates actions, plain text.
+ */
+export async function* readEvents(
+  body: ReadableStream<Uint8Array>,
+  contentType: string | null,
+): AsyncGenerator<AnswerEvent> {
+  if (!contentType?.includes('ndjson')) {
+    for await (const text of readText(body)) yield { type: 'text', text };
+    return;
+  }
+  let buffer = '';
+  for await (const chunk of readText(body)) {
+    buffer += chunk;
+    let end = buffer.indexOf('\n');
+    while (end >= 0) {
+      const event = parseEvent(buffer.slice(0, end));
+      buffer = buffer.slice(end + 1);
+      if (event) yield event;
+      end = buffer.indexOf('\n');
+    }
+    if (buffer.length > LINE_MAX) throw new Error('Answer line too long');
+  }
+  const last = parseEvent(buffer);
+  if (last) yield last;
+}
+
 async function errorCode(response: Response) {
   try {
     const body: unknown = await response.json();
@@ -108,7 +156,8 @@ async function errorCode(response: Response) {
 
 /**
  * Sends a question to Claude through /api/ask and maps every contract error to an outcome. The
- * history is the visitor's own earlier questions; answers are never sent back. Throws only when
+ * history is the visitor's own earlier questions; answers are never sent back. A streamed answer
+ * yields checked events: its text, then at most one place on the site to show. Throws only when
  * the caller aborts.
  */
 export async function askClaude(
@@ -127,7 +176,7 @@ export async function askClaude(
       method: 'POST',
       cache: 'no-store',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', Accept: 'text/plain' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, text/plain' },
       body: JSON.stringify(buildRequest(question, earlier)),
       signal: controller.signal,
     });
@@ -141,16 +190,17 @@ export async function askClaude(
   if (response.ok) {
     if (!response.body) return { kind: 'fallback', reason: 'unknown' };
     const body = response.body;
-    const chunks = (async function* () {
+    const type = response.headers.get('Content-Type');
+    const events = (async function* () {
       try {
-        yield* readText(body);
+        yield* readEvents(body, type);
       } finally {
         signal?.removeEventListener('abort', abort);
       }
     })();
     return {
       kind: 'stream',
-      chunks,
+      events,
       remaining: count(response.headers.get(REMAINING_HEADER)),
       limit: count(response.headers.get(LIMIT_HEADER)),
     };

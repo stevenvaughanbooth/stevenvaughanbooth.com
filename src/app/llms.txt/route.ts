@@ -1,3 +1,4 @@
+import { caseStudies, caseStudyPath } from '@/content/case-studies';
 import {
   adage,
   awards,
@@ -25,8 +26,7 @@ const and = new Intl.ListFormat('en', { type: 'conjunction' });
 /** What each home page section covers, for the link list below. */
 const sectionSummaries: Record<SectionId, string> = {
   'open-source': `${adage.name}, his open-source experiment. ${adage.tagline}`,
-  work: 'Three themes of his work, each with an interactive diagram.',
-  film: `${film.title} (${film.duration}), an optional film. ${film.note}`,
+  work: 'Three themes of his work, each with an interactive diagram and a case study.',
   experience: `Career progression at ${person.company} since ${careerStartYear}, recognition, and education.`,
   contact: 'Email first, then LinkedIn and GitHub.',
 };
@@ -84,7 +84,11 @@ ${list(awards.map((award) => `${award.year} ${award.name}: ${describeAward(award
 
 ## Site
 
-${list([link('Home', '/', 'Who Steven is, what he builds, and how to reach him.'), ...siteLinks])}
+${list([link('Home', '/', `Who Steven is, what he builds, and how to reach him. The hero's portrait opens with ${film.title} (${film.duration}), an optional film. ${film.note}`), ...siteLinks])}
+
+## Case studies
+
+${list(caseStudies.map((study) => link(study.theme.title, caseStudyPath(study.id), study.summary)))}
 
 ## Structured data
 
@@ -104,7 +108,7 @@ ${list([link('Home', '/', 'Who Steven is, what he builds, and how to reach him.'
 
 ## Optional
 
-- [How this site is built](${url('/colophon')})
+- [How I built this](${url('/colophon')}): How the site was rebuilt with Claude Code, then its stack, budgets and security model.
 - [Source code for this site](${site.repo})
 ${publicReferences.map((ref) => `- [${ref.label}](${ref.href}): Public reference for product terminology.`).join('\n')}
 `;

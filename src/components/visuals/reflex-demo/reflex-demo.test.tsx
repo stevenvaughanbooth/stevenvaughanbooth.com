@@ -10,6 +10,10 @@ import { ReflexDemo } from '../reflex-demo';
 import { knownCommand, steps, transcript } from './script';
 import { beatsShown, buildFrames, finalFrame, runProgress, type Step } from './timeline';
 
+// The controller's first dynamic import is transformed on demand, which can take over a second
+// when the whole suite runs in parallel.
+const controllerLoad = { timeout: 5000 };
+
 let page: ReturnType<typeof mockIntersectionObserver>;
 
 const card = () => screen.getByRole('group', { name: 'Session replay, illustrative' });
@@ -22,7 +26,7 @@ const pendingText = () =>
 async function loadController({ onScreen }: { onScreen: boolean }) {
   const staticButton = button('Replay the session');
   page.show(onScreen ? 0.6 : 0, { near: true });
-  await waitFor(() => expect(staticButton).not.toBeInTheDocument());
+  await waitFor(() => expect(staticButton).not.toBeInTheDocument(), controllerLoad);
   // The controller's first report: where the card is as it takes over.
   page.show(onScreen ? 0.6 : 0);
 }

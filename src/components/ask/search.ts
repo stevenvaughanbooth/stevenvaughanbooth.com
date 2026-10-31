@@ -30,8 +30,9 @@ export interface Results {
 /** Topics the Links group already covers, so they are not listed twice. */
 const linkedTopics = new Set<Topic['id']>(['contact', 'github', 'linkedin']);
 const stopWords = new Set(['a', 'an', 'the', 'to', 'of', 'and', 'my', 'me', 'go', 'open', 'show']);
+// "show me…" and "take me to…" go to Ask too, which places them on the page.
 const questionStart =
-  /^(what|whats|how|why|who|whos|when|where|which|do|does|did|is|are|was|can|could|would|should|tell|explain|describe|has|have)\b/;
+  /^(what|whats|how|why|who|whos|when|where|which|do|does|did|is|are|was|can|could|would|should|tell|explain|describe|has|have|show|take)\b/;
 
 function isSubsequence(needle: string, haystack: string): boolean {
   let i = 0;

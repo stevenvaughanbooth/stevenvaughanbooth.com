@@ -3,12 +3,14 @@ import {
   answerFor,
   type AskMode,
   type CuratedAnswer,
+  isNavigationRequest,
   matchQuestion,
   type Topic,
   topicById,
 } from '@/content/answers';
 import { HISTORY_MAX_ITEMS, QUESTION_MAX } from '@/lib/ask-contract';
 import { askClaude, getAskStatus } from '@/lib/ask-client';
+import type { PageTargetId } from '@/lib/page-targets';
 
 export type Notice =
   | { kind: 'curated-mode' }
@@ -26,6 +28,8 @@ export interface Turn {
   /** Topics the question touched on without matching any, offered as "Did you mean…". */
   suggestions?: Topic[];
   text: string;
+  /** The place a live answer pointed to, already checked against the allowlist. */
+  actions?: PageTargetId[];
   streaming: boolean;
   notice?: Notice;
   /** Allowance reported with this live answer. */
@@ -57,10 +61,17 @@ function spoken(answer: CuratedAnswer | undefined): string {
 }
 
 /**
- * The palette's conversation state. `announce` sends a message to the launcher's live region,
- * which owns the timing.
+ * Shows a place on the site. `afterAnswer` is true when a live answer streamed first, so the
+ * visitor may have moved on; false when the request was just made.
  */
-export function useAsk(announce: (message: string) => void) {
+export type ShowTarget = (target: PageTargetId, afterAnswer: boolean) => void;
+
+/**
+ * The palette's conversation state. `announce` sends a message to the launcher's live region,
+ * which owns the timing. `show` performs a page action; this hook calls it unprompted only for an
+ * explicit request to be shown something ("show me the awards").
+ */
+export function useAsk(announce: (message: string) => void, show: ShowTarget) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [status, setStatus] = useState<Status>({ state: 'unknown' });
   const nextId = useRef(0);
@@ -136,7 +147,7 @@ export function useAsk(announce: (message: string) => void) {
   /** Settles a live turn from curated notes when Claude cannot answer it. */
   function settleCurated(id: number, question: string, notice: Notice) {
     const reply = curatedReply(question, notice);
-    patch(id, { source: 'curated', streaming: false, text: '', ...reply });
+    patch(id, { source: 'curated', streaming: false, text: '', actions: undefined, ...reply });
     announceAnswer(reply);
   }
 
@@ -153,6 +164,7 @@ export function useAsk(announce: (message: string) => void) {
       patch(id, {
         source: 'live',
         text: '',
+        actions: undefined,
         streaming: true,
         answer: undefined,
         suggestions: undefined,
@@ -180,10 +192,16 @@ export function useAsk(announce: (message: string) => void) {
             patch(id, { quota: { remaining, limit } });
           }
           let text = '';
+          let action: PageTargetId | undefined;
           try {
-            for await (const chunk of outcome.chunks) {
-              text += chunk;
-              patch(id, { text });
+            for await (const event of outcome.events) {
+              if (event.type === 'text') {
+                text += event.text;
+                patch(id, { text });
+              } else {
+                action = event.target;
+                patch(id, { actions: [action] });
+              }
             }
           } catch {
             if (current.signal.aborted) return;
@@ -195,6 +213,8 @@ export function useAsk(announce: (message: string) => void) {
           if (!text.trim()) return settleCurated(id, question, { kind: 'fallback' });
           patch(id, { streaming: false });
           announce(text);
+          // Claude only suggests the place; the page moves by itself only if the visitor asked.
+          if (action && isNavigationRequest(question)) show(action, true);
           return;
         }
         case 'limit_reached':
@@ -221,10 +241,33 @@ export function useAsk(announce: (message: string) => void) {
     }
   }
 
+  /**
+   * An explicit request to be shown something the curated notes can place ("show me the awards"):
+   * recorded like any answer, then shown at once. The move of focus speaks for it, so nothing is
+   * announced. Returns false, doing nothing, for any other question.
+   */
+  function navigate(raw: string): boolean {
+    const question = clean(raw);
+    const match = matchQuestion(question);
+    if (!question || match.kind !== 'show') return false;
+    const last = turns.at(-1);
+    if (last?.question !== question || last.notice) {
+      addTurn({
+        question,
+        source: 'curated',
+        answer: answerFor(match.answer, mode),
+        text: '',
+        streaming: false,
+      });
+    }
+    show(match.target, false);
+    return true;
+  }
+
   /** Free-form text typed by the visitor. Only questions curated notes cannot settle reach Claude. */
   function ask(raw: string) {
     const question = clean(raw);
-    if (!question) return;
+    if (!question || navigate(question)) return;
     const match = matchQuestion(question);
     // Help, refusals, the prompt link and exact topic questions never need a model.
     const local = match.kind === 'topic' ? match.exact : match.kind !== 'none';
@@ -239,7 +282,7 @@ export function useAsk(announce: (message: string) => void) {
   /** A suggested prompt (from an "Ask about this" button): curated topics first, then Claude. */
   function run(raw: string) {
     const question = clean(raw);
-    if (!question) return;
+    if (!question || navigate(question)) return;
     const last = turns.at(-1);
     if (last && last.question === question && !last.notice) return;
     const match = matchQuestion(question);
@@ -276,6 +319,7 @@ export function useAsk(announce: (message: string) => void) {
     refresh,
     ask,
     run,
+    navigate,
     answerTopic,
     retry,
     clear,

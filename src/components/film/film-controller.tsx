@@ -1,12 +1,12 @@
 import {
+  Component,
   type KeyboardEvent,
-  type RefObject,
+  type ReactNode,
   useEffect,
   useEffectEvent,
   useRef,
   useState,
 } from 'react';
-import { useInView } from '@/components/visuals/shared/hooks';
 import { type FilmContent, type FilmStatus, FilmView } from './film-view';
 import { filmDuration, pickSource, sources } from './media';
 
@@ -21,39 +21,44 @@ const seekKeys: Record<string, (t: number, duration: number) => number> = {
   End: (_, duration) => duration,
 };
 
-interface FilmControllerProps extends FilmContent {
-  /** Set when Play was pressed on the static player, before this chunk arrived. */
-  playRequested: RefObject<boolean>;
+/**
+ * Loaded on intent by the hero's shell: the theater's player, which mounts as the theater opens.
+ * If it throws, the theater keeps its notes and shows `fallback` instead, and the page stays up.
+ */
+export function Theater({ fallback, ...content }: FilmContent & { fallback: ReactNode }) {
+  return (
+    <KeepOnError fallback={fallback}>
+      <FilmController {...content} />
+    </KeepOnError>
+  );
+}
+
+class KeepOnError extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
 }
 
 /**
- * Loaded lazily by the shell: the click-to-play film. The <video> has no source until Play, so
- * nothing downloads before the visitor asks; then it picks the best encode the browser supports
- * and falls back on error. It pauses while scrolled out of view and resumes on return.
+ * Plays the full film from the start, picking the best encode the browser supports and falling
+ * back on error. The theater is modal, so the film is never scrolled out of view.
  */
-export function FilmController({ playRequested, ...content }: FilmControllerProps) {
+function FilmController(content: FilmContent) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
   const sourceIndex = useRef(-1);
-  const autoPaused = useRef(false);
   const [status, setStatus] = useState<FilmStatus>('idle');
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(filmDuration);
   const [hasFrame, setHasFrame] = useState(false);
-
-  useInView(cardRef, {
-    onChange(inView) {
-      const video = videoRef.current;
-      if (!video) return;
-      if (!inView && !video.paused) {
-        autoPaused.current = true;
-        video.pause();
-      } else if (inView && autoPaused.current) {
-        autoPaused.current = false;
-        video.play().catch(() => {});
-      }
-    },
-  });
 
   function load(video: HTMLVideoElement, index: number) {
     const source = sources[index];
@@ -72,30 +77,23 @@ export function FilmController({ playRequested, ...content }: FilmControllerProp
       load(video, pickSource(video));
     }
     if (video.ended) video.currentTime = 0;
-    autoPaused.current = false;
     setStatus(video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA ? 'playing' : 'loading');
-    // Called inside the click so mobile browsers treat it as user-initiated. Rejections from an
-    // interrupted play() are expected; real failures arrive as the element's error event.
+    // Rejections from an interrupted play() are expected; real failures arrive as the element's
+    // error event.
     video.play().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'NotAllowedError') setStatus('paused');
     });
   }
 
-  // A press on the static player while this chunk loaded: honour it. The film is muted, so
-  // browsers let it start without the original gesture.
-  const playOnArrival = useEffectEvent(() => {
-    if (playRequested.current) play();
-  });
-  useEffect(() => playOnArrival(), []);
+  // Opening the theater is the request to play. The film is muted, so browsers let it start
+  // even though the press that opened the theater has passed.
+  const playOnOpen = useEffectEvent(play);
+  useEffect(() => playOnOpen(), []);
 
   function toggle() {
     const video = videoRef.current;
-    if (video && !video.paused) {
-      autoPaused.current = false;
-      video.pause();
-    } else {
-      play();
-    }
+    if (video && !video.paused) video.pause();
+    else play();
   }
 
   function seek(to: number) {
@@ -135,7 +133,6 @@ export function FilmController({ playRequested, ...content }: FilmControllerProp
       duration={duration}
       hasFrame={hasFrame}
       controls={{
-        cardRef,
         onToggle: toggle,
         onSeek: seek,
         onSeekKey,

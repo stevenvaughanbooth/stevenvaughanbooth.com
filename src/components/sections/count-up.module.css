@@ -1,0 +1,59 @@
+@property --count {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+
+/*
+ * The count is ::after, drawn over the real text, which stays in place but transparent: it holds
+ * the width, and it is what assistive technology reads (the overlay's alternative text is empty).
+ * The overlay rests on the final value and counts from zero only once the trigger fires, so a
+ * figure that never triggers still shows the true number. Without scroll-triggered animations,
+ * under reduced motion, in forced colours and in print, none of this applies and the real text
+ * simply shows.
+ */
+@supports (timeline-trigger: --a view()) and (content: '' / '') {
+  @media screen and (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+    .figure {
+      position: relative;
+      display: inline-block;
+      trigger-scope: --count-up;
+      timeline-trigger: --count-up view() entry 0% exit 100%;
+    }
+
+    .text {
+      color: transparent;
+    }
+
+    /*
+     * DM Sans has proportional digits, so the count changes width as it runs, at times past the
+     * final figure's. The overlay is out of flow, so only the real text sizes the figure, and it
+     * hangs from the figure's right edge. With a right-to-left direction, the count and its suffix
+     * each start at their right edge, which stays put as the overlay grows leftwards, so nothing
+     * moves its starting point and there is no layout shift. plaintext keeps the figure itself
+     * reading left to right.
+     */
+    .figure::after {
+      position: absolute;
+      top: 0;
+      right: 0;
+      white-space: nowrap;
+      direction: rtl;
+      unicode-bidi: plaintext;
+      --count: var(--count-to);
+      counter-reset: count var(--count);
+      content: counter(count) attr(data-suffix) / '';
+      /* Longhands, so no shorthand can reset the trigger whatever order a minifier writes. */
+      animation-name: count-up;
+      animation-duration: 1.6s;
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+      animation-trigger: --count-up play-once;
+    }
+  }
+}
+
+@keyframes count-up {
+  from {
+    --count: 0;
+  }
+}

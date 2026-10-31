@@ -1,14 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adage, awards, experience, person, projects, site } from '@/content/profile';
 
-/** Every string in a nested record, URLs aside. */
-function strings(value: unknown): string[] {
-  if (typeof value === 'string') return value.startsWith('http') ? [] : [value.trim()];
-  if (Array.isArray(value)) return value.flatMap(strings);
-  if (value && typeof value === 'object') return Object.values(value).flatMap(strings);
-  return [];
-}
-
 const secrets = {
   ANTHROPIC_API_KEY: 'sk-ant-api03-test-only-not-a-real-key',
   KV_REST_API_URL: 'https://example-redis.upstash.io',
@@ -44,8 +36,11 @@ describe('system prompt', () => {
       ...awards.flatMap((award) => [award.name, award.year, award.reason]),
       adage.summary,
       adage.install,
-      // Every result and caveat, whatever shape the evidence record takes.
-      ...strings(adage.evidence),
+      // Every result with its caveat, as the prose passage words them.
+      adage.evidence.headline,
+      adage.evidence.context,
+      adage.evidence.candor,
+      ...adage.evidence.results.flatMap((result) => [result.value, result.caveat]),
       adage.links.repo,
     ];
     for (const fact of facts) expect(SYSTEM_PROMPT).toContain(fact);
@@ -70,6 +65,12 @@ describe('system prompt', () => {
     expect(SYSTEM_PROMPT).not.toMatch(/\bpromotions\b/);
     expect(SYSTEM_PROMPT).toMatch(/Salesforce source code/);
     expect(SYSTEM_PROMPT).not.toMatch(/systems, code,/);
+  });
+
+  it('quotes each of Adage’s results once, in sentences', async () => {
+    const { SYSTEM_PROMPT } = await loadPrompt();
+    expect(SYSTEM_PROMPT.split('48%')).toHaveLength(2);
+    expect(SYSTEM_PROMPT).not.toMatch(/%\./);
   });
 
   it('treats earlier questions as context and never claims earlier answers', async () => {

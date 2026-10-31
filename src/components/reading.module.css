@@ -1,0 +1,138 @@
+/*
+ * Which section is being read, in CSS alone. Each home-page section publishes a view timeline
+ * (globals.css) and each nav item plays against its own section's. In the header, a green bar on
+ * the header's edge grows in from the left as the section reaches the reading line, and leaves to
+ * the right as the next one takes over; neighbours hand over across the same stretch of scroll,
+ * so the bar glides from one item to the next. Only `scale` animates, so it runs on the
+ * compositor and never moves layout. The current label brightens with it, and the Sections menu
+ * marks the current item with a dot. Without scroll-driven animations, and on pages without the
+ * sections, the timelines are inactive and nothing is marked.
+ */
+@property --reading-on {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.marker {
+  scale: 0 1;
+}
+
+/* The current item's label brightens with its bar. Hover keeps its own colour. */
+.link:not(:hover) {
+  color: color-mix(in oklab, var(--fg) calc(var(--reading-on) * 100%), var(--muted));
+}
+
+.dot {
+  opacity: var(--reading-on);
+}
+
+@supports (timeline-scope: --a) {
+  /*
+   * Near the page's end the last section takes over (and the others hand over), even on screens
+   * too tall for it to reach the reading line: --read-end is its untrimmed timeline.
+   */
+  .item,
+  .marker {
+    animation-duration: auto;
+    animation-timing-function: linear;
+    animation-fill-mode: both, forwards;
+    animation-timeline: var(--reading), --read-end;
+    animation-range:
+      normal,
+      entry 70% entry 100%;
+  }
+
+  .marker {
+    animation-name: reading, reading-handover;
+  }
+
+  .item:last-child .marker {
+    animation-name: reading, reading-takeover;
+  }
+
+  /* The label and the dot follow the same timelines, through a number they mix and fade by. */
+  .item {
+    animation-name: reading-on, reading-on-handover;
+  }
+
+  .item:last-child {
+    animation-name: reading-on, reading-on-takeover;
+  }
+
+  /* Reduced motion: the mark moves in one step as each section takes over, without the glide. */
+  @media (prefers-reduced-motion: reduce) {
+    .item,
+    .marker {
+      animation-timing-function: step-end;
+    }
+  }
+}
+
+@keyframes reading {
+  entry 0% {
+    scale: 0 1;
+    transform-origin: left;
+  }
+  /* The origin waits on the left while the bar is full, then switches for the exit. */
+  entry 100% {
+    scale: 1 1;
+    transform-origin: left;
+    animation-timing-function: step-end;
+  }
+  exit 0% {
+    scale: 1 1;
+    transform-origin: right;
+  }
+  exit 100% {
+    scale: 0 1;
+    transform-origin: right;
+  }
+}
+
+@keyframes reading-handover {
+  from {
+    transform-origin: right;
+  }
+  to {
+    scale: 0 1;
+    transform-origin: right;
+  }
+}
+
+@keyframes reading-takeover {
+  from {
+    transform-origin: left;
+  }
+  to {
+    scale: 1 1;
+    transform-origin: left;
+  }
+}
+
+@keyframes reading-on {
+  entry 0% {
+    --reading-on: 0;
+  }
+  entry 100% {
+    --reading-on: 1;
+  }
+  exit 0% {
+    --reading-on: 1;
+  }
+  exit 100% {
+    --reading-on: 0;
+  }
+}
+
+@keyframes reading-on-handover {
+  to {
+    --reading-on: 0;
+  }
+}
+
+@keyframes reading-on-takeover {
+  to {
+    --reading-on: 1;
+  }
+}

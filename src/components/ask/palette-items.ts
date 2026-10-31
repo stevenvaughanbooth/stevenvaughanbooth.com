@@ -21,12 +21,11 @@ export interface LinkItem {
 const sectionKeywords: Partial<Record<string, string[]>> = {
   'open-source': [adage.name, 'reflex', 'demo', 'oss'],
   work: ['projects', 'ideas', 'themes', 'mcp', 'platform', 'productivity'],
-  film: ['video', 'movie', 'interlude'],
   experience: ['career', 'timeline', 'roles', 'education', 'resume', 'awards', 'recognition'],
   contact: ['email', 'reach', 'hire'],
 };
 
-/** Every page section, in reading order, then the colophon. */
+/** Every page section in reading order, then the colophon. */
 export const goToItems: GoToItem[] = [
   ...sections.map((section) => ({
     id: section.id,
@@ -36,9 +35,9 @@ export const goToItems: GoToItem[] = [
   })),
   {
     id: 'colophon',
-    label: 'Colophon · How this site is built',
+    label: 'Colophon · How I built this',
     href: '/colophon',
-    keywords: ['stack', 'source', 'nextjs', 'website'],
+    keywords: ['stack', 'source', 'nextjs', 'website', 'claude code'],
   },
 ];
 

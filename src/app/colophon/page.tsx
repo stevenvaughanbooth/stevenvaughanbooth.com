@@ -1,14 +1,30 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { ArrowUpRight, GitHub } from '@/components/ui/icons';
+import { Brief } from '@/components/story/brief';
+import { Decisions } from '@/components/story/decisions';
+import { Findings } from '@/components/story/findings';
+import {
+  kilobytes as kb,
+  measured,
+  measuredOn,
+  milliseconds,
+  otherCategories,
+  seconds,
+} from '@/components/story/measured';
+import { Results } from '@/components/story/results';
+import { Roles } from '@/components/story/roles';
+import { Tile } from '@/components/story/tile';
+import { afterLaunch } from '@/components/story/story';
+import { Timeline } from '@/components/story/timeline';
+import { ArrowDown, ArrowUpRight, GitHub } from '@/components/ui/icons';
 import { site } from '@/content/profile';
 import lighthouse from '../../../lighthouserc.json';
 import pkg from '../../../package.json';
 
 export const metadata: Metadata = {
-  title: 'How this site is built',
+  title: 'How I built this',
   description:
-    'The principles, stack, rendering strategy, CI budgets, accessibility practices and Ask Steven security model behind this site.',
+    'How Steven Booth rebuilt this site in about a day with Claude Code, then the stack, rendering, CI budgets, accessibility and Ask Steven security model behind it.',
   alternates: { canonical: '/colophon' },
 };
 
@@ -39,14 +55,27 @@ const source = {
   workflow: `${site.repo}/blob/main/.github/workflows/ci.yml`,
 };
 
+/** The story first, then the colophon. The page's navigation and section numbers come from here. */
 const sections = [
-  { id: 'principles', label: 'Principles' },
-  { id: 'stack', label: 'Stack' },
-  { id: 'rendering', label: 'Rendering' },
-  { id: 'budgets', label: 'Budgets' },
-  { id: 'accessibility', label: 'Accessibility' },
-  { id: 'ask-steven', label: 'Ask Steven' },
-  { id: 'source', label: 'Source' },
+  { id: 'brief', label: 'The brief', part: 'story' },
+  { id: 'day', label: 'The day', part: 'story' },
+  { id: 'review', label: 'What review caught', part: 'story' },
+  { id: 'calls', label: 'My calls', part: 'story' },
+  { id: 'results', label: 'Results', part: 'story' },
+  { id: 'principles', label: 'Principles', part: 'colophon' },
+  { id: 'stack', label: 'Stack', part: 'colophon' },
+  { id: 'rendering', label: 'Rendering', part: 'colophon' },
+  { id: 'budgets', label: 'Budgets', part: 'colophon' },
+  { id: 'accessibility', label: 'Accessibility', part: 'colophon' },
+  { id: 'ask-steven', label: 'Ask Steven', part: 'colophon' },
+  { id: 'source', label: 'Source', part: 'colophon' },
+] as const;
+
+type SectionId = (typeof sections)[number]['id'];
+
+const parts = [
+  { id: 'story', label: 'The story' },
+  { id: 'colophon', label: 'The colophon' },
 ] as const;
 
 const goals = [
@@ -127,7 +156,7 @@ const stack: StackRow[] = [
     concern: 'Live answers',
     choice: 'Route Handler → Anthropic Messages API',
     version: 'claude-haiku-5-5',
-    why: 'Claude Haiku 5.5 at low effort, streamed as plain text. The key stays on the server.',
+    why: 'Claude Haiku 5.5 at low effort, streamed as text and at most one page action. The key stays on the server.',
   },
   {
     concern: 'Abuse limits',
@@ -158,17 +187,17 @@ const anatomy = [
     kind: 'Client islands',
     dot: 'bg-amber',
     parts:
-      'Theme toggle, Sections menu, copy button, Ask buttons, the scene list, and a small shell for each diagram and the film',
+      'Theme toggle, Sections menu, the hero’s ask bar, Ask buttons, keyboard shortcuts, copy button, the scene list, and a small shell for each diagram and the film’s frame',
     detail:
-      'Hydrated with the page. Animations pause off-screen and settle on a static frame under reduced motion.',
+      'Hydrated with the page. Animations pause off-screen or behind a dialog, and settle on a static frame under reduced motion.',
   },
   {
     kind: 'Loaded on demand',
     dot: 'bg-lilac',
     parts:
-      'The Ask Steven palette, and each diagram’s and the film’s controller as its card nears view',
+      'The Ask Steven palette, the shortcuts sheet, each diagram’s controller as its card nears view, and the film’s player',
     detail:
-      'Buttons announce “open” on a tiny event bus. The palette’s code loads on intent, when an Ask button is pointed at, focused or pressed, or on the shortcut; never with the page.',
+      'Buttons announce “open” on a tiny event bus. The palette’s code loads on intent, when the ask bar or an Ask button is pointed at, focused or pressed, or on a shortcut; never with the page.',
   },
   {
     kind: 'Server only',
@@ -185,11 +214,11 @@ const techniques = [
   },
   {
     title: 'Motion in CSS',
-    body: 'Sections rise into place with scroll-driven animations that never fade their text, and the theme switch uses a View Transition. Neither needs a library, and both stand down under prefers-reduced-motion.',
+    body: 'Sections rise into place with scroll-driven animations that never fade their text. A green line, placed with anchor positioning, follows the reader from the hero to the email address, and the header marks the section being read. The theme switch and the case studies use View Transitions. None of it needs a library, and all of it stands down under prefers-reduced-motion.',
   },
   {
     title: 'A film that waits',
-    body: 'The interlude is click-to-play. Its video downloads only after Play and is cached as immutable.',
+    body: 'Arrival opens the hero’s frame only once the page has loaded and gone idle, from tablet width up. It never plays by itself on phones, under reduced motion or with Save-Data. The theater’s player loads on intent, and every file is cached as immutable.',
   },
   {
     title: 'Locked-down headers',
@@ -227,38 +256,27 @@ const weights = [
   { label: 'JavaScript, compressed', value: kilobytes('script') },
   { label: 'Whole page, compressed', value: kilobytes('total') },
   {
-    label: 'Video requests before Play',
+    label: 'Video requests on a phone',
     value: String(budget('resource-summary:media:count', 'maxNumericValue')),
   },
 ];
 
-/** Measured with this repository's lighthouserc.json. Update after a change that moves them. */
-const measured = {
-  pages: [
-    {
-      path: '/',
-      metrics: [
-        { label: 'Performance', value: '95' },
-        { label: 'First contentful paint', value: '1.21 s' },
-        { label: 'Largest contentful paint', value: '2.93 s' },
-        { label: 'Total blocking time', value: '21 ms' },
-        { label: 'Layout shift', value: '0' },
-        { label: 'JavaScript', value: '159 KB' },
-      ],
-    },
-    {
-      path: '/colophon',
-      metrics: [
-        { label: 'Performance', value: '98' },
-        { label: 'First contentful paint', value: '0.91 s' },
-        { label: 'Largest contentful paint', value: '2.48 s' },
-        { label: 'Total blocking time', value: '10 ms' },
-        { label: 'Layout shift', value: '0' },
-        { label: 'JavaScript', value: '152 KB' },
-      ],
-    },
-  ],
-  note: 'Lighthouse 12.6.1 with this repository’s lighthouserc.json on 30 October 2026: emulated mobile, simulated throttling, median of 3 runs, against a local production build. Accessibility, best practices and SEO scored 100 on both pages. The home page’s largest contentful paint is the hero’s headline, and its performance score sits on the floor. On Lighthouse’s desktop preset, both pages score 100 in every category.',
+const otherScores = [...new Set(measured.pages.map(otherCategories))];
+
+/** The last run, from the module the story's results read too. Update the numbers there. */
+const lastMeasured = {
+  pages: measured.pages.map((page) => ({
+    path: page.path,
+    metrics: [
+      { label: 'Performance', value: String(page.performance) },
+      { label: 'First contentful paint', value: seconds(page.fcp) },
+      { label: 'Largest contentful paint', value: seconds(page.lcp) },
+      { label: 'Total blocking time', value: milliseconds(page.tbt) },
+      { label: 'Layout shift', value: String(page.cls) },
+      { label: 'JavaScript', value: kb(page.script) },
+    ],
+  })),
+  note: `Lighthouse ${measured.lighthouse} with this repository’s lighthouserc.json on ${measuredOn()}: emulated mobile, simulated throttling, median of ${lighthouse.ci.collect.numberOfRuns} runs, against a local production build. Accessibility, best practices and SEO scored ${otherScores.length === 1 ? `${otherScores[0]} on every page` : measured.pages.map((page) => `${otherCategories(page)} on ${page.path}`).join(', ')}. The home page’s largest contentful paint is ${measured.homeLcpElement}. On Lighthouse’s desktop preset, every page scores ${measured.desktopScore} in every category.`,
 };
 
 const e2e = [
@@ -268,7 +286,9 @@ const e2e = [
   'The palette’s code loads only on intent, and a failed load leaves the page up with a working retry.',
   'The palette’s live, used-up, busy and curated states, with follow-ups that never send answers back.',
   'Dialogs are modal and keep focus. The metadata tour never moves the tab under keyboard focus.',
-  'The film requests no video before Play.',
+  'The film never plays by itself on phones or under reduced motion, and its theater morphs from the frame and back with focus returned.',
+  'Answers that show a place scroll to it, focus it and mark it, and only for allowlisted places. The case studies morph from the Work section and back.',
+  'The signal line meets every section label as it passes, and the shortcuts sheet, its switch and the / ? T keys behave as listed.',
   'No console errors, and axe finds no serious or critical issue in either theme, mid-reveal or in the palette.',
   'No browser bundle contains the API key, the Anthropic SDK or a server secret’s name.',
 ];
@@ -280,11 +300,11 @@ const accessibility = [
   },
   {
     title: 'Keyboard',
-    body: 'Every control is reachable in a logical order and shows a clear focus ring. Section links move focus into the section, and closing a dialog returns focus to where it was.',
+    body: 'Every control is reachable in a logical order and shows a clear focus ring. Section links move focus into the section, and closing a dialog returns focus to where it was. The single-key shortcuts can be turned off from their sheet.',
   },
   {
     title: 'Motion',
-    body: 'When a visitor asks for reduced motion, reveals, transitions and diagram animations stop. The guided tours and the Adage replay show their finished state.',
+    body: 'When a visitor asks for reduced motion, reveals, transitions and diagram animations stop. The guided tours and the Adage replay show their finished state, the signal line is drawn in full, and the film never plays by itself.',
   },
   {
     title: 'Meaning',
@@ -335,48 +355,138 @@ export default function ColophonPage() {
       <div aria-hidden className="bg-grid absolute inset-x-0 top-0 -z-10 h-[32rem]" />
       <article className="page pt-32 pb-24 md:pt-40 md:pb-32">
         <header className="max-w-3xl">
-          <p className="label">Colophon</p>
-          <h1 className="mt-4 text-title font-semibold text-balance">How this site is built</h1>
+          <p className="label">How I built this</p>
+          <h1 className="mt-4 text-title font-semibold text-balance">
+            How I built this site with Claude Code
+          </h1>
           <p className="mt-6 text-lg leading-relaxed text-pretty text-muted md:text-xl">
-            A personal site that doubles as a work sample. It is statically prerendered, typed from
-            content to API, tested in a real browser on every change, and held to performance and
-            accessibility budgets that fail the build.
+            I rebuilt this site in about a day with Claude Code. I set the goal and made every
+            product call. Claude Code, running Claude Opus 5.5, planned the work, ran a team of
+            agents that wrote, reviewed and tested the code, and integrated what they built. Nothing
+            reached production until I had approved a preview.
+          </p>
+          <p className="mt-4 leading-relaxed text-pretty text-muted">
+            The story of that day comes first. The technical colophon follows: the stack, the
+            budgets, accessibility and the security model behind Ask Steven.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href={source.repo} className="pill pill-solid">
               <GitHub /> Source on GitHub
             </a>
-            <a href={source.architecture} className="pill pill-outline">
-              Architecture notes <ArrowUpRight />
+            <a href="#colophon" className="pill pill-outline">
+              Skip to the colophon <ArrowDown />
             </a>
           </div>
         </header>
 
+        <div className="mt-14 md:mt-20">
+          <Roles />
+        </div>
+
         <div className="mt-16 grid gap-10 md:mt-24 lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-16">
           <nav aria-label="On this page" className="lg:sticky lg:top-28 lg:self-start">
             <p className="label">On this page</p>
-            <ol className="mt-4 flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
-              {sections.map((section, i) => (
-                <li key={section.id}>
-                  <a
-                    href={`#${section.id}`}
-                    className="group flex items-baseline gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg lg:rounded-lg lg:border-transparent lg:px-2 lg:hover:border-transparent lg:hover:bg-elevated"
-                  >
-                    <span
-                      aria-hidden
-                      className="font-mono text-xs text-subtle group-hover:text-green"
-                    >
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    {section.label}
-                  </a>
-                </li>
+            {/* Phones and tablets: the two parts side by side. From lg: one column beside the text. */}
+            <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-6 sm:max-w-md lg:grid-cols-1">
+              {parts.map((part) => (
+                <div key={part.id}>
+                  <p className="px-2 font-mono text-micro tracking-wide text-subtle uppercase">
+                    {part.label}
+                  </p>
+                  <ol className="mt-2 space-y-0.5">
+                    {sections.map((section, i) =>
+                      section.part === part.id ? (
+                        <li key={section.id}>
+                          <a
+                            href={`#${section.id}`}
+                            className="group flex items-baseline gap-2 rounded-lg px-2 py-1.5 text-sm text-muted transition-colors hover:bg-elevated hover:text-fg"
+                          >
+                            <span
+                              aria-hidden
+                              className="font-mono text-xs text-subtle group-hover:text-green"
+                            >
+                              {String(i + 1).padStart(2, '0')}
+                            </span>
+                            {section.label}
+                          </a>
+                        </li>
+                      ) : null,
+                    )}
+                  </ol>
+                </div>
               ))}
-            </ol>
+            </div>
           </nav>
 
           <div className="min-w-0">
-            <Section id="principles" title="Three goals settle every trade-off.">
+            <Section
+              id="brief"
+              title="I asked for an exemplary site."
+              lede="The goal, in the words I gave Claude Code, and the two conditions I added once Ask Steven was going to call a live model."
+            >
+              <Brief securityHref="#ask-steven" />
+            </Section>
+
+            <Section
+              id="day"
+              title="From the first plan to production in about a day."
+              lede="Claude Code ran the work in waves. I set the goal at the start, made the product calls as they came up, and approved the result at the end."
+            >
+              <Timeline />
+              <h3 className="label mt-14">After launch</h3>
+              <div className="mt-6">
+                <Timeline entries={afterLaunch} heading="h4" />
+              </div>
+            </Section>
+
+            <Section
+              id="review"
+              title="Independent review caught what the first pass missed."
+              lede="A few of the reviewers’ findings, and what changed because of them."
+            >
+              <Findings />
+            </Section>
+
+            <Section
+              id="calls"
+              title="Every product call was mine."
+              lede="These are the ones that shaped the site."
+            >
+              <Decisions />
+            </Section>
+
+            <Section
+              id="results"
+              title="The numbers, as measured."
+              lede={`Lighthouse ${measured.lighthouse} on ${measuredOn()}: emulated mobile, simulated throttling, the median of ${lighthouse.ci.collect.numberOfRuns} runs against a local production build.`}
+            >
+              <Results
+                floor={budget('categories:performance', 'minScore')}
+                detailsHref="#budgets"
+              />
+            </Section>
+
+            <div id="colophon" className="border-t border-line pt-14 pb-16 md:pt-20 md:pb-24">
+              <p className="label flex items-center gap-2">
+                <span aria-hidden className="size-2 rounded-full bg-green" />
+                The colophon
+              </p>
+              <h2 className="mt-4 max-w-2xl text-title font-semibold text-balance">
+                How the site works.
+              </h2>
+              <p className="mt-6 max-w-2xl text-lg leading-relaxed text-pretty text-muted">
+                A personal site that doubles as a work sample. It is statically prerendered, typed
+                from content to API, tested in a real browser on every change, and held to
+                performance and accessibility budgets that fail the build.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <a href={source.architecture} className="pill pill-outline">
+                  Architecture notes <ArrowUpRight />
+                </a>
+              </div>
+            </div>
+
+            <Section id="principles" title="Three goals settle every trade-off." opensPart>
               <ol className="grid gap-4 md:grid-cols-3">
                 {goals.map((goal, i) => (
                   <li
@@ -484,10 +594,10 @@ export default function ColophonPage() {
               title="Budgets that fail the build."
               lede={
                 <>
-                  Lighthouse CI audits the home page and this one on emulated mobile with simulated
-                  throttling, {lighthouse.ci.collect.numberOfRuns} runs each, and asserts on the
-                  median run. The thresholds below are read from <Code>lighthouserc.json</Code>, the
-                  same file CI uses.
+                  Lighthouse CI audits the home page, this one and a case study on emulated mobile
+                  with simulated throttling, {lighthouse.ci.collect.numberOfRuns} runs each, and
+                  asserts on the median run. The thresholds below are read from{' '}
+                  <Code>lighthouserc.json</Code>, the same file CI uses.
                 </>
               }
             >
@@ -509,7 +619,7 @@ export default function ColophonPage() {
               </p>
 
               <h3 className="label mt-12">Last measured</h3>
-              {measured.pages.map((page) => (
+              {lastMeasured.pages.map((page) => (
                 <div key={page.path} className="mt-4">
                   <h4 className="font-mono text-sm text-muted">{page.path}</h4>
                   <dl className="mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-3">
@@ -520,7 +630,7 @@ export default function ColophonPage() {
                 </div>
               ))}
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-pretty text-muted">
-                {measured.note}
+                {lastMeasured.note}
               </p>
 
               <h3 className="label mt-12">The pipeline</h3>
@@ -662,11 +772,14 @@ function Section({
   id,
   title,
   lede,
+  opensPart = false,
   children,
 }: {
-  id: (typeof sections)[number]['id'];
+  id: SectionId;
   title: string;
   lede?: ReactNode;
+  /** The first section after a part's introduction, which already sets it apart. */
+  opensPart?: boolean;
   children: ReactNode;
 }) {
   const index = sections.findIndex((section) => section.id === id);
@@ -674,7 +787,7 @@ function Section({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="border-t border-line py-14 first:border-t-0 first:pt-0 md:py-20"
+      className={`py-14 first:pt-0 md:py-20 ${opensPart ? 'pt-0 md:pt-0' : 'border-t border-line first:border-t-0'}`}
     >
       <p className="label">
         <span className="text-green">{String(index + 1).padStart(2, '0')}</span>
@@ -694,16 +807,6 @@ function Section({
       ) : null}
       <div className="mt-10">{children}</div>
     </section>
-  );
-}
-
-function Tile({ label, value }: { label: string; value: string }) {
-  return (
-    // dt must come first in a dl; column-reverse shows the value on top, justify-end keeps values level.
-    <div className="flex flex-col-reverse justify-end bg-surface p-5 md:p-6">
-      <dt className="mt-1 text-sm text-muted">{label}</dt>
-      <dd className="text-2xl font-semibold tracking-tight md:text-3xl">{value}</dd>
-    </div>
   );
 }
 

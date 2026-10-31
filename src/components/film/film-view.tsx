@@ -1,24 +1,35 @@
-import type { KeyboardEvent, ReactNode, Ref, VideoHTMLAttributes } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+  type VideoHTMLAttributes,
+  ViewTransition,
+} from 'react';
 import { PauseIcon, PlayIcon, ReplayIcon } from '@/components/visuals/shared/icons';
-import { type Scene, sceneAt, scenes, timecode } from './media';
+import { EndPlate } from './end-plate';
+import { poster as posterAsset, type Scene, sceneAt, scenes, timecode } from './media';
+import styles from './player.module.css';
+import { morph } from './theater';
 
 export type FilmStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
 
-/** Rendered once on the server and passed once: the static player and the controller share it. */
+/** Rendered on the server and handed to the theater's player. */
 export interface FilmContent {
   /** Accessible name for the video. */
   label: string;
   /** Shown on the poster before Play, e.g. "16 seconds · soundless", and read before the controls. */
   caption: string;
-  /** Server-rendered poster image, covering the frame until the first video frame. */
+  /**
+   * Server-rendered poster image, covering the frame until the first video frame. Its blurred
+   * placeholder is drawn here, so the page's HTML doesn't carry it for a theater never opened.
+   */
   poster: ReactNode;
-  /** Server-rendered plate shown over the final frame. */
-  endPlate: ReactNode;
+  /** The name in the end plate's footer. */
+  signature: string;
 }
 
-/** The controller's wiring. The static render has none: it is the idle player, inert. */
+/** The controller's wiring. */
 export interface FilmControls {
-  cardRef: Ref<HTMLDivElement>;
   video: VideoHTMLAttributes<HTMLVideoElement> & { ref: Ref<HTMLVideoElement> };
   onToggle: () => void;
   onSeek: (time: number) => void;
@@ -31,7 +42,7 @@ interface FilmViewProps extends FilmContent {
   duration: number;
   /** The first video frame has painted, so the poster fades out. */
   hasFrame: boolean;
-  controls?: FilmControls;
+  controls: FilmControls;
 }
 
 const icon = { width: 18, height: 18 };
@@ -43,15 +54,15 @@ const announcements: Partial<Record<FilmStatus, string>> = {
 };
 
 /**
- * The player: the frame (video, poster, and the loading, end and error states) above a control
- * bar with the one play control, the chapter title, the position slider and the timecode.
- * Elements marked data-play are what a click before the controller loads should start.
+ * The theater's player: the screen (video, poster, and the loading, end and error states) above a
+ * control bar with the one play control, the chapter title, the position slider and the
+ * timecode. The screen is the theater's half of the morph from the hero's frame.
  */
 export function FilmView({
   label,
   caption,
   poster,
-  endPlate,
+  signature,
   status,
   time,
   duration,
@@ -64,69 +75,73 @@ export function FilmView({
   const scene = sceneAt(time);
 
   return (
-    <div
-      ref={controls?.cardRef}
-      className="@container overflow-hidden rounded-2xl border border-line bg-surface shadow-card"
-    >
-      <div className="@container relative aspect-video overflow-hidden bg-elevated">
-        <video
-          {...controls?.video}
-          data-play
-          aria-label={label}
-          muted
-          playsInline
-          preload={started ? 'auto' : 'none'}
-          className="absolute inset-0 size-full cursor-pointer object-cover"
-          onClick={controls?.onToggle}
-        />
+    <div className="@container overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+      <ViewTransition {...morph}>
+        <div className="@container relative aspect-video overflow-hidden bg-elevated">
+          <video
+            {...controls.video}
+            aria-label={label}
+            muted
+            playsInline
+            preload={started ? 'auto' : 'none'}
+            className="absolute inset-0 size-full cursor-pointer object-cover"
+            onClick={controls.onToggle}
+          />
 
-        <div
-          className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${hasFrame ? 'opacity-0' : ''}`}
-        >
-          {poster}
-        </div>
-
-        {status === 'idle' && (
-          <p className="label pointer-events-none absolute top-3 left-3 rounded-full bg-surface/90 px-2.5 py-1 text-muted shadow-card backdrop-blur">
-            {caption}
-          </p>
-        )}
-
-        {status === 'loading' && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <span className="flex items-center gap-2 rounded-full border border-line bg-surface/90 px-4 py-2 font-mono text-xs text-muted shadow-card backdrop-blur">
-              <span className="size-3.5 animate-spin rounded-full border-2 border-line-strong border-t-green" />
-              Loading
-            </span>
+          <div
+            className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${hasFrame ? 'opacity-0' : ''}`}
+          >
+            <div
+              aria-hidden
+              className={styles.placeholder}
+              style={{ backgroundImage: `url(${posterAsset.blurDataURL})` }}
+            />
+            {poster}
           </div>
-        )}
 
-        {status === 'ended' && endPlate}
+          {status === 'idle' && (
+            <p className="label pointer-events-none absolute top-3 left-3 rounded-full bg-surface/90 px-2.5 py-1 text-muted shadow-card backdrop-blur">
+              {caption}
+            </p>
+          )}
 
-        {status === 'error' && (
-          <div className="absolute inset-0 grid place-items-center bg-bg/75 p-4 backdrop-blur-sm">
-            <div className="max-w-xs rounded-2xl border border-line bg-surface p-5 text-center shadow-card">
-              <p className="text-sm font-medium">The film couldn’t load.</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                Check your connection and try again, or read it scene by scene.
-              </p>
-              <button
-                type="button"
-                onClick={controls?.onToggle}
-                className="mt-4 inline-flex h-9 items-center rounded-full border border-line-strong px-4 text-sm font-medium transition-colors hover:bg-elevated"
-              >
-                Try again
-              </button>
+          {status === 'loading' && (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+              <span className="flex items-center gap-2 rounded-full border border-line bg-surface/90 px-4 py-2 font-mono text-xs text-muted shadow-card backdrop-blur">
+                <span className="size-3.5 animate-spin rounded-full border-2 border-line-strong border-t-green" />
+                Loading
+              </span>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {status === 'ended' && <EndPlate name={signature} />}
+
+          {status === 'error' && (
+            <div className="absolute inset-0 grid place-items-center bg-bg/75 p-4 backdrop-blur-sm">
+              <div className="max-w-xs rounded-2xl border border-line bg-surface p-5 text-center shadow-card">
+                <p className="text-sm font-medium">The film couldn’t load.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  Check your connection and try again, or read it scene by scene.
+                </p>
+                <button
+                  type="button"
+                  onClick={controls.onToggle}
+                  className="mt-4 inline-flex h-9 items-center rounded-full border border-line-strong px-4 text-sm font-medium transition-colors hover:bg-elevated"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </ViewTransition>
 
       <div className="flex items-center gap-3 border-t border-line px-3 py-2 @sm:gap-4 @sm:px-4">
+        {/* The theater focuses this control as it opens. */}
         <button
           type="button"
-          data-play
-          onClick={controls?.onToggle}
+          data-autofocus
+          onClick={controls.onToggle}
           aria-label={playing ? 'Pause film' : status === 'ended' ? 'Replay film' : 'Play film'}
           className="grid size-10 shrink-0 place-items-center rounded-full bg-fg text-bg transition-transform hover:scale-105 forced-colors:border"
         >
@@ -152,10 +167,8 @@ export function FilmView({
                 step="any"
                 value={time}
                 disabled={!started || status === 'error'}
-                onChange={
-                  controls && ((event) => controls.onSeek(event.currentTarget.valueAsNumber))
-                }
-                onKeyDown={controls?.onSeekKey}
+                onChange={(event) => controls.onSeek(event.currentTarget.valueAsNumber)}
+                onKeyDown={controls.onSeekKey}
                 className="peer absolute inset-0 z-10 w-full cursor-pointer opacity-0 disabled:cursor-default"
               />
               {/* Under forced colours the track keeps an outline and the played part a system colour. */}

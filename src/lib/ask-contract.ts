@@ -17,6 +17,20 @@ export const VISITOR_LIMIT = 3;
 export const REMAINING_HEADER = 'X-Ask-Remaining';
 export const LIMIT_HEADER = 'X-Ask-Limit';
 
+/**
+ * A 200 answer is newline-delimited JSON, one event per line, in order: text events as the answer
+ * streams, then at most one action event. Readers skip event types they do not know.
+ */
+export const ANSWER_CONTENT_TYPE = 'application/x-ndjson; charset=utf-8';
+
+export type AskStreamEvent =
+  | { type: 'text'; text: string }
+  /**
+   * A place on the site that shows what the answer is about (src/lib/page-targets.ts). The server
+   * forwards only allowlisted targets, and the browser checks again before offering one.
+   */
+  | { type: 'action'; target: string };
+
 /** GET /api/ask */
 export interface AskStatus {
   enabled: boolean;

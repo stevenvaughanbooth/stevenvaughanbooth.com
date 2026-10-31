@@ -1,8 +1,10 @@
+import { Fragment } from 'react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ArrowUpRight, Check, Copy, GitHub } from '@/components/ui/icons';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { ReflexDemo } from '@/components/visuals/reflex-demo';
 import { adage } from '@/content/profile';
+import { CountUp } from './count-up';
 
 export function OpenSource() {
   const facts = [adage.status, adage.language, adage.license, ...adage.harnesses];
@@ -36,8 +38,10 @@ export function OpenSource() {
         {/*
          * From lg the install row sits under the replay and the evidence fills the right column.
          * The 1fr second row absorbs the evidence column's extra height, so nothing stretches.
+         * Below lg the one column is capped at the page's width, so the install row cannot widen
+         * it, and the cards with it, past a 320px screen.
          */}
-        <div className="mt-12 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:grid-rows-[auto_1fr]">
+        <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr] lg:grid-rows-[auto_1fr]">
           <div className="lg:col-start-1 lg:row-start-1">
             <ReflexDemo />
           </div>
@@ -62,9 +66,10 @@ export function OpenSource() {
                   <li key={result.study} className="py-5 first:pt-0">
                     <p className="text-sm font-medium text-green">{result.study}</p>
                     <p className="mt-1 flex flex-wrap items-baseline gap-x-3">
-                      <span className="text-5xl font-semibold tracking-tight tabular-nums">
-                        {result.value}
-                      </span>
+                      <CountUp
+                        text={result.value}
+                        className="text-5xl font-semibold tracking-tight tabular-nums"
+                      />
                       <span className="text-lg font-medium">{result.label}</span>
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-pretty">{result.detail}</p>
@@ -91,7 +96,18 @@ export function OpenSource() {
               <span className="text-subtle select-none" aria-hidden>
                 $
               </span>
-              <code className="flex-1 overflow-x-auto whitespace-nowrap">{adage.install}</code>
+              {/*
+               * One line wherever it fits. On the narrowest phones it wraps rather than scroll,
+               * and only between words, never at a hyphen inside the package name.
+               */}
+              <code className="min-w-0 flex-1">
+                {adage.install.split(' ').map((word, index) => (
+                  <Fragment key={`${index}-${word}`}>
+                    {index > 0 ? ' ' : null}
+                    <span className="whitespace-nowrap">{word}</span>
+                  </Fragment>
+                ))}
+              </code>
               <CopyButton
                 value={adage.install}
                 label="Copy install command"

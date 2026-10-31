@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { roleAnchor } from '@/lib/page-targets';
 import { formatIndex } from '../shared/segmented-tabs';
 import s from './career-timeline.module.css';
 import type { Step, YearTick } from './timeline';
@@ -40,6 +41,8 @@ export function Roles({ steps }: { steps: readonly Step[] }) {
         return (
           <li
             key={step.key}
+            // A stable anchor, so Ask Steven can show (and open) this role.
+            id={roleAnchor(step)}
             className={s.role}
             style={style}
             data-current={step.current || undefined}

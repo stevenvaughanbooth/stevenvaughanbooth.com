@@ -73,6 +73,10 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
   },
+  // The case studies live at /work/<theme>; their parent is the home page's Work section.
+  async redirects() {
+    return [{ source: '/work', destination: '/#work', permanent: false }];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

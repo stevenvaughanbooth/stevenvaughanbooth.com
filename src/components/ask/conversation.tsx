@@ -4,14 +4,20 @@ import { accentText } from '@/components/ui/accent';
 import { ArrowUpRight, Check, Copy, Mail, Sparkle } from '@/components/ui/icons';
 import { type AnswerLink, type Topic, topicById } from '@/content/answers';
 import { person } from '@/content/profile';
+import { actionsOn, type PageTargetId, pageTarget } from '@/lib/page-targets';
 import { Retry } from './ask-icons';
+import { Locate } from './locate-icon';
 import type { Notice, Turn } from './use-ask';
 
 interface ConversationProps {
   idPrefix: string;
   turns: Turn[];
+  /** The page behind the palette, which decides what an answer's places offer. */
+  pathname: string;
   copied: boolean;
   onNavigate: (href: Route) => void;
+  /** Shows a place on the site; the palette closes first. */
+  onShow: (target: PageTargetId) => void;
   onTopic: (topic: Topic) => void;
   onRetry: (id: number) => void;
   onCopyEmail: () => void;
@@ -73,6 +79,57 @@ function LinkChip({ link, onNavigate }: { link: AnswerLink; onNavigate: (href: R
         </span>
       ) : null}
     </a>
+  );
+}
+
+/**
+ * The places an answer points to. "Show me" buttons stay on this page, the first as the main
+ * action; a case study is another page, so it is a link (a modified click opens it in a new tab).
+ * Nothing here moves the page until it is pressed.
+ */
+function Actions({
+  actions,
+  onShow,
+}: {
+  actions: readonly PageTargetId[];
+  onShow: (target: PageTargetId) => void;
+}) {
+  return (
+    <ul className="mt-4 flex flex-wrap gap-2" aria-label="On this site">
+      {actions.map((id, index) => {
+        const target = pageTarget(id);
+        if (!target) return null;
+        return (
+          <li key={id}>
+            {target.kind === 'case-study' ? (
+              <a
+                href={target.href}
+                className="pill pill-outline pill-sm"
+                onClick={(event) => {
+                  if (isModified(event)) return;
+                  event.preventDefault();
+                  onShow(id);
+                }}
+              >
+                Read {target.label}
+                <span aria-hidden className="text-subtle">
+                  →
+                </span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                className={`pill pill-sm ${index === 0 ? 'pill-solid' : 'pill-outline'}`}
+                onClick={() => onShow(id)}
+              >
+                <Locate width={16} height={16} />
+                Show me {target.label}
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -189,8 +246,10 @@ function TurnView({
   turn,
   latest,
   headingId,
+  pathname,
   copied,
   onNavigate,
+  onShow,
   onTopic,
   onRetry,
   onCopyEmail,
@@ -202,6 +261,10 @@ function TurnView({
   const { answer, notice } = turn;
   const live = turn.source === 'live';
   const paragraphs = live ? paragraphsOf(turn.text) : (answer?.paragraphs ?? []);
+  const actions = actionsOn(
+    live ? (turn.streaming ? [] : (turn.actions ?? [])) : (answer?.actions ?? []),
+    pathname,
+  );
 
   return (
     <article aria-labelledby={headingId} data-turn={turn.id} className="scroll-mt-4">
@@ -252,6 +315,8 @@ function TurnView({
             ))}
           </dl>
         ) : null}
+
+        {actions.length > 0 ? <Actions actions={actions} onShow={onShow} /> : null}
 
         {!live && answer?.links?.length ? (
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Related links">

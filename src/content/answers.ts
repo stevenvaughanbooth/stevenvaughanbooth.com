@@ -7,6 +7,13 @@
 import type { Route } from 'next';
 import { VISITOR_LIMIT } from '@/lib/ask-contract';
 import {
+  isPageTargetId,
+  type PageTargetId,
+  pageTarget,
+  roleAnchor,
+  targetId,
+} from '@/lib/page-targets';
+import {
   type Accent,
   adage,
   awards,
@@ -16,7 +23,8 @@ import {
   experience,
   person,
   projects,
-  type SectionId,
+  type Role,
+  sections,
   site,
   type Theme,
   themes,
@@ -25,7 +33,7 @@ import {
 /** checking: status unknown · live: questions left · curated: live answers off · exhausted: used up */
 export type AskMode = 'checking' | 'live' | 'curated' | 'exhausted';
 
-/** A related link: a page section or route, an https page, or a mailto. */
+/** A related link: a route, an https page, or a mailto. Places on this page are actions. */
 export interface AnswerLink {
   label: string;
   href: Route | `https://${string}` | `mailto:${string}`;
@@ -43,6 +51,12 @@ export interface CuratedAnswer {
   modeNote?: Record<AskMode, string>;
   facts?: AnswerFact[];
   links?: AnswerLink[];
+  /**
+   * Places on the site that show what the answer is about, offered as buttons ("Show me…"); the
+   * first is the main one. They move the page only when pressed, or when the visitor asked to be
+   * shown something.
+   */
+  actions?: PageTargetId[];
   /** Topics offered as natural next questions. */
   followUps?: TopicId[];
 }
@@ -98,26 +112,17 @@ function theme(id: Theme['id']) {
   return found;
 }
 
-const sectionHref = (id: SectionId): Route => `/#${id}`;
-const themeHref = (id: Theme['id']): Route => `/#work-${id}`;
-
-/** Every statement in a (possibly nested) evidence record, URLs aside. */
-function statements(value: unknown): string[] {
-  if (typeof value === 'string') return /^https?:\/\//.test(value) ? [] : [value.trim()];
-  if (Array.isArray(value)) return value.flatMap(statements);
-  if (value && typeof value === 'object') return Object.values(value).flatMap(statements);
-  return [];
-}
+/** A theme's diagram on the home page, then its case study, if the allowlist has it. */
+const themeActions = (id: Theme['id']) =>
+  [targetId(`work-${id}`), `case-study-${id}`].filter(isPageTargetId);
 
 /**
- * Adage's reported results with every caveat profile.ts attaches to them, as one passage. Built
- * from whatever the evidence record holds, so a caveat added there can never be left out here or
- * in the Claude system prompt, which uses it too.
+ * Adage's reported results with every caveat profile.ts attaches to them, as one passage, from
+ * the evidence record's prose fields, as /llms.txt quotes them. The Claude system prompt uses it
+ * too. The record's `results` are the page's cards, which restate the same figures field by field,
+ * so they stay out of it: with them, every number and caveat would read twice.
  */
-export const adageEvidence = statements(adage.evidence)
-  .filter(Boolean)
-  .map((text) => (/[.!?][”"’)]*$/.test(text) ? text : `${text}.`))
-  .join(' ');
+export const adageEvidence = `${adage.evidence.headline}. ${adage.evidence.context} ${adage.evidence.candor}`;
 
 const presidentsAward = awards.find((award) => /president/i.test(award.name));
 const c360Award = awards.find((award) => /customer 360/i.test(award.reason));
@@ -128,11 +133,6 @@ const emailLink: AnswerLink = { label: 'Email Steven', href: person.links.email 
 const linkedInLink: AnswerLink = { label: 'LinkedIn', href: person.links.linkedin };
 const githubLink: AnswerLink = { label: 'GitHub', href: person.links.github };
 const adageRepoLink: AnswerLink = { label: 'Adage on GitHub', href: adage.links.repo };
-const platformLink: AnswerLink = {
-  label: 'Explore the platform diagram',
-  href: themeHref('platform'),
-};
-const experienceLink: AnswerLink = { label: 'See the timeline', href: sectionHref('experience') };
 
 const devtools = theme('devtools');
 const mcp = theme('mcp');
@@ -155,7 +155,7 @@ export const topics: Topic[] = [
       'Steven is a Productivity Champion and developer tooling advocate. He shares and promotes useful AI tools, skills, and workflows across his organization, helping other engineers put them to work.',
       'His impact is in being a multiplier: a good idea reaches more people, teams build on it, and better ways of working spread.',
     ],
-    links: [{ label: 'See the team multiplier', href: themeHref('devtools') }],
+    actions: themeActions('devtools'),
     names: ['productivity champion', 'devtools', 'dev tools', 'developer tooling', 'multiplier'],
     keywords: [
       'dev kits',
@@ -191,10 +191,11 @@ export const topics: Topic[] = [
     accent: mcp.accent,
     heading: 'Context, one useful step at a time.',
     paragraphs: [
-      'Steven designed and piloted an MCP server and its APIs around how agents explore: start with a compact map, search for the relevant metadata, then retrieve the detail.',
-      'The diagram in the Work section steps through how the context narrows.',
+      'Steven designed and piloted MCP tools around how agents explore: start with a compact map, search for the relevant metadata, then retrieve the detail.',
+      // The same words on the home page and on the case study, which the diagram heads.
+      'The MCP diagram steps through how the context narrows.',
     ],
-    links: [{ label: 'Step through the diagram', href: themeHref('mcp') }],
+    actions: themeActions('mcp'),
     names: ['mcp', 'model context protocol', 'progressive disclosure'],
     keywords: [
       'api',
@@ -225,7 +226,7 @@ export const topics: Topic[] = [
       `${platform.lede} Objects, fields, and relationships give builders the foundations to create and customize applications. Steven’s work on the Core Metadata Platform helps enable a consistent, extensible experience across Salesforce Core, Data 360, and Marketing Cloud Next.`,
       'His work there connects three stories: getting useful metadata to agents, building Schema Evolution for Marketing Cloud Next, and leading a metadata migration that enabled Data 360 scale.',
     ],
-    links: [platformLink],
+    actions: themeActions('platform'),
     followUps: ['migration', 'schema', 'performance'],
     names: ['core metadata platform', 'metadata platform'],
     keywords: [
@@ -266,8 +267,8 @@ export const topics: Topic[] = [
       adageRepoLink,
       { label: 'Project site', href: adage.links.site },
       { label: 'Methods and limitations', href: adage.links.evidence },
-      { label: 'See the reflex demo', href: sectionHref('open-source') },
     ],
+    actions: [targetId('open-source')],
     names: ['adage', 'reflex', 'reflexes'],
     keywords: [
       'open source',
@@ -298,7 +299,7 @@ export const topics: Topic[] = [
           ]
         : []),
     ],
-    links: [platformLink],
+    actions: themeActions('platform'),
     names: ['metadata migration'],
     keywords: ['migration', 'migrat*'],
   },
@@ -313,7 +314,7 @@ export const topics: Topic[] = [
     paragraphs: [
       'Steven built the Schema Evolution framework to help keep schemas aligned with Marketing Cloud Next as products evolve. The work gives teams a shared foundation for coordinating schema changes.',
     ],
-    links: [platformLink],
+    actions: themeActions('platform'),
     names: ['schema evolution'],
     keywords: ['evolution', 'evolving schemas', 'marketing cloud next'],
   },
@@ -328,7 +329,7 @@ export const topics: Topic[] = [
     paragraphs: [
       'Steven improved the performance and efficiency of Salesforce metadata APIs, helping builders work with complex applications at enterprise scale.',
     ],
-    links: [platformLink],
+    actions: themeActions('platform'),
     names: ['api performance'],
     keywords: [
       'performance',
@@ -355,7 +356,7 @@ export const topics: Topic[] = [
     facts: c360Role
       ? [{ label: `${c360Role.start} – ${c360Role.end}`, value: c360Role.displayTitle }]
       : undefined,
-    links: [experienceLink],
+    actions: [targetId(c360Role ? roleAnchor(c360Role) : 'experience')],
     names: ['customer 360 data manager', 'customer 360', 'c360'],
     keywords: ['data manager'],
   },
@@ -373,7 +374,7 @@ export const topics: Topic[] = [
       label: `${role.start} – ${role.end}`,
       value: role.displayTitle,
     })),
-    links: [experienceLink],
+    actions: [targetId('experience')],
     names: ['career', 'resume', 'cv'],
     keywords: [
       'experience',
@@ -399,7 +400,7 @@ export const topics: Topic[] = [
     accent: 'amber',
     heading: 'Recognition for work that mattered.',
     paragraphs: awards.map((award) => `${award.year} ${award.name}. ${describeAward(award)}`),
-    links: [experienceLink],
+    actions: [targetId('recognition')],
     names: ['presidents award', 'all star', 'allstar', 'award', 'awards'],
     keywords: [
       'recognition',
@@ -419,7 +420,7 @@ export const topics: Topic[] = [
     prompt: 'Where did Steven study?',
     glyph: '◇',
     paragraphs: [`Steven studied at ${person.education.school}: ${person.education.degree}.`],
-    links: [experienceLink],
+    actions: [targetId('experience')],
     names: ['santa clara', 'education', 'university', 'college', 'degree'],
     keywords: ['school', 'scu', 'study', 'studied', 'graduat*'],
   },
@@ -466,7 +467,7 @@ export const topics: Topic[] = [
       'Help better workflows take hold across teams. Give agents the right context. Build foundations that other people can extend.',
       `On the open-source side, ${adage.name} is his experiment in learning the repeatable parts of agent work.`,
     ],
-    links: [{ label: 'Work', href: sectionHref('work') }],
+    actions: [targetId('work')],
     followUps: ['devtools', 'mcp', 'platform', 'adage'],
     keywords: [
       'project',
@@ -496,6 +497,7 @@ export const topics: Topic[] = [
       'You can reach Steven by email or connect on LinkedIn. His work is focused on backend platforms, distributed systems, and agent tooling.',
     ],
     links: [emailLink, linkedInLink],
+    actions: [targetId('contact')],
     names: [
       'contact',
       'email',
@@ -566,7 +568,7 @@ export const topics: Topic[] = [
       exhausted: `Ask Steven answers preset topics instantly from curated notes. Other questions go to Claude through a rate-limited server route, ${VISITOR_LIMIT} a day per visitor, and this browser has used its share for now. The API key never reaches the browser.`,
     },
     links: [
-      { label: 'How this site is built', href: '/colophon' },
+      { label: 'How I built this', href: '/colophon' },
       { label: 'Source on GitHub', href: site.repo },
     ],
     names: ['colophon', 'this site', 'this website', 'ask steven'],
@@ -613,6 +615,19 @@ export const featuredTopicIds: TopicId[] = [
   'awards',
 ];
 
+/** A place on the site, as a request a visitor might type. */
+const showMe = (id: string) => `Show me ${pageTarget(targetId(id))?.label ?? id}`;
+
+/**
+ * Suggested questions under the hero's ask bar: one open-source topic, one theme's own question,
+ * and one request that moves the page, so the first thing a visitor tries shows what Ask can do.
+ */
+export const heroSuggestions: string[] = [
+  `What is ${adage.name}?`,
+  themes.find((theme) => theme.id === 'mcp')?.prompt ?? 'How do you design APIs for agents?',
+  showMe('work-platform'),
+];
+
 export const helpAnswer: CuratedAnswer = {
   heading: 'Follow your curiosity.',
   paragraphs: [
@@ -641,7 +656,7 @@ export const promptAnswer: CuratedAnswer = {
   ],
   links: [
     { label: 'Read prompt.ts', href: `${site.repo}/blob/main/src/lib/ask/prompt.ts` },
-    { label: 'How this site is built', href: '/colophon' },
+    { label: 'How I built this', href: '/colophon' },
   ],
 };
 
@@ -664,6 +679,19 @@ export function answerFor(answer: CuratedAnswer, mode: AskMode): CuratedAnswer {
   if (!answer.modeNote) return answer;
   const { modeNote, ...rest } = answer;
   return { ...rest, paragraphs: [...rest.paragraphs, modeNote[mode]] };
+}
+
+/** A career role, for "show me his principal role": its title, dates and focus, from profile.ts. */
+function roleAnswer(role: Role): CuratedAnswer {
+  return {
+    heading: role.displayTitle,
+    paragraphs: [
+      `${role.title} at ${person.company}, ${role.start} to ${role.end}.`,
+      ...(role.focus ? [`Focus: ${role.focus}`] : []),
+    ],
+    actions: [targetId(roleAnchor(role))],
+    followUps: ['career'],
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -735,6 +763,8 @@ const MIN_SCORE = 2;
 export type MatchResult =
   | { kind: 'topic'; topic: Topic; answer: CuratedAnswer; score: number; exact: boolean }
   | { kind: 'help' | 'private' | 'prompt'; answer: CuratedAnswer }
+  /** An explicit request to be shown something on the site. `target` is the answer's first action. */
+  | { kind: 'show'; target: PageTargetId; answer: CuratedAnswer }
   /** No confident match. Suggestions are topics the question touched on, best first. */
   | { kind: 'none'; answer: CuratedAnswer; suggestions: TopicId[] };
 
@@ -754,6 +784,89 @@ export function keywordScore(topic: Topic, normalized: string): number {
   return score;
 }
 
+/**
+ * "Show me…", "take me to…", "open…": the only phrasings that may move the page without a press.
+ * "open" is a verb only when it is not the start of "open source".
+ */
+const navigationRequest =
+  /^(?:(?:can|could|would|will) you |please )*(?:show(?: me)?|take me to|bring me to|bring up|go to|jump to|skip to|scroll to|navigate to|point me to|open(?! source\b))\b ?/;
+
+/** Whether a question asks to be shown something, rather than told about it. */
+export function isNavigationRequest(raw: string): boolean {
+  return navigationRequest.test(normalize(raw));
+}
+
+const wordCount = (phrase: string) => phrase.split(' ').length;
+
+/** Each role by its titles, e.g. "principal engineer", and by its first word alone ("lead"). */
+const roleNames = experience.map((role) => {
+  const display = normalize(role.displayTitle);
+  const first = display.split(' ')[0] ?? display;
+  const names = [display, normalize(role.title)];
+  if (first !== 'member') names.push(first);
+  if (role.end === 'Present') names.push('current role', 'current job');
+  return { role, names };
+});
+
+/**
+ * The place a navigation request asks for: a role by name; else the best-matching topic's first
+ * action (or its case study, when one is asked for), at any confidence, since the verb has already
+ * said what kind of question this is; else a section by name. Null when nothing fits, so the
+ * question is answered as an ordinary one.
+ */
+function navigation(normalized: string): { target: PageTargetId; answer: CuratedAnswer } | null {
+  const match = navigationRequest.exec(normalized);
+  if (!match) return null;
+  const rest = normalized.slice(match[0].length);
+  const text = ` ${rest} `;
+  if (!rest) return null;
+
+  // The longest title wins: "principal member of technical staff" over "member of technical staff".
+  const role = roleNames
+    .map(({ role, names }) => ({
+      role,
+      score: Math.max(0, ...names.filter((name) => hits(text, name)).map(wordCount)),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.role;
+  if (role) return { target: targetId(roleAnchor(role)), answer: roleAnswer(role) };
+
+  const caseStudy = /\bcase stud(?:y|ies)\b/.test(rest);
+  // The best topic decides, even when it has no place to show ("show me how this site is built").
+  const topic = topics
+    .map((candidate) => ({ topic: candidate, score: keywordScore(candidate, rest) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.topic;
+  const actions = topic?.actions ?? [];
+  const pick = caseStudy
+    ? actions.find((id) => pageTarget(id)?.kind === 'case-study')
+    : actions.find((id) => pageTarget(id)?.kind !== 'case-study');
+  const target = pick ?? actions[0];
+  if (topic && target) {
+    return {
+      target,
+      answer: { ...topic, actions: [target, ...actions.filter((id) => id !== target)] },
+    };
+  }
+
+  const section = sections.find(
+    (candidate) => isPageTargetId(candidate.id) && hits(text, normalize(candidate.label)),
+  );
+  if (section) {
+    const id = targetId(section.id);
+    // The topic that leads with this section answers for it, e.g. Work → "What Steven builds".
+    const owner = topics.find((candidate) => candidate.actions?.[0] === id);
+    return {
+      target: id,
+      answer: owner ?? {
+        paragraphs: [`Here is ${pageTarget(id)?.label} on this page.`],
+        actions: [id],
+      },
+    };
+  }
+  return null;
+}
+
 function isExact(topic: Topic, normalized: string): boolean {
   return (
     normalized === topic.id ||
@@ -764,7 +877,7 @@ function isExact(topic: Topic, normalized: string): boolean {
 
 /**
  * Resolves a question to a curated answer. Help first, then private requests, then questions
- * about the prompt, then a topic's own phrasing, then the highest-scoring topic (ties go to the
+ * about the prompt, then requests to be shown something, then a topic's own phrasing, then the highest-scoring topic (ties go to the
  * earlier topic), but only when the match is confident: a name or at least two keyword points.
  * Anything weaker returns the fallback with the near misses as suggestions. Pure and
  * deterministic.
@@ -780,6 +893,8 @@ export function matchQuestion(raw: string): MatchResult {
   if (promptPatterns.some((pattern) => pattern.test(normalized))) {
     return { kind: 'prompt', answer: promptAnswer };
   }
+  const shown = navigation(normalized);
+  if (shown) return { kind: 'show', ...shown };
 
   const exact = topics.find((topic) => isExact(topic, normalized));
   if (exact) {

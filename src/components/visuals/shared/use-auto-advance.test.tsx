@@ -144,6 +144,34 @@ describe('useAutoAdvance', () => {
     expect(selected()).toBe('Step 1');
   });
 
+  it('holds while a modal dialog covers the page', () => {
+    mockReducedMotion(false);
+    render(<Tour />);
+    page.show(1);
+
+    // jsdom never matches :modal, so report one open, as the Ask palette or shortcuts would.
+    const dialog = document.body.appendChild(document.createElement('dialog'));
+    const querySelector = document.querySelector.bind(document);
+    const modal = vi
+      .spyOn(document, 'querySelector')
+      .mockImplementation(((selector: string) =>
+        selector === 'dialog:modal' ? dialog : querySelector(selector)) as never);
+    act(() => {
+      dialog.dispatchEvent(new Event('toggle'));
+    });
+    tick(durationMs * 3);
+    expect(selected()).toBe('Step 0');
+    expect(playback()).toBe('playing');
+
+    modal.mockRestore();
+    act(() => {
+      dialog.dispatchEvent(new Event('toggle'));
+    });
+    tick(durationMs);
+    expect(selected()).toBe('Step 1');
+    dialog.remove();
+  });
+
   it('stops for good once a tab takes focus or the visitor picks a step', () => {
     mockReducedMotion(false);
     render(<Tour />);

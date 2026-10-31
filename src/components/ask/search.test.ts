@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sections } from '@/content/profile';
+import { isPageTargetId } from '@/lib/page-targets';
 import { goToItems } from './palette-items';
 import { fuzzyScore, looksLikeQuestion, search } from './search';
 
@@ -10,9 +11,14 @@ describe('search', () => {
     expect(results.defaultKey).toBe(results.options[0]?.key);
     // Derived from the shared section list, so it can't point at a section that isn't there.
     expect(goToItems.map((item) => item.href)).toEqual([
-      ...sections.map((section) => `/#${section.id}`),
+      ...sections.filter((section) => isPageTargetId(section.id)).map(({ id }) => `/#${id}`),
       '/colophon',
     ]);
+  });
+
+  it('no longer offers the film section, which now plays in the hero', () => {
+    expect(goToItems.map((item) => item.id)).not.toContain('film');
+    expect(search('film').options.map((option) => option.key)).not.toContain('go:film');
   });
 
   it('always offers to ask, first', () => {
@@ -27,7 +33,7 @@ describe('search', () => {
     ['email', 'link:email'],
     ['copy', 'link:copy-email'],
     ['work', 'go:work'],
-    ['film', 'go:film'],
+    ['contact', 'go:contact'],
     ['colophon', 'go:colophon'],
     ['adage', 'topic:adage'],
     ['mcp', 'topic:mcp'],
@@ -54,8 +60,10 @@ describe('search', () => {
     expect(fuzzyScore('banana', 'Work')).toBe(0);
   });
 
-  it('recognizes questions', () => {
+  it('recognizes questions, and requests to be shown something', () => {
     expect(looksLikeQuestion('What is Adage?')).toBe(true);
+    expect(looksLikeQuestion('show me adage')).toBe(true);
+    expect(search('take me to the awards').defaultKey).toBe('ask');
     expect(looksLikeQuestion('tell me about mcp')).toBe(true);
     expect(looksLikeQuestion('adage')).toBe(false);
     expect(looksLikeQuestion('core metadata platform')).toBe(false);

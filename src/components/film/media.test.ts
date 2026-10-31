@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { pickSource, poster, sceneAt, scenes, sources, timecode } from './media';
+import { frameSources, pickSource, poster, sceneAt, scenes, sources, timecode } from './media';
 
 const publicDir = join(process.cwd(), 'public');
+const files = [...sources, ...frameSources, poster];
 
 describe('film media', () => {
   it('prefers AV1 only when the browser is confident it can play it', () => {
@@ -15,10 +16,19 @@ describe('film media', () => {
     expect(pickSource(browser('maybe'))).toBe(1);
     expect(pickSource(browser(''))).toBe(1);
     expect(pickSource(browser('', ''))).toBe(sources.length - 1);
+    expect(pickSource(browser('probably'), frameSources)).toBe(0);
+    expect(pickSource(browser('maybe'), frameSources)).toBe(1);
+  });
+
+  it('offers the frame and the theater the same codecs, in the same order', () => {
+    const codec = (type: string) => type.split('"')[1]?.split('.')[0];
+    expect(frameSources.map((source) => codec(source.type))).toEqual(
+      sources.map((source) => codec(source.type)),
+    );
   });
 
   it('names every file by its content hash, since /film is cached immutably', () => {
-    for (const { src } of [...sources, poster]) {
+    for (const { src } of files) {
       const hash = src.match(/\.([0-9a-f]{8})\.\w+$/)?.[1];
       const bytes = readFileSync(join(publicDir, src));
       expect(createHash('sha256').update(bytes).digest('hex').slice(0, 8)).toBe(hash);
@@ -26,7 +36,7 @@ describe('film media', () => {
   });
 
   it('ships no film file that nothing references', () => {
-    const referenced = [...sources, poster].map(({ src }) => src.replace('/film/', ''));
+    const referenced = files.map(({ src }) => src.replace('/film/', ''));
     expect(readdirSync(join(publicDir, 'film')).sort()).toEqual(referenced.sort());
   });
 

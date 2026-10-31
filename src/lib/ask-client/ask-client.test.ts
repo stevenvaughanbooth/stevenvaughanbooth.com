@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HISTORY_MAX_ITEMS, QUESTION_MAX } from '@/lib/ask-contract';
-import { askClaude, buildRequest, getAskStatus, parseRetryAfter } from '.';
+import { ANSWER_CONTENT_TYPE, HISTORY_MAX_ITEMS, QUESTION_MAX } from '@/lib/ask-contract';
+import {
+  type AnswerEvent,
+  askClaude,
+  buildRequest,
+  getAskStatus,
+  parseEvent,
+  parseRetryAfter,
+  readEvents,
+} from '.';
 
 function textStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -28,11 +36,18 @@ function mockFetch(response: Response | Error) {
   return fetchMock;
 }
 
-async function collect(chunks: AsyncGenerator<string>) {
+/** The answer's text and actions, the way the palette reads them. */
+async function collect(events: AsyncGenerator<AnswerEvent>) {
   let text = '';
-  for await (const chunk of chunks) text += chunk;
-  return text;
+  const actions: string[] = [];
+  for await (const event of events) {
+    if (event.type === 'text') text += event.text;
+    else actions.push(event.target);
+  }
+  return { text, actions };
 }
+
+const ndjson = (...events: unknown[]) => events.map((event) => `${JSON.stringify(event)}\n`);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -86,20 +101,105 @@ describe('parseRetryAfter', () => {
   });
 });
 
+describe('readEvents', () => {
+  const read = (chunks: string[], type: string | null = ANSWER_CONTENT_TYPE) =>
+    collect(readEvents(textStream(chunks), type));
+
+  it('reassembles lines split anywhere, including inside a multi-byte character', async () => {
+    const joined = ndjson({ type: 'text', text: 'Steven’s ' }, { type: 'text', text: 'work' }).join(
+      '',
+    );
+    const bytes = new TextEncoder().encode(joined);
+    const cut = new TextEncoder().encode(joined.slice(0, joined.indexOf('’'))).length + 1;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 5));
+        controller.enqueue(bytes.slice(5, cut));
+        controller.enqueue(bytes.slice(cut));
+        controller.close();
+      },
+    });
+    await expect(collect(readEvents(body, ANSWER_CONTENT_TYPE))).resolves.toEqual({
+      text: 'Steven’s work',
+      actions: [],
+    });
+  });
+
+  it('checks actions against the allowlist again, and skips what it does not know', async () => {
+    await expect(
+      read(
+        ndjson(
+          { type: 'text', text: 'Here.' },
+          { type: 'action', target: 'javascript:alert(1)' },
+          { type: 'action', target: '../../admin' },
+          { type: 'action', target: 'film' },
+          { type: 'action', target: 42 },
+          { type: 'sparkle', text: 'from a newer server' },
+          { type: 'action', target: 'recognition' },
+        ),
+      ),
+    ).resolves.toEqual({ text: 'Here.', actions: ['recognition'] });
+  });
+
+  it('reads a final line without a newline', async () => {
+    await expect(read(['{"type":"text","text":"Done"}'])).resolves.toEqual({
+      text: 'Done',
+      actions: [],
+    });
+  });
+
+  it('throws on a line that is not JSON, so the answer reads as cut off', async () => {
+    await expect(read(['{"type":"text","text":"Half', '\n'])).rejects.toThrow();
+  });
+
+  it('reads plain text from a server that predates actions', async () => {
+    await expect(read(['{"type":"action"} is ', 'just text'], 'text/plain')).resolves.toEqual({
+      text: '{"type":"action"} is just text',
+      actions: [],
+    });
+  });
+
+  it('parses one event per line', () => {
+    expect(parseEvent('  ')).toBeNull();
+    expect(parseEvent('null')).toBeNull();
+    expect(parseEvent('{"type":"text","text":7}')).toBeNull();
+    expect(parseEvent('{"type":"action","target":"work-mcp"}')).toEqual({
+      type: 'action',
+      target: 'work-mcp',
+    });
+  });
+});
+
 describe('askClaude', () => {
-  it('streams text and reads the allowance headers', async () => {
+  it('streams the answer’s events and reads the allowance headers', async () => {
     const fetchMock = mockFetch(
-      new Response(textStream(['Steven builds ', 'platforms.']), {
-        status: 200,
-        headers: { 'Content-Type': 'text/plain', 'X-Ask-Remaining': '1', 'X-Ask-Limit': '3' },
-      }),
+      new Response(
+        textStream(
+          ndjson(
+            { type: 'text', text: 'Steven builds ' },
+            { type: 'text', text: 'platforms.' },
+            { type: 'action', target: 'work-platform' },
+          ),
+        ),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': ANSWER_CONTENT_TYPE,
+            'X-Ask-Remaining': '1',
+            'X-Ask-Limit': '3',
+          },
+        },
+      ),
     );
     const outcome = await askClaude('What does Steven build?', ['Who is Steven?']);
     expect(outcome.kind).toBe('stream');
     if (outcome.kind !== 'stream') return;
     expect(outcome.remaining).toBe(1);
     expect(outcome.limit).toBe(3);
-    await expect(collect(outcome.chunks)).resolves.toBe('Steven builds platforms.');
+    await expect(collect(outcome.events)).resolves.toEqual({
+      text: 'Steven builds platforms.',
+      actions: ['work-platform'],
+    });
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/ask');
@@ -122,7 +222,7 @@ describe('askClaude', () => {
     mockFetch(new Response(body, { status: 200 }));
     const outcome = await askClaude('?');
     if (outcome.kind !== 'stream') throw new Error('expected a stream');
-    await expect(collect(outcome.chunks)).resolves.toBe('Steven’s work');
+    await expect(collect(outcome.events)).resolves.toEqual({ text: 'Steven’s work', actions: [] });
   });
 
   it.each([

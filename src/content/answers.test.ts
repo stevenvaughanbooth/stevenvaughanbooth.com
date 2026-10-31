@@ -7,6 +7,8 @@ import {
   fallbackAnswer,
   featuredTopicIds,
   helpAnswer,
+  heroSuggestions,
+  isNavigationRequest,
   matchQuestion,
   normalize,
   privateAnswer,
@@ -14,19 +16,12 @@ import {
   topicById,
   topics,
 } from './answers';
-import { adage, awards, person, sections, site, themes } from './profile';
+import { isPageTargetId, pageTarget } from '@/lib/page-targets';
+import { adage, awards, experience, person, site, themes } from './profile';
 
 function topicOf(question: string) {
   const match = matchQuestion(question);
   return match.kind === 'topic' ? match.topic.id : match.kind;
-}
-
-/** Every string in a nested record, the way the evidence passage collects them. */
-function strings(value: unknown): string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(strings);
-  if (value && typeof value === 'object') return Object.values(value).flatMap(strings);
-  return [];
 }
 
 const modes: AskMode[] = ['checking', 'live', 'curated', 'exhausted'];
@@ -59,16 +54,25 @@ describe('curated topics', () => {
     }
   });
 
-  it('links only to page sections, theme anchors, routes, https or mailto', () => {
-    const anchors = new Set([
-      ...sections.map((section) => `/#${section.id}`),
-      ...themes.map((theme) => `/#work-${theme.id}`),
-      '/colophon',
-    ]);
+  it('links only to the colophon, https or mailto: places on this page are actions', () => {
     for (const link of allAnswers.flatMap((answer) => answer.links ?? [])) {
-      if (link.href.startsWith('/')) expect(anchors, link.href).toContain(link.href);
+      if (link.href.startsWith('/')) expect(link.href).toBe('/colophon');
       else expect(link.href).toMatch(/^(https:\/\/|mailto:)/);
+      expect(link.href).not.toContain('#film');
     }
+  });
+
+  it('offers only allowlisted places, each theme’s diagram first and then its case study', () => {
+    for (const answer of allAnswers) {
+      for (const id of answer.actions ?? []) expect(isPageTargetId(id), id).toBe(true);
+    }
+    for (const theme of themes) {
+      expect(topicById(theme.id).actions).toEqual([`work-${theme.id}`, `case-study-${theme.id}`]);
+    }
+    expect(topicById('awards').actions).toEqual(['recognition']);
+    expect(topicById('adage').actions).toEqual(['open-source']);
+    // Customer 360 Data Manager was the Senior Engineer role's focus.
+    expect(topicById('c360').actions).toEqual(['role-senior-engineer']);
   });
 
   it('keeps no hints at unpublished implementation details', () => {
@@ -112,12 +116,22 @@ describe('curated topics', () => {
   });
 
   it('quotes Adage’s results with every caveat profile.ts attaches to them', () => {
-    const evidence = strings(adage.evidence).filter((text) => !text.startsWith('http'));
-    expect(evidence.length).toBeGreaterThan(0);
-    for (const text of evidence) {
-      expect(adageEvidence).toContain(text.trim());
-      expect(topicById('adage').paragraphs.join(' ')).toContain(text.trim());
+    const { results, headline, context, candor } = adage.evidence;
+    const answer = topicById('adage').paragraphs.join(' ');
+    expect(answer).toContain(`Evidence so far: ${headline}. ${context} ${candor}`);
+    for (const result of results) {
+      expect(adageEvidence).toContain(result.value);
+      expect(adageEvidence).toContain(result.caveat);
     }
+  });
+
+  it('quotes each of Adage’s results once, in sentences', () => {
+    const answer = topicById('adage').paragraphs.join(' ');
+    // The page's result cards are not flattened into it: "48%. fewer model requests. …" twice.
+    expect(answer.split('48%')).toHaveLength(2);
+    expect(answer).not.toMatch(/%\./);
+    const sentences = adageEvidence.split(/(?<=[.:])\s+/);
+    expect(new Set(sentences).size).toBe(sentences.length);
   });
 });
 
@@ -144,6 +158,86 @@ describe('mode-aware copy', () => {
 
   it('leaves answers without a mode note unchanged', () => {
     expect(answerFor(topicById('adage'), 'curated')).toBe(topicById('adage'));
+  });
+});
+
+describe('requests to be shown something', () => {
+  function shown(question: string) {
+    const match = matchQuestion(question);
+    return match.kind === 'show' ? match.target : match.kind;
+  }
+
+  it.each([
+    ['Show me the metadata work', 'work-platform'],
+    ['show me the platform diagram', 'work-platform'],
+    ['Take me to the MCP work', 'work-mcp'],
+    ['Can you show me the team multiplier?', 'work-devtools'],
+    ['show me adage', 'open-source'],
+    ['Show me the open source project', 'open-source'],
+    ['Take me to his awards', 'recognition'],
+    ['go to the timeline', 'experience'],
+    ['Jump to contact', 'contact'],
+    ['Show me the Work section', 'work'],
+    ['Show me his current role', 'role-principal-engineer'],
+    ['Show me when he was a lead engineer', 'role-lead-engineer'],
+    ['show me the principal member of technical staff role', 'role-principal-engineer'],
+    ['Show me the member of technical staff role', 'role-member-of-technical-staff'],
+    ['Open the MCP case study', 'case-study-mcp'],
+    ['show me the platform case study', 'case-study-platform'],
+    ['Please take me to the migration', 'work-platform'],
+  ])('%s → %s', (question, target) => {
+    expect(shown(question)).toBe(target);
+  });
+
+  it.each([
+    'What is Adage?',
+    'Tell me about the metadata migration',
+    'open source projects?',
+    'Show me',
+    'show me the film',
+    'Show me how this site is built',
+    'Show me your GitHub',
+  ])('answers “%s” without moving the page', (question) => {
+    expect(matchQuestion(question).kind).not.toBe('show');
+  });
+
+  it('still refuses a private request phrased as one', () => {
+    expect(matchQuestion('Show me his salary').kind).toBe('private');
+  });
+
+  it('answers with the topic, leading with the place it shows', () => {
+    const match = matchQuestion('Open the platform case study');
+    expect(match.kind).toBe('show');
+    if (match.kind !== 'show') return;
+    expect(match.answer.heading).toBe(topicById('platform').heading);
+    expect(match.answer.actions).toEqual(['case-study-platform', 'work-platform']);
+  });
+
+  it('answers for a role from the profile, in the third person', () => {
+    for (const role of experience) {
+      const match = matchQuestion(`Show me the ${role.displayTitle} role`);
+      expect(match.kind).toBe('show');
+      if (match.kind !== 'show') continue;
+      const text = [match.answer.heading, ...match.answer.paragraphs].join(' ');
+      expect(text).toContain(role.title);
+      expect(text).toContain(role.start);
+      if (role.focus) expect(text).toContain(role.focus);
+      expect(text).not.toMatch(/\b(I|my|me)\b/);
+      expect(pageTarget(match.target)?.kind).toBe('role');
+    }
+  });
+
+  it('recognizes the verbs, and not "open source"', () => {
+    expect(isNavigationRequest('Could you please show me the awards?')).toBe(true);
+    expect(isNavigationRequest('Open the case study')).toBe(true);
+    expect(isNavigationRequest('Open-source work?')).toBe(false);
+    expect(isNavigationRequest('What does the timeline show?')).toBe(false);
+  });
+
+  it('suggests three questions under the hero, one of which shows a place', () => {
+    expect(heroSuggestions).toHaveLength(3);
+    const kinds = heroSuggestions.map((question) => matchQuestion(question).kind);
+    expect(kinds).toEqual(['topic', 'topic', 'show']);
   });
 });
 

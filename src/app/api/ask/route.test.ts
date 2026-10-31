@@ -17,6 +17,12 @@ const fake = vi.hoisted(() => ({
   redisCalls: [] as string[],
   events: [] as StreamEvent[],
   upstreamError: null as Error | null,
+  /**
+   * The stream fails after this many events, as the SDK's does for tool input it cannot parse.
+   * `dropped`: no read was waiting when it failed, so its iterator just ends (the SDK's rejects
+   * only reads already waiting) and only its end promise, done(), has the error.
+   */
+  midStream: null as { after: number; error: Error; dropped?: boolean } | null,
   streamCalls: [] as { params: Record<string, unknown>; signal?: AbortSignal }[],
   clientOptions: [] as Record<string, unknown>[],
   abort: vi.fn(),
@@ -81,15 +87,24 @@ vi.mock('@anthropic-ai/sdk', async (importOriginal) => {
       const stream = (params: Record<string, unknown>, options?: { signal?: AbortSignal }) => {
         fake.streamCalls.push({ params, signal: options?.signal });
         let index = 0;
+        let failed: Error | undefined;
         return {
           [Symbol.asyncIterator]: () => ({
             next: async () => {
               if (fake.upstreamError) throw fake.upstreamError;
-              if (options?.signal?.aborted) throw new actual.APIUserAbortError();
+              if (options?.signal?.aborted) throw (failed = new actual.APIUserAbortError());
+              if (fake.midStream && index === fake.midStream.after) {
+                failed = fake.midStream.error;
+                if (fake.midStream.dropped) return { value: undefined, done: true };
+                throw failed;
+              }
               const value = fake.events[index++];
               return value ? { value, done: false } : { value: undefined, done: true };
             },
           }),
+          done: async () => {
+            if (failed) throw failed;
+          },
           abort: fake.abort,
         };
       };
@@ -102,6 +117,7 @@ vi.mock('@anthropic-ai/sdk', async (importOriginal) => {
 const { GET, POST } = await import('./route');
 const { default: RealAnthropic } = await import('@anthropic-ai/sdk');
 const { NETWORK_LIMIT } = await import('@/lib/ask/rate-limit');
+const { pageTargetIds } = await import('@/lib/page-targets');
 
 const text = (value: string) => ({
   type: 'content_block_delta',
@@ -116,6 +132,47 @@ const answer = (...parts: string[]) => [
   stop('end_turn'),
   { type: 'message_stop' },
 ];
+/** A show_on_page call at content block `index`, its input streamed in the given fragments. */
+const call = (index: number, ...fragments: string[]) => [
+  {
+    type: 'content_block_start',
+    index,
+    content_block: { type: 'tool_use', id: `toolu_${index}`, name: 'show_on_page', input: {} },
+  },
+  ...fragments.map((partial_json) => ({
+    type: 'content_block_delta',
+    index,
+    delta: { type: 'input_json_delta', partial_json },
+  })),
+  { type: 'content_block_stop', index },
+];
+/** An answer that ends by pointing at a place on the site, the way Claude ends a tool-use turn. */
+const pointing = (parts: string[], ...calls: StreamEvent[][]) => [
+  { type: 'message_start', message: {} },
+  ...parts.map(text),
+  ...calls.flat(),
+  stop('tool_use'),
+  { type: 'message_stop' },
+];
+
+/** What the SDK throws for tool input it cannot parse: its own error, the SyntaxError as cause. */
+const unparseable = () =>
+  Object.assign(new RealAnthropic.AnthropicError('Unexpected token w in JSON'), {
+    cause: new SyntaxError('Unexpected token w in JSON'),
+  });
+
+/** Reads a 200 answer the way the browser does: its text and its actions, from NDJSON. */
+async function read(response: Response) {
+  const lines = (await response.text()).split('\n').filter(Boolean);
+  const events = lines.map(
+    (line) => JSON.parse(line) as { type: string; text?: string; target?: string },
+  );
+  return {
+    text: events.map((event) => event.text ?? '').join(''),
+    actions: events.filter((event) => event.type === 'action').map((event) => event.target),
+    last: events.at(-1),
+  };
+}
 
 function ask(
   body: unknown = { question: 'What is Adage?' },
@@ -129,6 +186,8 @@ function ask(
       origin: `https://${SITE}`,
       'sec-fetch-site': 'same-origin',
       'content-type': 'application/json',
+      // What the current client sends; the client from before page actions sends text/plain.
+      accept: 'application/x-ndjson, text/plain',
       'x-forwarded-for': IP,
       ...headers,
     },
@@ -173,6 +232,7 @@ beforeEach(() => {
   fake.redisCalls.length = 0;
   fake.events = answer('Adage is ', 'an experiment.');
   fake.upstreamError = null;
+  fake.midStream = null;
   fake.streamCalls.length = 0;
   fake.abort.mockClear();
   vi.spyOn(console, 'error').mockImplementation(logs.error);
@@ -251,15 +311,53 @@ describe('GET /api/ask', () => {
 });
 
 describe('POST /api/ask', () => {
-  it('streams the answer as plain text with allowance headers and the updated cookie', async () => {
+  it('streams the answer as NDJSON with allowance headers and the updated cookie', async () => {
     const response = await POST(ask());
     expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(response.headers.get('content-type')).toBe('application/x-ndjson; charset=utf-8');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('x-ask-limit')).toBe('3');
     expect(response.headers.get('x-ask-remaining')).toBe('2');
     expect(cookieOf(response)).toMatch(/^__Host-ask=[\w-]+\.2\./);
-    await expect(response.text()).resolves.toBe('Adage is an experiment.');
+    await expect(response.text()).resolves.toBe(
+      '{"type":"text","text":"Adage is "}\n{"type":"text","text":"an experiment."}\n',
+    );
+  });
+
+  it('streams the text alone, as plain text, to a client that does not accept NDJSON', async () => {
+    // The client from before page actions sends text/plain and shows the body as it arrives.
+    for (const accept of ['text/plain', '*/*', undefined]) {
+      fake.events = pointing(['Steven designs ', 'MCP tools.'], call(1, '{"target":"work-mcp"}'));
+      const request = ask();
+      if (accept) request.headers.set('accept', accept);
+      else request.headers.delete('accept');
+      const response = await POST(request);
+      expect(response.status, accept).toBe(200);
+      expect(response.headers.get('content-type'), accept).toBe('text/plain; charset=utf-8');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('x-ask-remaining')).toMatch(/^\d$/);
+      await expect(response.text(), accept).resolves.toBe('Steven designs MCP tools.');
+    }
+
+    // Its notes are plain text too.
+    fake.events = [{ type: 'message_start', message: {} }, text('Steven built')];
+    const cut = await POST(ask(undefined, { accept: 'text/plain' }));
+    await expect(cut.text()).resolves.toMatch(/^Steven built\n\nThe answer was cut short\. /);
+    fake.events = pointing([], call(0, '{"target":"recognition"}'));
+    const pointed = await POST(ask(undefined, { accept: 'text/plain' }));
+    await expect(pointed.text()).resolves.toMatch(/^That's not something I can help with here/);
+  });
+
+  it('applies every check whatever the Accept header', async () => {
+    const plain = { accept: 'text/plain' };
+    expect((await POST(ask(undefined, { ...plain, origin: 'https://evil.example' }))).status).toBe(
+      403,
+    );
+    fake.bot = { isBot: true, isHuman: false, isVerifiedBot: false, bypassed: false };
+    expect((await POST(ask(undefined, plain))).status).toBe(403);
+    fake.bot = {};
+    expect((await POST(ask(undefined, plain))).status).toBe(503);
+    expect(fake.streamCalls).toHaveLength(0);
   });
 
   it('calls Claude Haiku with the frozen prompt and low effort', async () => {
@@ -507,19 +605,148 @@ describe('POST /api/ask', () => {
       ];
       const response = await POST(ask());
       expect(response.status).toBe(200);
-      await expect(response.text()).resolves.toMatch(
+      expect((await read(response)).text).toMatch(
         /^That's not something I can help with here.*email Steven at stevenvaughanbooth@gmail\.com/,
       );
     });
 
     it('marks a refused partial answer and a dropped stream', async () => {
       fake.events = [{ type: 'message_start', message: {} }, text('Steven'), stop('refusal')];
-      await expect((await POST(ask())).text()).resolves.toMatch(/^Steven\n\nThat's not something/);
+      expect((await read(await POST(ask()))).text).toMatch(/^Steven\n\nThat's not something/);
 
       fake.events = [{ type: 'message_start', message: {} }, text('Steven built')];
-      await expect((await POST(ask())).text()).resolves.toMatch(
+      expect((await read(await POST(ask()))).text).toMatch(
         /^Steven built\n\nThe answer was cut short/,
       );
+    });
+  });
+
+  describe('show_on_page', () => {
+    it('offers Claude one tool, at most one call, with the allowlist as its only inputs', async () => {
+      await (await POST(ask())).text();
+      const params = fake.streamCalls[0]?.params as unknown as Anthropic.MessageCreateParams;
+      expect(params.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: true });
+      expect(params.tools).toHaveLength(1);
+      const [tool] = params.tools as Anthropic.Tool[];
+      expect(tool).toMatchObject({
+        name: 'show_on_page',
+        strict: true,
+        eager_input_streaming: true,
+        input_schema: { type: 'object', required: ['target'], additionalProperties: false },
+      });
+      const properties = tool?.input_schema.properties as Record<string, { enum: string[] }>;
+      expect(properties.target?.enum).toEqual(pageTargetIds);
+      expect(properties.target?.enum).not.toContain('film');
+      // The prompt asks for the whole answer first, since the call ends the turn.
+      const system = params.system as Anthropic.TextBlockParam[];
+      expect(system[0]?.text).toMatch(/show_on_page/);
+    });
+
+    it('forwards one allowlisted target after the answer, with no second request', async () => {
+      fake.events = pointing(
+        ['Steven designs ', 'MCP tools.'],
+        call(1, '{"tar', 'get": "work-mcp"}'),
+      );
+      const response = await POST(ask({ question: 'Show me the agent work' }));
+      expect(response.status).toBe(200);
+      const answer = await read(response);
+      expect(answer.text).toBe('Steven designs MCP tools.');
+      expect(answer.actions).toEqual(['work-mcp']);
+      expect(answer.last).toEqual({ type: 'action', target: 'work-mcp' });
+      // No tool_result goes back: the call is a pointer for the page, not a request for data.
+      expect(fake.streamCalls).toHaveLength(1);
+    });
+
+    it('drops anything but exactly one allowlisted target, and logs only a fixed label', async () => {
+      for (const input of [
+        '{"target":"https://evil.example"}',
+        '{"target":"film"}',
+        // Where targets land on a case study page, which are anchors, not targets.
+        '{"target":"diagram"}',
+        '{"target":"case-study-title"}',
+        '{"target":"work-mcp","also":"contact"}',
+        '{"target":["work-mcp"]}',
+        '{"target":"work-mcp"}{"target":"contact"}',
+        '{"target":',
+        `{"target":"${'x'.repeat(400)}"}`,
+      ]) {
+        fake.events = pointing(['Here it is.'], call(1, input));
+        const answer = await read(await POST(ask()));
+        expect(answer.text, input).toBe('Here it is.');
+        expect(answer.actions, input).toEqual([]);
+      }
+      expect(logs.error).toHaveBeenCalledWith('[ask] tool: invalid input');
+      const logged = JSON.stringify(logs.error.mock.calls);
+      expect(logged).not.toContain('evil.example');
+    });
+
+    it('reads only the first call', async () => {
+      fake.events = pointing(
+        ['Both.'],
+        call(1, '{"target":"recognition"}'),
+        call(2, '{"target":"contact"}'),
+      );
+      expect((await read(await POST(ask()))).actions).toEqual(['recognition']);
+    });
+
+    it('drops the call from a turn that was cut off or refused', async () => {
+      fake.events = [
+        { type: 'message_start', message: {} },
+        text('Steven'),
+        ...call(1, '{"target":"work-mcp"}'),
+        stop('max_tokens'),
+      ];
+      let answer = await read(await POST(ask()));
+      expect(answer.text).toMatch(/^Steven\n\nThe answer was cut short/);
+      expect(answer.actions).toEqual([]);
+
+      fake.events = [
+        { type: 'message_start', message: {} },
+        text('Steven'),
+        ...call(1, '{"target":"work-mcp"}'),
+        stop('refusal'),
+      ];
+      answer = await read(await POST(ask()));
+      expect(answer.text).toMatch(/That's not something/);
+      expect(answer.actions).toEqual([]);
+    });
+
+    it('says a few words when Claude only pointed', async () => {
+      fake.events = pointing([], call(0, '{"target":"recognition"}'));
+      const answer = await read(await POST(ask()));
+      expect(answer.text).toBe('Here is where that is on this site.');
+      expect(answer.actions).toEqual(['recognition']);
+    });
+
+    it('ends the answer cleanly when the SDK cannot parse the streamed input', async () => {
+      // Thrown at the call's content_block_stop, after the text, its start and its one fragment,
+      // whether a read was waiting then or not.
+      for (const dropped of [false, true]) {
+        fake.events = pointing(['Steven designs MCP tools.'], call(1, '{"target":"a"]'));
+        fake.midStream = { after: 4, error: unparseable(), dropped };
+        logs.error.mockClear();
+        logs.warn.mockClear();
+        const answer = await read(await POST(ask()));
+        expect(answer.text, `dropped: ${dropped}`).toBe('Steven designs MCP tools.');
+        expect(answer.actions).toEqual([]);
+        expect(logs.error.mock.calls).toEqual([['[ask] tool: invalid input']]);
+        expect(logs.warn).not.toHaveBeenCalled();
+      }
+      expect(fake.abort).toHaveBeenCalled();
+    });
+
+    it('still reports a failure that is not the tool input as one, even during the call', async () => {
+      fake.events = pointing(['Steven designs MCP tools.'], call(1, '{"target":"work-mcp"}'));
+      // A typed API error is never the tool input, whatever its cause.
+      const lost = new RealAnthropic.APIConnectionError({ cause: new SyntaxError('Unexpected') });
+      for (const dropped of [false, true]) {
+        fake.midStream = { after: 4, error: lost, dropped };
+        logs.error.mockClear();
+        const answer = await read(await POST(ask()));
+        expect(answer.text).toMatch(/^Steven designs MCP tools\.\n\nThe answer was cut short/);
+        expect(answer.actions).toEqual([]);
+        expect(logs.error.mock.calls).toEqual([['[ask] stream: connection']]);
+      }
     });
   });
 

@@ -26,14 +26,22 @@ export function useReducedMotion(): boolean {
 
 function subscribeVisibility(onChange: () => void) {
   document.addEventListener('visibilitychange', onChange);
-  return () => document.removeEventListener('visibilitychange', onChange);
+  // Dialogs fire toggle as they open and close. It doesn't bubble, so listen while capturing.
+  document.addEventListener('toggle', onChange, true);
+  return () => {
+    document.removeEventListener('visibilitychange', onChange);
+    document.removeEventListener('toggle', onChange, true);
+  };
 }
 
-/** Whether the browser tab is in the foreground. False on the server. */
+/**
+ * Whether the page can be seen: the browser tab is in the foreground and no modal dialog (the
+ * Ask palette, the shortcuts sheet) covers it. False on the server.
+ */
 export function usePageVisible(): boolean {
   return useSyncExternalStore(
     subscribeVisibility,
-    () => document.visibilityState !== 'hidden',
+    () => document.visibilityState !== 'hidden' && !document.querySelector('dialog:modal'),
     () => false,
   );
 }

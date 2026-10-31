@@ -68,12 +68,23 @@ state: reduced motion on, page hidden, out of view. Prerendered HTML is always t
 `useAutoAdvance({ steps, durationMs })` follows the APG carousel rules:
 
 - plays one pass, from the first step to the last, starting as the card scrolls in;
-- counts down only while at least half the card is on screen and the tab is visible;
+- counts down only while at least half the card is on screen and the page can be seen;
 - holds while a mouse hovers the tabs and panel, or focus is inside them (the play button is
   outside, so pressing Play is never held by its own focus);
 - stops for good when the visitor picks a step or focuses a tab, and never moves the selection
   under focus;
 - never starts under reduced motion (hide its controls with `footerClassName="motion-reduce:hidden"`).
+
+**Off screen, nothing runs.** `usePageVisible` is false while the browser tab is hidden or a modal
+dialog (the Ask palette, the shortcuts sheet) covers the page; it listens for `visibilitychange`
+and for dialogs' `toggle` events. Timers count down only while their card is on screen and the
+page can be seen, and the CSS that animates with them (tab and phase progress bars) is paused by
+the same `running` flag, so a held tour resumes exactly where it stopped. The Adage replay follows
+the same rules, and its cursor exists only while the terminal is on screen.
+
+React's `<Activity>` was considered for this and not used: hiding a subtree applies
+`display: none`, which would collapse the card and shift the page. The shortcuts sheet uses it
+instead, where hiding is the point.
 
 ## Accessibility
 

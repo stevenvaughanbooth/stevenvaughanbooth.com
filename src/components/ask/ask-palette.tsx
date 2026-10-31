@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -15,6 +15,8 @@ import { ArrowUpRight, Copy, GitHub, LinkedIn, Mail, Sparkle } from '@/component
 import type { AskMode } from '@/content/answers';
 import { person } from '@/content/profile';
 import { QUESTION_MAX } from '@/lib/ask-contract';
+import { showOnPage } from '@/lib/page-actions';
+import type { PageTargetId } from '@/lib/page-targets';
 import type { AskOpenDetail } from './ask-events';
 import { Close, Hash } from './ask-icons';
 import { Conversation } from './conversation';
@@ -85,7 +87,8 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
   const recall = useRef<number | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const router = useRouter();
-  const ask = useAsk(announce);
+  const pathname = usePathname();
+  const ask = useAsk(announce, showTarget);
   const id = useId();
 
   const showResults = query.trim() !== '' || ask.turns.length === 0;
@@ -102,6 +105,8 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
   function show(detail: AskOpenDetail = {}) {
     const element = dialog.current;
     if (!element) return;
+    // "Show me the awards" from the hero moves the page straight there, without opening over it.
+    if (!element.open && ask.navigate(detail.question ?? detail.prompt ?? '')) return;
     if (!element.open) element.showModal();
     input.current?.focus();
     input.current?.select();
@@ -109,11 +114,25 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
     if (detail.prompt) {
       setQuery('');
       ask.run(detail.prompt);
+    } else if (detail.question) {
+      setQuery('');
+      ask.ask(detail.question);
     }
   }
 
   function close() {
     dialog.current?.close();
+  }
+
+  /**
+   * Closes the palette and shows a place on the site: scrolled to, focused and briefly
+   * highlighted, or opened when it is a page of its own. After a live answer, only if the visitor
+   * has not closed the palette in the meantime.
+   */
+  function showTarget(target: PageTargetId, afterAnswer: boolean) {
+    if (afterAnswer && !dialog.current?.open) return;
+    close();
+    showOnPage(target, { navigate: (href) => router.push(href) });
   }
 
   useImperativeHandle(ref, () => ({
@@ -151,6 +170,10 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
 
   function navigate(href: Route) {
     close();
+    // Sections are page targets too, so a jump lands the same way an answer's "Show me" does.
+    if (href.startsWith('/#') && showOnPage(href.slice(2), { navigate: (to) => router.push(to) })) {
+      return;
+    }
     if (href.startsWith('/#') && window.location.pathname === '/') {
       const target = document.getElementById(href.slice(2));
       if (target) {
@@ -442,8 +465,10 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
             <Conversation
               idPrefix={id}
               turns={ask.turns}
+              pathname={pathname}
               copied={copied}
               onNavigate={navigate}
+              onShow={(target) => showTarget(target, false)}
               onTopic={(topic) => ask.answerTopic(topic)}
               onRetry={ask.retry}
               onCopyEmail={() => void copyEmail()}

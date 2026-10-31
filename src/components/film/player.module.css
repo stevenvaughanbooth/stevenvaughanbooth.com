@@ -1,4 +1,19 @@
 /*
+ * The theater player's styles. They load with its code, on intent, not with the page.
+ *
+ * While the poster loads, its thumbnail stands in, blurred; scaled up a little so the blur's soft
+ * edge stays outside the screen, which clips it.
+ */
+.placeholder {
+  position: absolute;
+  inset: 0;
+  background-position: 50%;
+  background-size: cover;
+  filter: blur(24px);
+  scale: 1.1;
+}
+
+/*
  * The end plate sits on the monitor glass in the film's last frame. The glass corners were measured
  * on the 1280×720 frame and fitted as a CSS perspective transform; every value is relative to the
  * frame (an inline-size container), so the plate stays registered at any width without JS.

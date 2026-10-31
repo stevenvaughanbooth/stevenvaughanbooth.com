@@ -1,0 +1,268 @@
+/*
+ * Follow the signal: one green line from the hero's status dot to the email address in Contact.
+ * It leaves the dot, runs down the left gutter past a node beside each section label, and turns
+ * into the envelope at the end. No JavaScript: anchor positioning stretches the line between its
+ * two ends, and scroll-driven animations draw it.
+ *
+ * The line's head holds still at --signal-reach above the bottom of the viewport. The line, every
+ * node and the arrival are keyed to that same height, so each node lights exactly as the line
+ * reaches it, whatever the content above it. At the end of the page the email sits higher than
+ * that, because Contact's buttons and padding and the footer below it are taller than the reach
+ * plus the arrival, so the journey always finishes (tests/e2e/signal.spec.ts checks it).
+ *
+ * Fallbacks: below md, or without anchor positioning, there is no line and each node is a small
+ * dot before its label. Without scroll-driven animations, or under reduced motion, everything is
+ * drawn in full and holds still.
+ */
+
+.signal,
+.node,
+.end {
+  /* Line to content edge: 1rem where the gutter is narrow, opening to 2.5rem as it widens. */
+  --signal-gap: clamp(1rem, (100vw - var(--container-page)) / 4 + 1rem, 2.5rem);
+  --signal-reach: min(50vh, 22rem);
+}
+
+/* The two ends, as anchors: the hero's status dot carries `origin`, the email link `end`. */
+.origin {
+  anchor-name: --signal-origin;
+}
+
+.end {
+  position: relative;
+  anchor-name: --signal-end;
+  view-timeline: --signal-end block;
+}
+
+/* The line. `intro` carries the one-time drop out of the dot; `trace` is the part scroll draws. */
+.signal {
+  display: none;
+}
+
+.intro {
+  position: absolute;
+  inset: 0;
+  transform-origin: top;
+}
+
+.trace {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 1px;
+  background: var(--green);
+}
+
+/* A node: an outlined dot, filled with green once the line has reached it. */
+.node {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 9999px;
+  background: var(--bg);
+  vertical-align: 0.05em;
+  pointer-events: none;
+  view-timeline: --signal-node block;
+}
+
+.node::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--glow);
+}
+
+/*
+ * On arrival the signal underlines the address in green. A copy of the address (empty alt text,
+ * so it is never announced) lies exactly over it with transparent glyphs and a green underline,
+ * which inherits the link's offset and skips descenders the same way. At rest it is drawn in full
+ * (the clip only makes room for the underline below the text); the arrival's animation clips it
+ * back and reveals it from the left. Below 360px the address may wrap where the copy cannot, so
+ * the copy stays hidden there.
+ */
+.address {
+  position: relative;
+}
+
+.address::after {
+  content: attr(data-address) / '';
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  white-space: nowrap;
+  text-decoration: underline var(--green);
+  clip-path: inset(0 0 -0.5em 0);
+  pointer-events: none;
+}
+
+@media (width < 22.5rem) {
+  .address::after {
+    display: none;
+  }
+}
+
+/*
+ * From md, on screen, on a page with both ends: the line in the gutter, between the dot's centre
+ * and the email's centre. It sits under the page's content (z-index -1), so the nodes cover it.
+ */
+@supports (anchor-name: --a) {
+  @media screen and (min-width: 48rem) and (forced-colors: none) {
+    :root:has(.origin):has(.end) {
+      .signal {
+        display: block;
+        position: absolute;
+        z-index: -1;
+        top: anchor(--signal-origin center);
+        bottom: anchor(--signal-end center);
+        left: calc(anchor(--signal-end left) - var(--signal-gap));
+        right: anchor(--signal-origin left);
+        overflow: clip;
+        pointer-events: none;
+        view-timeline: --signal block;
+      }
+
+      /* The route ahead, faint. */
+      .signal::before {
+        content: '';
+        position: absolute;
+        inset-block: 0;
+        left: 0;
+        width: 1px;
+        background: var(--line);
+      }
+
+      /* Out of the dot to the gutter. */
+      .signal::after {
+        content: '';
+        position: absolute;
+        inset-inline: 0;
+        top: 0;
+        height: 1px;
+        background: var(--green);
+      }
+
+      /* On the line, level with the middle of the label's first line. */
+      .node {
+        position: absolute;
+        top: 0.5lh;
+        left: calc(0.5px - var(--signal-gap));
+        margin: 0;
+        translate: -50% -50%;
+      }
+
+      /* From the line into the envelope, meeting its left side (x = 3 of the icon's 24). */
+      .end::before {
+        content: '';
+        position: absolute;
+        top: calc(50% - 1px);
+        right: calc(100% - 0.125em);
+        width: calc(var(--signal-gap) + 0.125em);
+        height: 1px;
+        background: var(--green);
+        transform-origin: left;
+        pointer-events: none;
+      }
+    }
+  }
+}
+
+/*
+ * The journey, scrubbed by scroll. `entry <length>` is the scroll position where an element's top
+ * stands that far above the viewport's bottom edge, and `entry calc(50% + <length>)` where its
+ * centre does. The line's own range runs from its top to its bottom crossing the reach, so its
+ * head stays on it.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* Once, on load: the signal leaves the status dot, turns, and drops to the reach. */
+    .signal::after {
+      transform-origin: right;
+      animation: leave 0.25s cubic-bezier(0.5, 0, 1, 1) 0.6s backwards;
+    }
+
+    .intro {
+      animation: drop 1s cubic-bezier(0.16, 1, 0.3, 1) 0.85s backwards;
+    }
+
+    .trace {
+      animation: draw linear both;
+      animation-timeline: --signal;
+      animation-range: entry var(--signal-reach) exit var(--signal-reach);
+    }
+
+    .node::after {
+      animation: light linear both;
+      animation-timeline: --signal-node;
+      animation-range-start: entry calc(50% + var(--signal-reach));
+      animation-range-end: entry calc(50% + var(--signal-reach) + 1rem);
+    }
+
+    /* The arrival: into the envelope, then along the address. */
+    .end::before {
+      animation: elbow linear both;
+      animation-timeline: --signal-end;
+      animation-range-start: entry calc(50% + var(--signal-reach));
+      animation-range-end: entry calc(50% + var(--signal-reach) + 1.5rem);
+    }
+
+    .address::after {
+      animation: underline linear both;
+      animation-timeline: --signal-end;
+      animation-range-start: entry calc(50% + var(--signal-reach) + 1.5rem);
+      animation-range-end: entry calc(50% + var(--signal-reach) + 4rem);
+    }
+  }
+}
+
+@keyframes leave {
+  from {
+    scale: 0 1;
+  }
+}
+
+@keyframes drop {
+  from {
+    scale: 1 0;
+  }
+}
+
+@keyframes draw {
+  from {
+    translate: 0 -100%;
+  }
+}
+
+@keyframes light {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+
+@keyframes elbow {
+  from {
+    scale: 0 1;
+  }
+}
+
+@keyframes underline {
+  from {
+    clip-path: inset(0 100% -0.5em 0);
+  }
+}
+
+/*
+ * Decoration only, so it stays off paper and out of forced colours, which would drop the line's
+ * fills and paint the address copy. The line itself is drawn only on screen without them (above).
+ */
+@media print, (forced-colors: active) {
+  .node,
+  .address::after {
+    display: none;
+  }
+}
