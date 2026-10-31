@@ -352,7 +352,7 @@ export const adage = {
   install: 'npm install -g @adage-sh/cli',
   links: {
     repo: 'https://github.com/stevenvaughanbooth/adage',
-    site: 'https://adage-site-bice.vercel.app',
+    site: 'https://adage.sh',
     evidence: 'https://github.com/stevenvaughanbooth/adage/blob/main/docs/benchmarks.md',
   },
   /** The README's worked example of a reflex. */
