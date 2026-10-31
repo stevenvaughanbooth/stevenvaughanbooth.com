@@ -26,7 +26,8 @@ export function SiteHeader() {
         data-component="site-header"
         className="site-header fixed inset-x-0 top-0 z-40 border-b border-line/70 bg-bg/75 backdrop-blur-xl backdrop-saturate-150"
       >
-        <div className="page flex h-16 items-center gap-6">
+        {/* A tighter gap on phones keeps Ask Steven on one line beside four buttons at 320px. */}
+        <div className="page flex h-16 items-center gap-4 md:gap-6">
           {/* No prefetch: on the home page it would download the page already on screen. */}
           <Link href="/" prefetch={false} className="font-mono text-lg font-medium tracking-tight">
             <span aria-hidden>

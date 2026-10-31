@@ -173,7 +173,7 @@ test('the HUD reports this visit and the build in numbers', async ({ page }) => 
   const value = (term: string) =>
     panel.locator('dt', { hasText: term }).locator('xpath=following-sibling::dd[1]');
   await expect(value('FCP')).toHaveText(/^\d+\.\d\d s/);
-  await expect(value('CLS')).toHaveText(/^\d/);
+  await expect(value('CLS')).toHaveText(/^(< )?\d/);
   // The X just pressed is an interaction.
   await expect(value('INP')).toHaveText(/^\d+ ms/);
   await expect(value('JavaScript')).toHaveText(/^\d+ KB\d+ files/);

@@ -112,7 +112,8 @@ export function rate(metric: keyof typeof thresholds, value: number): Rating {
 
 export const formatSeconds = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
 export const formatMilliseconds = (ms: number) => `${Math.round(ms)} ms`;
-export const formatShift = (value: number) => (value === 0 ? '0' : value.toFixed(3));
+export const formatShift = (value: number) =>
+  value === 0 ? '0' : value < 0.001 ? '< 0.001' : value.toFixed(3);
 export const formatKilobytes = (bytes: number) => `${Math.round(bytes / 1024)} KB`;
 export const formatCount = (count: number) => count.toLocaleString('en-US');
 

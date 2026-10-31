@@ -70,7 +70,7 @@ const polygon = (points: readonly Point[], shift: Point = [0, 0], scale = 1) =>
 /** The colours of the sheet's back and its shadow, for the theme the page is leaving or entering. */
 function paper(dark: boolean) {
   return dark
-    ? { crease: '#5b6370', roll: '#1b1f26', sheen: '#2b3039', back: '#1d2128', tip: '#121418' }
+    ? { crease: '#7a8494', roll: '#1b1f26', sheen: '#2d333d', back: '#1d2128', tip: '#121418' }
     : { crease: '#ffffff', roll: '#deded6', sheen: '#f3f3ee', back: '#e6e6df', tip: '#cfcfc6' };
 }
 

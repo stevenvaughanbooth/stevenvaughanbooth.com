@@ -162,6 +162,7 @@ describe('formatting', () => {
     expect(formatMilliseconds(47.6)).toBe('48 ms');
     expect(formatShift(0)).toBe('0');
     expect(formatShift(0.0123)).toBe('0.012');
+    expect(formatShift(0.0002)).toBe('< 0.001');
     expect(formatKilobytes(168_263)).toBe('164 KB');
     expect(formatCount(1834)).toBe('1,834');
   });

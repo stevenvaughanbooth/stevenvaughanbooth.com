@@ -36,6 +36,8 @@ describe('CountUp', () => {
 
   it('renders text that cannot count as it is', () => {
     const { container } = render(<CountUp text="1.5×" className="text-5xl" />);
-    expect(container.innerHTML).toBe('<span class="text-5xl">1.5×</span>');
+    expect(container.innerHTML).toBe(
+      '<span data-component="count-up" class="text-5xl">1.5×</span>',
+    );
   });
 });

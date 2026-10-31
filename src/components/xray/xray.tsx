@@ -21,9 +21,9 @@ import {
 import {
   type Bounds,
   type Box,
+  isSmall,
   type LabelRequest,
   placeCard,
-  isSmall,
   placeLabels,
   runsDown,
 } from './layout';
@@ -135,6 +135,12 @@ function inFixedLayer(element: Element): boolean {
 
 const hasBox = (rect: DOMRect) => rect.width > 0 && rect.height > 0;
 
+/** The elements the page marks as components the manifest knows, in document order. */
+const marked = () =>
+  [...document.querySelectorAll<HTMLElement>('[data-component]')].filter((element) =>
+    componentById(element.dataset.component ?? ''),
+  );
+
 function scan(): Target[] {
   return marked().map((element) => ({
     key: keyOf(element),
@@ -146,11 +152,6 @@ function scan(): Target[] {
   }));
 }
 
-const marked = () =>
-  [...document.querySelectorAll<HTMLElement>('[data-component]')].filter((element) =>
-    componentById(element.dataset.component ?? ''),
-  );
-
 /** Whether the page's components, or which of them have a box, differ from `targets`. */
 function stale(targets: readonly Target[], rects: readonly DOMRect[]): boolean {
   const elements = marked();
@@ -160,6 +161,16 @@ function stale(targets: readonly Target[], rects: readonly DOMRect[]): boolean {
       (target, i) => elements[i] !== target.element || target.boxed !== hasBox(rects[i]!),
     )
   );
+}
+
+/** A modal dialog or an open popover (the Sections menu) has Escape to itself. */
+function somethingOnTop(): boolean {
+  try {
+    return document.querySelector('dialog:modal, :popover-open') !== null;
+  } catch {
+    // A browser without :popover-open has no popovers either.
+    return document.querySelector('dialog:modal') !== null;
+  }
 }
 
 /** The parts of one label that the layout pass moves. */
@@ -175,6 +186,8 @@ function XrayOverlay() {
   const overlay = useRef<HTMLDivElement>(null);
   const [targets, setTargets] = useState(scan);
   const [active, setActive] = useState<string | null>(null);
+  // Client navigations change the page under the overlay; the HUD names the one on screen.
+  const [path, setPath] = useState(() => window.location.pathname);
   const parts = useRef(new Map<string, LabelParts>());
   const focusBox = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
@@ -202,7 +215,7 @@ function XrayOverlay() {
   // Escape closes an open card first, then X-ray itself; a press elsewhere closes a pinned card.
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
-    if (document.querySelector('dialog:modal, :popover-open')) return;
+    if (somethingOnTop()) return;
     event.preventDefault();
     if (active) return closeCard();
     // Leaving from a label or the HUD: the labels go, so focus goes back to the toggle.
@@ -240,6 +253,10 @@ function XrayOverlay() {
       const rects = targets.map((target) => target.element.getBoundingClientRect());
       if (stale(targets, rects)) {
         setTargets(scan());
+        return false;
+      }
+      if (window.location.pathname !== path) {
+        setPath(window.location.pathname);
         return false;
       }
       const width = document.documentElement.clientWidth;
@@ -363,7 +380,7 @@ function XrayOverlay() {
     }
     if (layout()) frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [targets, active]);
+  }, [targets, active, path]);
 
   const shown = targets.filter((target) => target.boxed);
   const current = shown.find((target) => target.key === active);
@@ -373,7 +390,7 @@ function XrayOverlay() {
       <style href="xray-kinds" precedence="medium">
         {kindRules}
       </style>
-      <Hud targets={targets} overlay={overlay} />
+      <Hud targets={targets} overlay={overlay} path={path} />
       {/* The header's labels hang on a rail below it, which the page's pass under. */}
       <div ref={rail} aria-hidden className={styles.rail} />
       <section aria-label="Components on this page">
@@ -583,7 +600,7 @@ interface Build {
   commit?: string;
 }
 
-/** What the server wrote into the header at build time: the repository, versions and commit. */
+/** What the server wrote on the toggle at build time: the repository, versions and commit. */
 function useBuild(): Build {
   const [build] = useState<Build>(() => {
     try {
@@ -616,13 +633,9 @@ const sameStats = (a: PageStats, b: PageStats) =>
 
 /** The Lighthouse run for this page, or for the page of its kind that was measured. */
 function lighthouseFor(path: string) {
-  const pages: readonly { path: string }[] = measured.pages;
+  const find = (measuredPath: string) => measured.pages.find((page) => page.path === measuredPath);
   return (
-    measured.pages.find((page) => page.path === path) ??
-    (path.startsWith('/work/') && pages.some((page) => page.path === '/work/mcp')
-      ? measured.pages.find((page) => page.path === '/work/mcp')
-      : undefined) ??
-    homeMeasurement
+    find(path) ?? (path.startsWith('/work/') ? find('/work/mcp') : undefined) ?? homeMeasurement
   );
 }
 
@@ -671,13 +684,13 @@ function Cell({ term, children, note, wide }: CellProps) {
   );
 }
 
-function Hud({
-  targets,
-  overlay,
-}: {
+interface HudProps {
   targets: readonly Target[];
   overlay: RefObject<HTMLDivElement | null>;
-}) {
+  path: string;
+}
+
+function Hud({ targets, overlay, path }: HudProps) {
   const titleId = useId();
   const bodyId = useId();
   const build = useBuild();
@@ -700,7 +713,6 @@ function Hud({
   const ids = new Set(targets.map((target) => target.entry.id));
   const count = (kind: ComponentKind) =>
     [...ids].filter((id) => componentById(id)?.kind === kind).length;
-  const path = location.pathname;
   const lighthouse = lighthouseFor(path);
   const scores = [
     lighthouse.performance,
@@ -761,11 +773,12 @@ function Hud({
         <Legend inBody />
         <p className={styles.caption}>This visit, measured in your browser</p>
         <dl className={styles.cells}>
-          <Cell term="FCP">
+          <Cell term="FCP" note={vitals.fcp === undefined ? 'not reported' : undefined}>
             {vitals.fcp === undefined ? '—' : formatSeconds(vitals.fcp)}
             {vitals.fcp === undefined ? null : <Rated rating={rate('fcp', vitals.fcp)} />}
           </Cell>
-          <Cell term="LCP">
+          {/* The browser stops looking for the LCP at the first input, and may not have named one. */}
+          <Cell term="LCP" note={vitals.lcp === undefined ? 'not reported' : undefined}>
             {vitals.lcp === undefined ? '—' : formatSeconds(vitals.lcp)}
             {vitals.lcp === undefined ? null : <Rated rating={rate('lcp', vitals.lcp)} />}
           </Cell>
