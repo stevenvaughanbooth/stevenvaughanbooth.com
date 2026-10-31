@@ -16,7 +16,7 @@ export function SiteFooter() {
           <ul className="grid grid-cols-2 gap-x-10 gap-y-2.5">
             <li>
               <Link href="/colophon" className="hover:text-fg">
-                How I built this
+                Under the hood
               </Link>
             </li>
             <li>

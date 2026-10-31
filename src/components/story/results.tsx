@@ -52,11 +52,7 @@ export function Results({ floor, detailsHref }: ResultsProps) {
           {ci.high.toFixed(2)}, where my local build scored {fraction(ci.localThen)}. So CI enforces
           a floor of {floor.toFixed(2)}, and {measured.performanceTarget} stays the target.
         </p>
-        <p className="mt-3 max-w-2xl leading-relaxed text-pretty text-muted">
-          Lighthouse’s simulation charges the framework’s scripts to the largest paint, and slower
-          machines pay more for them. Shipping less JavaScript before first paint is how to raise it
-          back.
-        </p>
+
         <a
           href={detailsHref}
           className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-green hover:underline"

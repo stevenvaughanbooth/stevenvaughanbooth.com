@@ -1,29 +1,27 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { fraction, homeMeasurement, measured } from '@/components/story/measured';
-import { afterLaunch, timeline } from '@/components/story/story';
+import { siteComponents } from '@/content/components';
 import { person } from '@/content/profile';
 
 // The floor CI enforces, read from the same file Lighthouse CI uses.
 const lighthouse = JSON.parse(readFileSync('lighthouserc.json', 'utf8'));
 const floor: number = lighthouse.ci.assert.assertions['categories:performance'][1].minScore;
 
-test('the footer’s “How I built this” link opens the story', async ({ page }) => {
+test('the footer’s “Under the hood” link opens the page', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('contentinfo').getByRole('link', { name: 'How I built this' }).click();
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Under the hood' }).click();
 
   await expect(page).toHaveURL(/\/colophon$/);
-  await expect(page).toHaveTitle(/^How I built this/);
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'How I built this site with Claude Code' }),
-  ).toBeVisible();
-  await expect(page.getByRole('figure', { name: 'Who did what' })).toBeVisible();
+  await expect(page).toHaveTitle(/^Under the hood/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Under the hood' })).toBeVisible();
+  await expect(page.locator('#components')).toBeVisible();
 });
 
-test('the hero’s line under the proof strip opens the story too', async ({ page }) => {
+test('the hero’s line under the proof strip opens it too', async ({ page }) => {
   await page.goto('/');
   const hero = page.getByRole('region', { name: person.name });
-  const link = hero.getByRole('link', { name: 'How I built this site with Claude Code' });
+  const link = hero.locator('a[href="/colophon"]');
   await expect(link).toBeVisible();
   // Below the proof strip, and still in the hero rather than crowding the text above it.
   const strip = await hero.locator('dl').boundingBox();
@@ -33,25 +31,26 @@ test('the hero’s line under the proof strip opens the story too', async ({ pag
 
   await link.click();
   await expect(page).toHaveURL(/\/colophon$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'How I built this site with Claude Code',
-  );
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Under the hood');
 });
 
-test('the day ends at launch, and round two follows under its own heading', async ({ page }) => {
+test('Claude Code gets one line, low on the page, and never the page’s name', async ({ page }) => {
   await page.goto('/colophon');
-  const headings = await page
-    .locator('#day')
-    .locator('h3, h4')
-    .evaluateAll((els) => els.map((el) => `${el.tagName.toLowerCase()} ${el.textContent}`));
-  expect(headings).toEqual([
-    ...timeline.map((entry) => `h3 ${entry.title}`),
-    'h3 After launch',
-    ...afterLaunch.map((entry) => `h4 ${entry.title}`),
-  ]);
+  const article = page.locator('article').first();
+  expect((await article.innerText()).match(/Claude Code/g)).toHaveLength(1);
+  await expect(page.locator('#source')).toContainText('Claude Code');
+  const headings = await page.locator('h1, h2, h3, h4, h5').allTextContents();
+  expect(headings.filter((text) => text.includes('Claude Code'))).toEqual([]);
+  await expect(page.locator('body')).not.toContainText('How I built this');
+  const description = await page.locator('meta[name="description"]').getAttribute('content');
+  expect(description).not.toContain('Claude Code');
+  for (const property of ['og:title', 'og:description']) {
+    const content = await page.locator(`meta[property="${property}"]`).getAttribute('content');
+    expect(content, property).not.toContain('Claude Code');
+  }
 });
 
-test('the story comes first, then the colophon, in the order of the page’s navigation', async ({
+test('leads with the components, and numbers its sections as its navigation does', async ({
   page,
 }) => {
   await page.goto('/colophon');
@@ -63,38 +62,45 @@ test('the story comes first, then the colophon, in the order of the page’s nav
     .locator('article section[id]')
     .evaluateAll((sections) => sections.map((section) => section.id));
   expect(rendered).toEqual(linked);
+  expect(rendered[0]).toBe('components');
 
-  // Every section is named by its h2, and the colophon's introduction sits between the parts.
-  for (const id of rendered) {
-    await expect(page.locator(`#${id}`)).toHaveAccessibleName(/\S/);
+  const numbers = await nav
+    .getByRole('link')
+    .evaluateAll((links) => links.map((link) => link.querySelector('[aria-hidden]')?.textContent));
+  for (const [i, id] of rendered.entries()) {
+    const section = page.locator(`#${id}`);
+    // Every section is named by its h2, and its label carries the number the navigation shows.
+    await expect(section).toHaveAccessibleName(/\S/);
+    await expect(section.locator('p.label').first()).toContainText(numbers[i] ?? '');
+    expect(numbers[i]).toBe(String(i + 1).padStart(2, '0'));
   }
-  const between = await page.evaluate(() => {
-    const [results, intro, principles] = ['results', 'colophon', 'principles'].map((id) =>
-      document.getElementById(id),
-    );
-    return Boolean(
-      results &&
-      intro &&
-      principles &&
-      results.compareDocumentPosition(intro) & Node.DOCUMENT_POSITION_FOLLOWING &&
-      intro.compareDocumentPosition(principles) & Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-  expect(between).toBe(true);
 });
 
-test('“Skip to the colophon” moves keyboard focus there', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/colophon');
-  await page.getByRole('link', { name: 'Skip to the colophon' }).focus();
-  await page.keyboard.press('Enter');
+test('the prerendered HTML holds every component on the map', async ({ page, request }) => {
+  const html = await (await request.get('/colophon')).text();
+  for (const component of siteComponents) {
+    expect(html, component.id).toContain(`id="component-${component.id}"`);
+  }
 
-  await expect(page).toHaveURL(/#colophon$/);
-  await expect(page.locator('#colophon')).toBeInViewport();
-  await page.keyboard.press('Tab');
-  await expect(
-    page.locator('#colophon').getByRole('link', { name: 'Architecture notes' }),
-  ).toBeFocused();
+  await page.goto('/colophon');
+  await expect(page.locator('[data-component="colophon"]')).toHaveCount(1);
+  const map = page.locator('#components');
+  for (const component of siteComponents) {
+    const card = map.locator(`#component-${component.id}`);
+    await expect(card).toHaveAccessibleName(component.name);
+    await expect(card.getByRole('heading').first()).toHaveText(`<${component.name} />`);
+  }
+});
+
+test('“Peel back this page” is a button X-ray mode can pick up', async ({ page }) => {
+  await page.goto('/colophon');
+  const button = page.locator('article header').getByRole('button', {
+    name: 'Peel back this page',
+  });
+  await expect(button).toBeVisible();
+  await expect(button).toHaveAttribute('type', 'button');
+  // X-ray mode's listener picks up presses on any element with the attribute, whatever its value.
+  await expect(button).toHaveAttribute('data-xray-toggle');
 });
 
 test('the results show the measured numbers and the floor from lighthouserc.json', async ({
@@ -114,17 +120,6 @@ test('the results show the measured numbers and the floor from lighthouserc.json
   await expect(caveat).toContainText(
     `where my local build scored ${fraction(measured.ciRunners.localThen)}`,
   );
-});
-
-test('the timeline dates are machine-readable and in order', async ({ page }) => {
-  await page.goto('/colophon');
-  const stamps = await page
-    .locator('#day time')
-    .evaluateAll((times) => times.map((time) => Date.parse(time.getAttribute('datetime') ?? '')));
-
-  expect(stamps.length).toBeGreaterThan(1);
-  expect(stamps.every((stamp) => Number.isFinite(stamp))).toBe(true);
-  expect([...stamps].sort((a, b) => a - b)).toEqual(stamps);
 });
 
 test('the page fits the viewport with no sideways scrolling', async ({ page }) => {
