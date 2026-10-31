@@ -51,7 +51,7 @@ export function CaseStudyArticle({ study }: { study: CaseStudy }) {
   const { theme } = study;
   return (
     <FadeThrough>
-      <article aria-labelledby={headingId} className="relative isolate">
+      <article data-component="case-study" aria-labelledby={headingId} className="relative isolate">
         <div aria-hidden className="bg-grid absolute inset-x-0 top-0 -z-10 h-[32rem]" />
         <CaseStudyFocus
           heading={headingId}

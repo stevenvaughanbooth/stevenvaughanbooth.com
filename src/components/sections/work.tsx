@@ -18,6 +18,7 @@ export function Work() {
     <FadeThrough>
       <section
         id="work"
+        data-component="work"
         aria-labelledby="work-title"
         className="border-t border-line py-20 md:py-28"
       >

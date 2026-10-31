@@ -10,7 +10,12 @@ export function OpenSource() {
   const facts = [adage.status, adage.language, adage.license, ...adage.harnesses];
 
   return (
-    <section id="open-source" aria-labelledby="open-source-title" className="reveal py-20 md:py-28">
+    <section
+      id="open-source"
+      data-component="open-source"
+      aria-labelledby="open-source-title"
+      className="reveal py-20 md:py-28"
+    >
       <div className="page">
         <SectionHeading
           id="open-source-title"

@@ -17,6 +17,7 @@ export function AskButton({ prompt, ...props }: AskButtonProps) {
     <button
       {...props}
       type="button"
+      data-component="ask-button"
       aria-haspopup="dialog"
       onPointerEnter={warmAsk}
       onFocus={warmAsk}

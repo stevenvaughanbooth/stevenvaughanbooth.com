@@ -1,11 +1,12 @@
 /**
- * The site's single-key shortcuts: / starts a question, ? opens the shortcuts sheet and T switches
- * the theme. (⌘K / Ctrl+K, which opens Ask Steven, is the palette loader's.) A key counts only when
+ * The site's single-key shortcuts: / starts a question, ? opens the shortcuts sheet, T switches
+ * the theme and X peels the page back to show what it is made of. (⌘K / Ctrl+K, which opens Ask
+ * Steven, is the palette loader's.) A key counts only when
  * nobody is typing and no modifier is held, and visitors can turn single-key shortcuts off from the
  * sheet, as WCAG 2.1.4 requires: they can clash with speech input and other assistive technology.
  */
 
-export type ShortcutAction = 'ask' | 'sheet' | 'theme';
+export type ShortcutAction = 'ask' | 'sheet' | 'theme' | 'xray';
 
 /** The sheet's dialog id, so the listener can find it without loading its code. */
 export const sheetId = 'shortcuts';
@@ -76,7 +77,9 @@ export function shortcutFor(event: KeyboardEvent): ShortcutAction | null {
   if (isTypingTarget(event.target)) return null;
   if (event.key === '/') return 'ask';
   if (event.key === '?') return 'sheet';
-  // Caps Lock gives "T" without Shift; Shift+T is left alone.
-  if ((event.key === 't' || event.key === 'T') && !event.shiftKey) return 'theme';
+  // Caps Lock gives "T" without Shift; Shift+T is left alone. The same goes for X.
+  if (event.shiftKey) return null;
+  if (event.key === 't' || event.key === 'T') return 'theme';
+  if (event.key === 'x' || event.key === 'X') return 'xray';
   return null;
 }

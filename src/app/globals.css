@@ -260,10 +260,10 @@
 /*
  * The fixed header stays above page transitions: without a name of its own it is part of the
  * page's snapshot, and the case study's gliding and fading groups would draw over it. Captured on
- * its own, it simply shows its new state on top. The theme reveal and the film's theater animate
- * the page as a whole, so for those it stays in the page snapshot.
+ * its own, it simply shows its new state on top. The theme reveal, the film's theater and X-ray's
+ * peel animate the page as a whole, so for those it stays in the page snapshot.
  */
-:root:not(:active-view-transition-type(theme, arrival)) .site-header {
+:root:not(:active-view-transition-type(theme, arrival, xray)) .site-header {
   view-transition-name: site-header;
 }
 

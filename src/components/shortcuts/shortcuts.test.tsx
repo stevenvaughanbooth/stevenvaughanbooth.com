@@ -27,6 +27,9 @@ afterEach(() => {
   // Unmount while matchMedia is still stubbed: the toggle reads it as the theme resets.
   cleanup();
   delete document.documentElement.dataset.theme;
+  document.documentElement.removeAttribute('data-xray');
+  document.documentElement.removeAttribute('class');
+  window.history.replaceState(null, '', '/');
   localStorage.clear();
   vi.unstubAllGlobals();
 });
@@ -96,6 +99,7 @@ describe('Shortcuts', () => {
       'Ask StevenCtrl K',
       'Type a question/',
       'Switch themeT',
+      'Under the hoodX',
       'Show these shortcuts?',
       'Close a dialog or menuEsc',
     ]);
@@ -193,7 +197,7 @@ describe('Shortcuts', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
     const toggle = screen.getByRole('switch', { name: 'Single-key shortcuts' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
-    expect(toggle).toHaveAccessibleDescription(/Turn off \/, T and \?/);
+    expect(toggle).toHaveAccessibleDescription(/Turn off \/, T, X and \?/);
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -214,5 +218,69 @@ describe('Shortcuts', () => {
       'aria-checked',
       'false',
     );
+  });
+});
+
+describe('X-ray', () => {
+  const xray = () => document.documentElement.hasAttribute('data-xray');
+
+  function renderWithToggle() {
+    renderPage();
+    const toggle = document.createElement('button');
+    toggle.id = 'xray-toggle';
+    toggle.textContent = 'Under the hood';
+    toggle.setAttribute('data-xray-toggle', '');
+    toggle.setAttribute('aria-pressed', 'false');
+    document.body.prepend(toggle);
+    return toggle;
+  }
+
+  it('loads on X and turns on and off, keeping the toggle’s aria-pressed in step', async () => {
+    const toggle = renderWithToggle();
+    press('x');
+    await waitFor(() => expect(xray()).toBe(true));
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('region', { name: 'Under the hood' })).toBeVisible();
+
+    press('X');
+    await waitFor(() => expect(xray()).toBe(false));
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    toggle.remove();
+  });
+
+  it('turns on from any [data-xray-toggle] button, and Escape turns it off', async () => {
+    const toggle = renderWithToggle();
+    const other = document.createElement('button');
+    other.setAttribute('data-xray-toggle', '');
+    other.innerHTML = '<span>Peel it back</span>';
+    document.body.append(other);
+
+    fireEvent.click(other.firstChild as Element);
+    await waitFor(() => expect(xray()).toBe(true));
+    // A button without aria-pressed of its own is left as it is.
+    expect(other).not.toHaveAttribute('aria-pressed');
+
+    press('Escape');
+    await waitFor(() => expect(xray()).toBe(false));
+    toggle.remove();
+    other.remove();
+  });
+
+  it('opens from ?xray in the address', async () => {
+    window.history.replaceState(null, '', '/?xray');
+    const toggle = renderWithToggle();
+    await waitFor(() => expect(xray()).toBe(true));
+    toggle.remove();
+  });
+
+  it('stays out of the way of typing and of the single-key switch', async () => {
+    const toggle = renderWithToggle();
+    press('x', screen.getByRole('textbox', { name: 'Search' }));
+    localStorage.setItem(shortcutsStorageKey, 'off');
+    press('x');
+    // Give a load that should not have started the time it would need.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(xray()).toBe(false);
+    toggle.remove();
   });
 });

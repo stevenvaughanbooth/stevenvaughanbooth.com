@@ -180,6 +180,7 @@ export function ArrivalShell({
     <div
       ref={frameRef}
       id="film"
+      data-component="arrival"
       className={`relative rounded-2xl border border-line bg-elevated shadow-card md:rounded-3xl ${className}`}
     >
       <Activity mode={open ? 'hidden' : 'visible'}>

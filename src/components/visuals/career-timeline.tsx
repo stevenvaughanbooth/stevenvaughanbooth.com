@@ -15,7 +15,10 @@ export function CareerTimeline() {
   const { props: logo } = getImageProps({ src: salesforceLogo, alt: 'Salesforce', width: 48 });
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 shadow-card md:p-8">
+    <div
+      data-component="career-timeline"
+      className="rounded-2xl border border-line bg-surface p-5 shadow-card md:p-8"
+    >
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="flex items-center gap-3.5">
           {/* eslint-disable-next-line @next/next/no-img-element -- getImageProps supplies the optimized srcset */}

@@ -122,11 +122,11 @@ export const siteComponents: readonly SiteComponent[] = [
   {
     id: 'xray-toggle',
     name: 'XrayToggle',
-    file: 'src/components/theme-toggle.tsx',
-    kind: 'client',
-    loads: 'With the page, X-ray on intent',
-    features: ['useSyncExternalStore', 'React Compiler'],
-    why: 'A small button beside the theme toggle that reports X-ray’s state; the overlay, its numbers and the blueprint styles download only on a hover, focus or press, or on X.',
+    file: 'src/components/xray/xray-toggle.tsx',
+    kind: 'server',
+    loads: 'On intent',
+    features: ['Server Component', 'View Transitions', 'dynamic import()'],
+    why: 'A plain button: the shortcuts listener handles its presses, and the overlay, the stats and the blueprint styles download only on hover, focus, a press or X.',
     onPage: true,
   },
   {

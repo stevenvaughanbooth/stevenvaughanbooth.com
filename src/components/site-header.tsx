@@ -8,6 +8,7 @@ import styles from './reading.module.css';
 import { Shortcuts } from './shortcuts/shortcuts';
 import { ThemeToggle } from './theme-toggle';
 import { Moon, Sun } from './ui/icons';
+import { XrayToggle } from './xray/xray-toggle';
 
 export interface NavItem {
   id: SectionId;
@@ -21,8 +22,12 @@ const nav: NavItem[] = sections
 export function SiteHeader() {
   return (
     <>
-      <header className="site-header fixed inset-x-0 top-0 z-40 border-b border-line/70 bg-bg/75 backdrop-blur-xl backdrop-saturate-150">
-        <div className="page flex h-16 items-center gap-6">
+      <header
+        data-component="site-header"
+        className="site-header fixed inset-x-0 top-0 z-40 border-b border-line/70 bg-bg/75 backdrop-blur-xl backdrop-saturate-150"
+      >
+        {/* A tighter gap on phones keeps Ask Steven on one line beside four buttons at 320px. */}
+        <div className="page flex h-16 items-center gap-4 md:gap-6">
           {/* No prefetch: on the home page it would download the page already on screen. */}
           <Link href="/" prefetch={false} className="font-mono text-lg font-medium tracking-tight">
             <span aria-hidden>
@@ -75,10 +80,12 @@ export function SiteHeader() {
               <Sun className="hidden dark:block" />
               <Moon className="dark:hidden" />
             </ThemeToggle>
+            <XrayToggle />
             {/* Section menu for small screens, on the native Popover API. */}
             <button
               type="button"
               popoverTarget="mobile-nav"
+              data-component="sections-menu"
               aria-label="Sections"
               className="grid size-9 place-items-center rounded-full text-muted transition-colors hover:bg-elevated hover:text-fg md:hidden"
             >

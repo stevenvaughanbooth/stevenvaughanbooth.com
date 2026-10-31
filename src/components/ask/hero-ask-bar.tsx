@@ -37,7 +37,12 @@ export function HeroAskBar({ suggestions, className }: HeroAskBarProps) {
   }
 
   return (
-    <div className={`@container ${className ?? ''}`} onPointerEnter={warmAsk} onFocus={warmAsk}>
+    <div
+      data-component="hero-ask-bar"
+      className={`@container ${className ?? ''}`}
+      onPointerEnter={warmAsk}
+      onFocus={warmAsk}
+    >
       {/*
        * method="dialog" makes a submit before hydration a no-op (it closes only a dialog the form
        * is in), so an early Enter never reloads the page with the question in its URL.

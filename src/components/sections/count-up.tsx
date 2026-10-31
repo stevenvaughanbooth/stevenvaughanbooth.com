@@ -24,9 +24,16 @@ export function parseFigure(text: string): Figure | null {
  */
 export function CountUp({ text, className = '' }: { text: string; className?: string }) {
   const figure = parseFigure(text);
-  if (!figure) return <span className={className}>{text}</span>;
+  if (!figure) {
+    return (
+      <span data-component="count-up" className={className}>
+        {text}
+      </span>
+    );
+  }
   return (
     <span
+      data-component="count-up"
       className={`${styles.figure} ${className}`}
       data-suffix={figure.suffix}
       style={{ '--count-to': figure.value } as CSSProperties}

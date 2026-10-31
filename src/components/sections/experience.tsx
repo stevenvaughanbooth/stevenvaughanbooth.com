@@ -6,6 +6,7 @@ export function Experience() {
   return (
     <section
       id="experience"
+      data-component="experience"
       aria-labelledby="experience-title"
       className="reveal border-t border-line py-20 md:py-28"
     >

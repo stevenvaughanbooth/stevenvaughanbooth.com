@@ -29,6 +29,7 @@ export function VisualFrame({
   return (
     <div
       role="group"
+      data-component={id}
       aria-labelledby={`${id}-title`}
       className="@container rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6"
     >

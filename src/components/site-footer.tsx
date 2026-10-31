@@ -4,7 +4,7 @@ import { ShortcutsButton } from './shortcuts/shortcuts';
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line">
+    <footer data-component="site-footer" className="border-t border-line">
       <div className="page flex flex-col gap-8 py-12 text-sm text-muted md:flex-row md:items-start md:justify-between">
         <div className="max-w-md space-y-3">
           <p className="font-mono text-fg">

@@ -86,6 +86,7 @@ export function ThemeToggle({ children }: { children: ReactNode }) {
     <button
       type="button"
       id={themeToggleId}
+      data-component="theme-toggle"
       onClick={(event) => switchTheme(event.currentTarget)}
       aria-label="Dark mode"
       aria-pressed={dark ?? undefined}

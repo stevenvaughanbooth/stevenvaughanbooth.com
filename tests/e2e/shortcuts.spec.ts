@@ -25,6 +25,7 @@ test('? opens the shortcuts sheet, and Escape closes it and returns focus', asyn
     'Ask Steven',
     'Type a question',
     'Switch theme',
+    'Under the hood',
     'Show these shortcuts',
     'Close a dialog or menu',
   ]);
@@ -124,13 +125,15 @@ test('single-key shortcuts can be turned off, and the footer button still opens 
   await page.keyboard.press('Escape');
   await expect(sheet(page)).toBeHidden();
 
-  // Off for good: across a reload, neither ? nor T does anything.
+  // Off for good: across a reload, neither ?, T nor X does anything.
   await page.reload();
   await hydrated(page);
   await page.keyboard.press('Shift+Slash');
   await page.keyboard.press('t');
+  await page.keyboard.press('x');
   await expect(sheet(page)).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
+  expect(await page.evaluate(() => document.documentElement.hasAttribute('data-xray'))).toBe(false);
 
   // The footer button shows from the sm breakpoint, where a keyboard is likely.
   if (isMobile) return;
