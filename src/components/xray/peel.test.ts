@@ -1,74 +1,68 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockReducedMotion } from '@/test/browser-mocks';
-import { canPeel, FLAP_REACH, peel, peelShapes, peelStops } from './peel';
-
-type Point = readonly [number, number];
-
-/** Twice the signed area of a polygon (shoelace), positive or negative by winding. */
-const area = (points: readonly Point[]) =>
-  Math.abs(
-    points.reduce((sum, [x, y], i) => {
-      const [nx, ny] = points[(i + 1) % points.length]!;
-      return sum + x * ny - nx * y;
-    }, 0) / 2,
-  );
-
-/** How far a point lies from the top-right corner, measured into the page at 45°. */
-const depth = (width: number, [x, y]: Point) => (width - x + y) / Math.SQRT2;
+import { poseFor } from './fold';
+import { canPeel, peel, poseStyles, pull, spring } from './peel';
 
 const W = 1440;
 const H = 900;
+const diagonalLength = Math.hypot(W, H);
 
 afterEach(() => {
   vi.unstubAllGlobals();
   Reflect.deleteProperty(document, 'startViewTransition');
 });
 
-describe('peelShapes', () => {
-  it('starts with the whole page flat and no flap', () => {
-    const { page, flap } = peelShapes(W, H, 0);
-    expect(area(page)).toBeCloseTo(W * H);
-    expect(area(flap)).toBeCloseTo(0);
+describe('poseStyles', () => {
+  it('leaves the page whole and hides the helpers while the corner is home', () => {
+    const styles = poseStyles(poseFor(W, H, [W, 0]), diagonalLength);
+    expect(styles.page.clipPath).toBe(`polygon(0px 0px, ${W}px 0px, ${W}px ${H}px, 0px ${H}px)`);
+    expect(styles.flap.transform).toBe('scale(0)');
   });
 
-  it('ends with nothing left lying flat', () => {
-    const end = peelStops(W, H).at(-1)!;
-    expect(end).toBeCloseTo((W + H) / Math.SQRT2);
-    expect(area(peelShapes(W, H, end).page)).toBeCloseTo(0);
+  it('lays the helpers along the fold, turned with it', () => {
+    // Pulled straight left, the fold stands upright: the helpers' x axis points left.
+    const styles = poseStyles(poseFor(W, H, [W - 400, 0]), diagonalLength);
+    expect(styles.flap.transform).toMatch(/^matrix\(-1, 0, 0, -1, /);
+    expect(styles.shade.transform).toMatch(/^matrix\(1, 0, 0, -1, /);
+    // The flap is clipped, in its own quarter-size units, to the strip that turned over: from
+    // the fold (x 0) to 200px past it.
+    const xs = [...styles.flap.clipPath.matchAll(/(-?[\d.e-]+)px (-?[\d.e-]+)px/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(Math.min(...xs)).toBeCloseTo(0);
+    expect(Math.max(...xs)).toBeCloseTo(200 / 4);
+  });
+});
+
+describe('motions', () => {
+  it('pulls along a straight line, easing in and out, and arrives on time', () => {
+    const motion = pull([W, 0], [0, H], 0, 900);
+    expect(motion(0)).toEqual({ point: [W, 0], done: false });
+    expect(motion(450).point[0]).toBeCloseTo(W / 2);
+    expect(motion(100).point[0]).toBeGreaterThan(W - W * 0.05);
+    expect(motion(900)).toEqual({ point: [0, H], done: true });
   });
 
-  it('keeps the same number of points all the way, so the browser can interpolate', () => {
-    for (const s of [0, 100, 700, 1200, 1600]) {
-      const { page, flap } = peelShapes(W, H, s);
-      expect(page).toHaveLength(7);
-      expect(flap).toHaveLength(5);
+  it('springs home without overshooting, from rest', () => {
+    const motion = spring([W - 300, 200], [0, 0], [W, 0], 16, 0);
+    let x = W - 300;
+    for (let t = 16; t < 2000; t += 16) {
+      const { point, done } = motion(t);
+      expect(point[0]).toBeGreaterThanOrEqual(x);
+      expect(point[0]).toBeLessThanOrEqual(W);
+      x = point[0];
+      if (done) {
+        expect(point).toEqual([W, 0]);
+        return;
+      }
     }
+    throw new Error('never arrived');
   });
 
-  it('lifts exactly the corner triangle at first, and the page keeps the rest', () => {
-    const s = 200;
-    const leg = s * Math.SQRT2;
-    const { page } = peelShapes(W, H, s);
-    expect(area(page)).toBeCloseTo(W * H - (leg * leg) / 2);
-    // The fold crosses the top edge and the right edge at the same depth.
-    expect(page[0]).toEqual([W - leg, 0]);
-    expect(page[4]).toEqual([W, leg]);
-    expect(depth(W, page[0]!)).toBeCloseTo(s);
-  });
-
-  it('folds the lifted part over the line, landing a little short of its mirror image', () => {
-    const s = 300;
-    const { flap } = peelShapes(W, H, s);
-    // The corner itself goes furthest: (1 + reach) times the fold's depth.
-    expect(depth(W, flap[0]!)).toBeCloseTo((1 + FLAP_REACH) * s);
-    // Points on the fold stay put.
-    for (const point of flap.slice(1)) expect(depth(W, point)).toBeCloseTo(s);
-  });
-
-  it('changes shape only at the stops, where the fold passes a corner', () => {
-    expect(peelStops(W, H).map((s) => Math.round(s * Math.SQRT2))).toEqual([0, 900, 1440, 2340]);
-    // A square viewport has one corner fewer to pass.
-    expect(peelStops(500, 500)).toHaveLength(3);
+  it('can end a spring early, once it has done its work', () => {
+    const motion = spring([W - 300, 200], [-1, 1], [-2000, 3000], 9, 0, ([x]) => x < 0);
+    expect(motion(0).done).toBe(false);
+    expect(motion(2000).done).toBe(true);
   });
 });
 
@@ -85,16 +79,16 @@ describe('peel', () => {
     expect(start).not.toHaveBeenCalled();
   });
 
-  it('runs a typed view transition, with its helpers, where it can', async () => {
+  it('runs a typed view transition, with its helpers, and changes the page even if skipped', async () => {
     mockReducedMotion(false);
     vi.stubGlobal('CSS', { supports: () => true });
-    let finish = () => {};
     const start = vi.fn((options: StartViewTransitionOptions) => {
       if (typeof options.update === 'function') void options.update();
       return {
         updateCallbackDone: Promise.resolve(),
-        ready: new Promise(() => {}),
-        finished: new Promise<void>((resolve) => (finish = resolve)),
+        ready: Promise.reject(new Error('skipped')),
+        finished: Promise.resolve(),
+        skipTransition: vi.fn(),
       };
     });
     Object.defineProperty(document, 'startViewTransition', { value: start, configurable: true });
@@ -109,7 +103,6 @@ describe('peel', () => {
       update: expect.any(Function),
       types: ['xray', 'xray-lay'],
     });
-    finish();
     await new Promise((resolve) => setTimeout(resolve));
     expect(document.querySelectorAll('[data-xray-peel]')).toHaveLength(0);
   });

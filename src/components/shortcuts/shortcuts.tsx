@@ -30,16 +30,16 @@ function warm() {
   });
 }
 
-const warmXray = () => loadXray().catch(() => {});
-
 /** X-ray's overlay, which the listener renders after the header, and whether it is on. */
 export interface XrayView {
   Overlay: ComponentType;
   on: boolean;
 }
 
-const onXrayToggle = (event: Event) =>
-  event.target instanceof Element && event.target.closest('[data-xray-toggle]') !== null;
+const on = (selector: string) => (event: Event) =>
+  event.target instanceof Element && event.target.closest(selector) !== null;
+const onXrayToggle = on('[data-xray-toggle]');
+const onEar = on('[data-xray-ear]');
 
 /** Opens the shortcuts sheet, loading it first if need be. */
 export function openShortcuts(): void {
@@ -107,7 +107,24 @@ export function Shortcuts() {
     }
 
     const onIntent = (event: Event) => {
-      if (onXrayToggle(event)) warmXray();
+      // Loaded, X-ray readies its overlay out of sight, so turning it on starts at once.
+      if (onXrayToggle(event) || onEar(event)) {
+        loadXray().then(
+          (loaded) => loaded.prepare(setXray),
+          () => {},
+        );
+      }
+    };
+    // The dog-ear: the pointer is captured on the root before X-ray loads, so the drag keeps
+    // every move while the page curls (xray.tsx).
+    const onPull = (event: PointerEvent) => {
+      if (event.button || !onEar(event)) return;
+      event.preventDefault();
+      document.documentElement.setPointerCapture(event.pointerId);
+      loadXray().then(
+        (loaded) => loaded.drag(event, setXray),
+        () => {},
+      );
     };
     const onClick = (event: Event) => {
       if (onXrayToggle(event)) void toggleXray();
@@ -120,6 +137,15 @@ export function Shortcuts() {
         // Without storage, only ?xray turns it on.
       }
       if (xrayWanted(window.location.search, stored)) void toggleXray();
+      // The dog-ear lifts once a visit, to be noticed.
+      try {
+        if (!sessionStorage.getItem('xray-ear')) {
+          sessionStorage.setItem('xray-ear', '1');
+          document.querySelector('[data-xray-ear]')?.setAttribute('data-hint', '');
+        }
+      } catch {
+        // Without storage, it stays still.
+      }
     };
 
     observeInteractions();
@@ -129,6 +155,7 @@ export function Shortcuts() {
     document.addEventListener('pointerover', onIntent);
     document.addEventListener('focusin', onIntent);
     document.addEventListener('click', onClick);
+    document.addEventListener('pointerdown', onPull);
     if (document.readyState === 'complete') onLoad();
     else window.addEventListener('load', onLoad, { once: true });
     return () => {
@@ -137,6 +164,7 @@ export function Shortcuts() {
       document.removeEventListener('pointerover', onIntent);
       document.removeEventListener('focusin', onIntent);
       document.removeEventListener('click', onClick);
+      document.removeEventListener('pointerdown', onPull);
       window.removeEventListener('load', onLoad);
     };
   }, []);

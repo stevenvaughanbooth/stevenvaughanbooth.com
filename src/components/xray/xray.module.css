@@ -708,7 +708,8 @@
 /*
  * The peel (peel.ts). The page as it was is the old snapshot, lifted off above the blueprint; laid
  * back down, the restored page is the new one, on top. The browser's cross-fade is off, and the
- * helpers carry no animation of their own: peel.ts drives every part with one easing.
+ * helpers carry no animation of their own: peel.ts places every part, frame by frame, turning
+ * the helpers about their top-left corner.
  */
 /* One rule per pseudo-element: a selector list of them would be merged into :is(), which can't
    hold pseudo-elements, and dropped. */
@@ -735,6 +736,7 @@
 
 :global(::view-transition-new(xray-flap)) {
   animation: none;
+  transform-origin: 0 0;
 }
 
 :global(::view-transition-group(xray-shade)) {
@@ -744,6 +746,7 @@
 
 :global(::view-transition-new(xray-shade)) {
   animation: none;
+  transform-origin: 0 0;
 }
 
 /* Colours change at once underneath, so the new snapshot is the finished blueprint. */

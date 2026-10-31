@@ -1,0 +1,116 @@
+/*
+ * The dog-ear (xray-toggle.tsx): the page's top-right corner turned down along its diagonal. The
+ * corner that lifted shows the blueprint underneath; the half below the fold is the back of the
+ * sheet, lit at the crease like the peel's flap, casting a soft shadow on the page. It sits in the
+ * screen's corner, clear of the header's buttons at every width (their edge is 20px in).
+ */
+.ear {
+  --ear-paper-crease: light-dark(#ffffff, #7a8494);
+  --ear-paper-roll: light-dark(#deded6, #1b1f26);
+  --ear-paper-sheen: light-dark(#f3f3ee, #2d333d);
+  --ear-paper-back: light-dark(#e6e6df, #1d2128);
+  --ear-blueprint: light-dark(#15457f, #0a2548);
+
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 45;
+  display: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(-1px 1.5px 1.5px light-dark(rgb(18 20 23 / 0.24), rgb(0 0 0 / 0.6)));
+  transform-origin: top right;
+  transition: scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Only where the peel can run: typed view transitions, and motion welcome. */
+@supports selector(:active-view-transition-type(a)) {
+  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+    :global(html:not([data-xray])) .ear {
+      display: block;
+    }
+  }
+}
+
+/* The blueprint, where the corner has lifted off it. */
+.ear::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  background:
+    linear-gradient(rgb(190 222 255 / 0.22) 1px, transparent 1px) 0 0 / 6px 6px,
+    linear-gradient(90deg, rgb(190 222 255 / 0.22) 1px, transparent 1px) 0 0 / 6px 6px,
+    var(--ear-blueprint);
+}
+
+/* The back of the turned-down corner: brightest at the crease, as the flap is. */
+.ear::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  background: linear-gradient(
+    to bottom left,
+    var(--ear-paper-crease) 50%,
+    var(--ear-paper-roll) 57%,
+    var(--ear-paper-sheen) 72%,
+    var(--ear-paper-back)
+  );
+}
+
+@media (hover: hover) {
+  .ear:hover {
+    scale: 1.25;
+  }
+}
+
+.ear:active {
+  cursor: grabbing;
+}
+
+/* The hint, under the header, while a pointer rests on the corner. */
+.hint {
+  position: absolute;
+  top: 4.25rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  scale: 0.75;
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity 0.15s,
+    scale 0.15s;
+}
+
+@media (hover: hover) {
+  /* Its own scale undoes the corner's lift, so the text stays its true size. */
+  .ear:hover .hint {
+    opacity: 1;
+    scale: 0.8;
+    transition-delay: 0.3s;
+  }
+}
+
+/* Once a visit, after the page has loaded: the corner lifts and settles, to be noticed. */
+.ear[data-hint] {
+  animation: hint 1.6s cubic-bezier(0.16, 1, 0.3, 1) 1.2s;
+}
+
+@keyframes hint {
+  30% {
+    scale: 1.6;
+  }
+}

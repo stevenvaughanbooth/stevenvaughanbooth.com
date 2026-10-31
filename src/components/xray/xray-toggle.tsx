@@ -1,5 +1,6 @@
 import { site } from '@/content/profile';
 import pkg from '../../../package.json';
+import ear from './ear.module.css';
 
 /**
  * What the HUD says about the build, written into the HTML as the page is prerendered: the
@@ -54,5 +55,20 @@ export function XrayToggle() {
         <path d="m9.25 12.75-1.5 1.75 1.5 1.75M14.75 12.75l1.5 1.75-1.5 1.75M12.6 12.25l-1.2 4.5" />
       </svg>
     </button>
+  );
+}
+
+/**
+ * The dog-ear: the page's top-right corner, turned down a little over the blueprint underneath,
+ * to pull back by hand. Pressing it captures the pointer (shortcuts/shortcuts.tsx), and dragging
+ * it peels the page (xray.tsx). It repeats the toggle above for pointers, so it is hidden from
+ * assistive technology and takes no focus; keyboards have the toggle and X. It shows only where
+ * the peel can run, never under reduced motion, and goes while X-ray is on.
+ */
+export function XrayEar() {
+  return (
+    <div data-xray-ear aria-hidden className={ear.ear}>
+      <span className={ear.hint}>Drag to peel back</span>
+    </div>
   );
 }

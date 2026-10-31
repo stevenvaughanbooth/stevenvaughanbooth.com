@@ -429,3 +429,144 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(await axeViolations(page)).toEqual([]);
   });
 }
+
+const ear = (page: Page) => page.locator('[data-xray-ear]');
+
+/**
+ * Pulls the page's corner from the dog-ear to `to` (a share of the viewport), by mouse or, on
+ * phones, by touch (through the DevTools protocol, which Playwright's touchscreen lacks), in small
+ * steps as a hand would. `end` lets go, cancels the pointer, or holds on.
+ */
+async function pull(
+  page: Page,
+  isMobile: boolean,
+  to: readonly [number, number],
+  end: 'release' | 'cancel' | 'hold' = 'release',
+) {
+  const { width, height } = page.viewportSize()!;
+  const box = (await ear(page).boundingBox())!;
+  const from = [box.x + box.width - 5, box.y + 5] as const;
+  const target = [to[0] * width, to[1] * height] as const;
+  const steps = 16;
+  if (isMobile) {
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel', x = 0, y = 0) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y }],
+      });
+    await touch('touchStart', ...from);
+    for (let i = 1; i <= steps; i++) {
+      await touch('touchMove', ...lerp(from, target, i / steps));
+      await page.waitForTimeout(30);
+    }
+    if (end === 'release') await touch('touchEnd');
+    if (end === 'cancel') await touch('touchCancel');
+    return;
+  }
+  await page.mouse.move(...from);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(...lerp(from, target, i / steps));
+    await page.waitForTimeout(30);
+  }
+  if (end === 'release') await page.mouse.up();
+  if (end === 'cancel') await page.keyboard.press('Escape');
+}
+
+const lerp = (a: readonly [number, number], b: readonly [number, number], t: number) =>
+  [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t] as const;
+
+/** Waits until no view transition is left on screen. */
+const transitionOver = (page: Page) =>
+  expect(page.locator('[data-xray-peel]')).toHaveCount(0, { timeout: 10_000 });
+
+test.describe('the dog-ear', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await hydrated(page);
+  });
+
+  test('pulled far enough, it peels the page into X-ray', async ({ page, isMobile }) => {
+    await expect(ear(page)).toBeVisible();
+    await expect(ear(page)).toHaveAttribute('aria-hidden', 'true');
+    await pull(page, isMobile, [0.15, 0.7]);
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+    expect(await xrayOn(page)).toBe(true);
+    await transitionOver(page);
+    await expect(hud(page)).toBeVisible();
+    // In X-ray the corner has been turned already.
+    await expect(ear(page)).toBeHidden();
+  });
+
+  test('pulled a little and let go, it springs back and nothing changes', async ({
+    page,
+    isMobile,
+  }) => {
+    await pull(page, isMobile, [0.85, 0.15]);
+    await transitionOver(page);
+    expect(await xrayOn(page)).toBe(false);
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+    await expect(hud(page)).toBeHidden();
+    await expect(ear(page)).toBeVisible();
+  });
+
+  test('a cancelled pointer, or Escape, springs it back from anywhere', async ({
+    page,
+    isMobile,
+  }) => {
+    await pull(page, isMobile, [0.3, 0.6], 'cancel');
+    await transitionOver(page);
+    expect(await xrayOn(page)).toBe(false);
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('the toggle still works afterwards, and lays the page back down', async ({
+    page,
+    isMobile,
+  }) => {
+    await pull(page, isMobile, [0.85, 0.15]);
+    await transitionOver(page);
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await transitionOver(page);
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+    await transitionOver(page);
+    expect(await xrayOn(page)).toBe(false);
+  });
+
+  test('takes no focus and stays out of the keyboard’s way', async ({ page }) => {
+    const focusable = await ear(page).evaluate(
+      (element) =>
+        element.matches(':focus, [tabindex]') ||
+        element.querySelector('[tabindex], a, button') !== null,
+    );
+    expect(focusable).toBe(false);
+  });
+});
+
+test('there is no dog-ear under reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await hydrated(page);
+  await expect(ear(page)).toBeHidden();
+});
+
+test('pointing at the dog-ear is intent enough to load X-ray', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phones have no hover');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const bodies: Promise<string>[] = [];
+  page.on('response', (response) => {
+    if (response.request().resourceType() === 'script') bodies.push(response.text());
+  });
+  const loaded = async () =>
+    (await Promise.all(bodies)).some((body) => body.includes('This visit, measured'));
+  await page.goto('/');
+  await hydrated(page);
+  await page.waitForLoadState('networkidle');
+  expect(await loaded()).toBe(false);
+  await ear(page).hover();
+  await expect.poll(loaded).toBe(true);
+});

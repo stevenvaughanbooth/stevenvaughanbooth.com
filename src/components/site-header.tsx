@@ -8,7 +8,7 @@ import styles from './reading.module.css';
 import { Shortcuts } from './shortcuts/shortcuts';
 import { ThemeToggle } from './theme-toggle';
 import { Moon, Sun } from './ui/icons';
-import { XrayToggle } from './xray/xray-toggle';
+import { XrayEar, XrayToggle } from './xray/xray-toggle';
 
 export interface NavItem {
   id: SectionId;
@@ -132,6 +132,7 @@ export function SiteHeader() {
       </header>
       {/* Outside the banner landmark: the sheet it loads is a page-level dialog. */}
       <Shortcuts />
+      <XrayEar />
     </>
   );
 }

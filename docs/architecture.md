@@ -110,8 +110,16 @@ Try again and Email Steven.
 hood" button (a Server Component), the `X` key or any `<button data-xray-toggle>` turns it on; the
 always-loaded part is a few listeners in `shortcuts.tsx` and a small INP recorder, and
 `xray/xray.tsx` with its stylesheet downloads on hover, focus or press of a toggle, or on `X`. The
-peel is one typed view transition: the old page is clipped along a 45° fold that sweeps from the
-top-right corner while a shaded flap folds back over it; under reduced motion it switches at once.
+peel is one typed view transition in which the page's top-right corner is pulled across the screen:
+the old page is clipped along the perpendicular bisector of the corner and the point it has been
+pulled to, and a shaded flap (the corner mirrored across that fold) lies over it, so the corner
+stays under the finger (`xray/fold.ts`, `xray/peel.ts`). A dog-ear in the corner lets a mouse, pen
+or finger pull it by hand: the pointer is captured before the transition starts, every frame
+replaces the keyframes of paused animations on the transition's pseudo-elements, and on release
+the page peels away (pulled a quarter of the diagonal, or flicked) or springs back with nothing
+changed. The toggle and `X` pull the corner along a scripted path with the same engine. The
+dog-ear repeats the toggle, so it is hidden from assistive technology; under reduced motion there
+is no dog-ear and X-ray switches at once.
 Every element with `data-component` is outlined and labelled from `components.ts`, and a HUD shows
 this visit's FCP, LCP, CLS and INP, the JavaScript transferred, and the build's measured results.
 

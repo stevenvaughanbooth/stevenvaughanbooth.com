@@ -82,7 +82,7 @@ export const measured = {
   /** The performance score the site aims for on mobile. A goal, not a measurement. */
   performanceTarget: 95,
   /** Playwright's are per project: the tests that ran and passed, and the ones a project skips. */
-  tests: { unit: 531, e2e: { passed: 279, skipped: 27 } },
+  tests: { unit: 543, e2e: { passed: 292, skipped: 28 } },
 } as const;
 
 function measurementOf(path: PageMeasurement['path']): PageMeasurement {

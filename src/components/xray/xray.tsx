@@ -44,7 +44,16 @@ import {
   summarizeResources,
   type Vitals,
 } from './metrics';
-import { peel } from './peel';
+import {
+  constrain,
+  cornerOf,
+  peeledPoint,
+  peelsAway,
+  type Point,
+  poseFor,
+  velocityOf,
+} from './fold';
+import { canPeel, peel, spring, startCurl } from './peel';
 import styles from './xray.module.css';
 
 /**
@@ -65,6 +74,7 @@ const kindName: Record<ComponentKind, string> = {
 const kindLetter: Record<ComponentKind, string> = { server: 'S', client: 'C', css: 'CSS' };
 
 let busy = false;
+let prepared = false;
 // A press while the page is peeling: it runs once the peel ends; a second one cancels it.
 let queued = false;
 // Where the overlay goes: the listener's state, handed over on the first toggle.
@@ -86,6 +96,134 @@ function remember(on: boolean) {
 }
 
 /**
+ * Renders the overlay hidden, under <Activity>, once a visitor shows intent: turning X-ray on
+ * then only reveals it, so the peel, and above all a drag, starts without a pause.
+ */
+export function prepare(show: (view: XrayView) => void): void {
+  if (prepared) return;
+  prepared = true;
+  shown = show;
+  if (!busy && !document.documentElement.hasAttribute('data-xray')) {
+    show({ Overlay: XrayOverlay, on: false });
+  }
+}
+
+/** The document's state (data-xray), the blueprint styles and the overlay, on or off at once. */
+function render(on: boolean, show: (view: XrayView) => void) {
+  const html = document.documentElement;
+  html.toggleAttribute('data-xray', on);
+  html.classList.toggle(styles.on ?? '', on);
+  flushSync(() => show({ Overlay: XrayOverlay, on }));
+}
+
+/** Every toggle that reports its state says so. */
+function pressed(on: boolean) {
+  for (const button of document.querySelectorAll('[data-xray-toggle][aria-pressed]')) {
+    button.setAttribute('aria-pressed', String(on));
+  }
+}
+
+/**
+ * Pulls the page's corner by hand, from the dog-ear (xray-toggle.tsx). The corner follows the
+ * pointer; on release the page either peels away into X-ray, heading the way it was pulled, or
+ * springs back flat with nothing changed. Escape, a cancelled pointer or a lost transition spring
+ * it back too. The listener captured the pointer on the root element before this loaded, so its
+ * moves keep coming while the transition holds the screen.
+ */
+export async function drag(down: PointerEvent, show: (view: XrayView) => void = shown) {
+  shown = show;
+  const root = document.documentElement;
+  const id = down.pointerId;
+  if (busy || root.hasAttribute('data-xray') || !canPeel() || !root.hasPointerCapture(id)) {
+    return;
+  }
+  busy = true;
+  let point: Point = [down.clientX, down.clientY];
+  const samples = [{ time: down.timeStamp, point }];
+  let curl: Awaited<ReturnType<typeof startCurl>> = null;
+  // An object, so the handlers' changes are seen after the awaits.
+  const hold: { outcome: 'held' | 'released' | 'cancelled'; at: number } = {
+    outcome: 'held',
+    at: 0,
+  };
+  let letGo = () => {};
+  const released = new Promise<void>((resolve) => (letGo = resolve));
+
+  const onMove = (event: PointerEvent) => {
+    if (event.pointerId !== id) return;
+    point = [event.clientX, event.clientY];
+    samples.push({ time: event.timeStamp, point });
+    if (samples.length > 32) samples.shift();
+    curl?.to(point);
+  };
+  const end = (how: 'released' | 'cancelled', at = 0) => {
+    if (hold.outcome !== 'held') return;
+    hold.outcome = how;
+    hold.at = at;
+    letGo();
+  };
+  const onUp = (event: PointerEvent) => {
+    if (event.pointerId === id) end('released', event.timeStamp);
+  };
+  const onCancel = (event: PointerEvent) => {
+    if (event.pointerId === id) end('cancelled');
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    end('cancelled');
+  };
+  root.addEventListener('pointermove', onMove);
+  root.addEventListener('pointerup', onUp);
+  root.addEventListener('pointercancel', onCancel);
+  root.addEventListener('lostpointercapture', onCancel);
+  window.addEventListener('keydown', onKey, true);
+
+  try {
+    // The blueprint is rendered underneath at once; it only stays if the page peels away.
+    curl = await startCurl({ lifting: true, update: () => render(true, show), from: point });
+    if (!curl) return render(false, show);
+    curl.to(point);
+    const lost = await Promise.race([released.then(() => false), curl.lost.then(() => true)]);
+    if (lost) return render(false, show);
+
+    const { width, height } = curl;
+    const velocity = hold.outcome === 'released' ? velocityOf(samples, hold.at) : ([0, 0] as Point);
+    const travel = poseFor(width, height, constrain(width, point)).travel;
+    const now = performance.now();
+    if (hold.outcome === 'released' && peelsAway(travel, velocity, width, height)) {
+      // On the way the hand was going: where it pulled the corner, or where it flicked.
+      const corner = cornerOf(width);
+      const pulled: Point = [point[0] - corner[0], point[1] - corner[1]];
+      const heading: Point = Math.hypot(...pulled) > 40 ? pulled : velocity;
+      const away = peeledPoint(width, height, [
+        Math.min(heading[0], 0),
+        Math.max(heading[1], 0) || 1,
+      ]);
+      remember(true);
+      pressed(true);
+      const gone = (at: Point) => poseFor(width, height, at).page.length === 0;
+      await Promise.race([curl.run(spring(point, velocity, away, 9, now, gone)), curl.lost]);
+    } else {
+      const home = cornerOf(width);
+      await Promise.race([curl.run(spring(point, velocity, home, 16, now)), curl.lost]);
+      // Flat again: the page as it was goes back under the snapshot of itself.
+      render(false, show);
+    }
+  } finally {
+    curl?.end();
+    root.removeEventListener('pointermove', onMove);
+    root.removeEventListener('pointerup', onUp);
+    root.removeEventListener('pointercancel', onCancel);
+    root.removeEventListener('lostpointercapture', onCancel);
+    window.removeEventListener('keydown', onKey, true);
+    if (root.hasPointerCapture(id)) root.releasePointerCapture(id);
+    busy = false;
+    queued = false;
+  }
+}
+
+/**
  * Turns X-ray on or off, inside the peel: the document's state (data-xray), the blueprint styles,
  * the overlay (which `show` hands to the listener) and every toggle's aria-pressed change
  * together, between its two snapshots.
@@ -103,13 +241,8 @@ export async function toggle(show: (view: XrayView) => void = shown): Promise<vo
     await peel({
       lifting: on,
       update() {
-        const html = document.documentElement;
-        html.toggleAttribute('data-xray', on);
-        html.classList.toggle(styles.on ?? '', on);
-        flushSync(() => show({ Overlay: XrayOverlay, on }));
-        for (const button of document.querySelectorAll('[data-xray-toggle][aria-pressed]')) {
-          button.setAttribute('aria-pressed', String(on));
-        }
+        render(on, show);
+        pressed(on);
       },
     });
   } finally {

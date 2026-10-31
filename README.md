@@ -235,6 +235,9 @@ on desktop Chrome and an emulated Pixel 7. They check that:
   prerendered HTML, numbers its sections as its navigation does, and its results match
   `measured.ts` and `lighthouserc.json`; its "Peel back this page" button turns X-ray on and off,
   its `aria-pressed` in step with the header's toggle
+- the page's dog-ear, pulled by mouse or finger past the threshold, peels the page into X-ray;
+  pulled a little, cancelled or met with Escape, it springs back with nothing changed; it is
+  absent under reduced motion, takes no focus, and pointing at it loads X-ray's code
 - pages log no console errors; `/profile.json`, `/llms.txt`, robots, sitemap and the OG image
   respond with the right types; unknown routes return a `noindex` 404
 - axe reports no serious or critical violations on `/`, `/colophon` and each case study in light
