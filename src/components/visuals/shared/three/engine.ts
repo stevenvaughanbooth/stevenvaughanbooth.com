@@ -18,6 +18,7 @@ import {
   rubberBand,
   spring,
 } from './pose';
+import { themeValue } from './tokens';
 
 /*
  * The 3D engine every diagram's scene runs on. It owns the WebGL renderer and everything around
@@ -131,17 +132,54 @@ export function defineScene<Data>(definition: SceneDefinition<Data>): SceneModul
   return { mount: (container, options) => mountScene(container, definition, options) };
 }
 
+const tokenNames = Object.keys(tokens) as TokenName[];
+
+/**
+ * Whether the dark theme is on show, as globals.css decides it: the toggle's data-theme on
+ * <html>, or else the system preference.
+ */
+function prefersDark(): boolean {
+  const chosen = document.documentElement.dataset.theme;
+  if (chosen === 'dark' || chosen === 'light') return chosen === 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+/**
+ * Hidden swatches, one per token, inside the scene's box: the fallback for a token whose value
+ * is not a plain light-dark() pair, read as the browser resolves it.
+ */
+function tokenProbe(): HTMLElement {
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden';
+  for (const name of tokenNames) {
+    const swatch = document.createElement('span');
+    swatch.style.color = `var(${tokens[name]})`;
+    probe.append(swatch);
+  }
+  return probe;
+}
+
+/**
+ * The site's colour tokens for the theme on show. Each is read from <html> and its light-dark()
+ * half picked here: Chromium resolves light-dark() for a new color-scheme only some frames after
+ * the switch, so the browser's own resolution would still give the old colours.
+ */
 function readTheme(probe: HTMLElement): Theme {
+  const dark = prefersDark();
+  const root = getComputedStyle(document.documentElement);
   const color = {} as Record<TokenName, Color>;
   const css = {} as Record<TokenName, string>;
-  const style = getComputedStyle(probe);
-  for (const name of Object.keys(tokens) as TokenName[]) {
-    probe.style.color = `var(${tokens[name]})`;
-    css[name] = style.color;
-    // Color parses the computed rgb() as sRGB and converts it to the linear working space.
-    color[name] = new Color(css[name]);
-  }
-  return { dark: style.colorScheme.includes('dark'), color, css };
+  tokenNames.forEach((name, index) => {
+    let value = themeValue(root.getPropertyValue(tokens[name]), dark);
+    if (!/^#[\da-f]{3,8}$/i.test(value)) {
+      const swatch = probe.children[index];
+      value = swatch ? getComputedStyle(swatch).color : '#000';
+    }
+    css[name] = value;
+    // Color parses an sRGB value and converts it to the linear working space.
+    color[name] = new Color(value);
+  });
+  return { dark, color, css };
 }
 
 const sameTheme = (a: Theme, b: Theme) =>
@@ -186,8 +224,7 @@ async function mountScene<Data>(
   canvas.className = 'cursor-grab active:cursor-grabbing';
   const layer = document.createElement('div');
   layer.className = 'pointer-events-none absolute inset-0 select-none';
-  const probe = document.createElement('span');
-  probe.style.cssText = 'position:absolute;visibility:hidden';
+  const probe = tokenProbe();
   container.append(canvas, layer, probe);
 
   const coarse = window.matchMedia('(pointer: coarse)').matches;
@@ -249,8 +286,21 @@ async function mountScene<Data>(
     },
   };
 
-  const parts = definition.build(context, options.data);
-  parts.theme(theme);
+  let parts: SceneParts;
+  try {
+    parts = definition.build(context, options.data);
+    parts.theme(theme);
+  } catch (error) {
+    // A scene that fails to build leaves nothing behind: the 2D card stays.
+    disposeObject(scene);
+    for (const resource of owned) resource.dispose();
+    renderer.dispose();
+    renderer.forceContextLoss();
+    canvas.remove();
+    layer.remove();
+    probe.remove();
+    throw error;
+  }
 
   // The camera: a flight from one pose to the next, plus the visitor's orbit on top.
   let step = options.step;
@@ -392,6 +442,7 @@ async function mountScene<Data>(
   }
 
   function retheme() {
+    if (disposed) return;
     const next = readTheme(probe);
     if (sameTheme(next, theme)) return;
     theme = next;

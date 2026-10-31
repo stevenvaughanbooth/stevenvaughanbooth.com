@@ -86,20 +86,20 @@ Under the hood are Server Components; the signal line is CSS only; the career ti
 too, built on native `<details name>` disclosures. These modules are the whole `'use client'`
 surface:
 
-| Module                                                                                     | Its job                                                                         | When its code loads                                                                                                                      |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `theme-toggle.tsx`                                                                         | Switches theme, exposes `aria-pressed`                                          | With the page                                                                                                                            |
-| `mobile-nav.tsx`                                                                           | Moves focus to the section heading from the Sections menu                       | With the page                                                                                                                            |
-| `ui/copy-button.tsx`                                                                       | Copies Adage's install command                                                  | With the page                                                                                                                            |
-| `ask/ask-button.tsx`, `ask/ask-shortcut.tsx`                                               | Ask buttons; the ⌘K or Ctrl K hint                                              | With the page                                                                                                                            |
-| `ask/hero-ask-bar.tsx`                                                                     | The hero's ask bar and its suggestions; hands questions on                      | With the home page; it warms the palette's code on hover or focus                                                                        |
-| `shortcuts/shortcuts.tsx`                                                                  | The `/`, `T`, `X` and `?` listener, the footer's sheet button, and X-ray's host | With the page; the sheet on `?`, or on hover, focus or press of the footer button; X-ray on intent                                       |
-| `ask/palette-loader.tsx`                                                                   | ⌘K listener, error boundary, the palette's live region                          | With the page (root layout)                                                                                                              |
-| `visuals/{team-multiplier,progressive-disclosure,metadata-platform,reflex-demo}/shell.tsx` | Show the server-rendered card, then swap in its controller                      | Shell with the page; controller when the card is within 200 px of the viewport, or on first focus or pointer inside                      |
-| `visuals/shared/three/scene-canvas.tsx`, `visuals/progressive-disclosure/scene.ts`         | The MCP diagram's 3D scene: three.js, the shared engine and the scene           | With its controller, then only after the load event and an idle period, where WebGL 2 is available and no data or memory opt-out applies |
-| `film/arrival-shell.tsx`                                                                   | The hero's film frame: its chip, autoplay policy and theater                    | With the page                                                                                                                            |
-| `case-study/focus.tsx`                                                                     | Focus on arrival, and back on the link after Back                               | With the case-study pages only                                                                                                           |
-| `app/error.tsx`, `app/global-error.tsx`                                                    | Error boundaries (themed, with a retry)                                         | With the page                                                                                                                            |
+| Module                                                                                     | Its job                                                                         | When its code loads                                                                                                                                            |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `theme-toggle.tsx`                                                                         | Switches theme, exposes `aria-pressed`                                          | With the page                                                                                                                                                  |
+| `mobile-nav.tsx`                                                                           | Moves focus to the section heading from the Sections menu                       | With the page                                                                                                                                                  |
+| `ui/copy-button.tsx`                                                                       | Copies Adage's install command                                                  | With the page                                                                                                                                                  |
+| `ask/ask-button.tsx`, `ask/ask-shortcut.tsx`                                               | Ask buttons; the ⌘K or Ctrl K hint                                              | With the page                                                                                                                                                  |
+| `ask/hero-ask-bar.tsx`                                                                     | The hero's ask bar and its suggestions; hands questions on                      | With the home page; it warms the palette's code on hover or focus                                                                                              |
+| `shortcuts/shortcuts.tsx`                                                                  | The `/`, `T`, `X` and `?` listener, the footer's sheet button, and X-ray's host | With the page; the sheet on `?`, or on hover, focus or press of the footer button; X-ray on intent                                                             |
+| `ask/palette-loader.tsx`                                                                   | ⌘K listener, error boundary, the palette's live region                          | With the page (root layout)                                                                                                                                    |
+| `visuals/{team-multiplier,progressive-disclosure,metadata-platform,reflex-demo}/shell.tsx` | Show the server-rendered card, then swap in its controller                      | Shell with the page; controller when the card is within 200 px of the viewport, or on first focus or pointer inside                                            |
+| `visuals/shared/three/scene-canvas.tsx`, `visuals/progressive-disclosure/scene.ts`         | The MCP diagram's 3D scene: three.js, the shared engine and the scene           | With its controller, then only after the load event, an idle period and a pause in scrolling, where WebGL 2 is available and no data or memory opt-out applies |
+| `film/arrival-shell.tsx`                                                                   | The hero's film frame: its chip, autoplay policy and theater                    | With the page                                                                                                                                                  |
+| `case-study/focus.tsx`                                                                     | Focus on arrival, and back on the link after Back                               | With the case-study pages only                                                                                                                                 |
+| `app/error.tsx`, `app/global-error.tsx`                                                    | Error boundaries (themed, with a retry)                                         | With the page                                                                                                                                                  |
 
 The palette itself (`ask-palette.tsx` with `use-ask`, `conversation`, `search`, `lib/ask-client` and
 `lib/page-actions`) is client code only by reachability: `palette-loader.tsx` imports it dynamically
@@ -146,9 +146,9 @@ in, with a Pause / Play / Replay control in the footer.
 A controller may also lay a **3D scene** over its SVG (today the MCP diagram does). Its
 `SceneCanvas` checks first that the device may draw in 3D (no Save-Data, no
 `prefers-reduced-data`, at least 4 GB of device memory where the browser reports it, and WebGL 2),
-then waits for the load event and an idle period before it imports the scene's chunk: three.js
-0.186 (named imports, about 146 KB compressed), the shared engine in `visuals/shared/three/` and the
-scene. The home page therefore never fetches three.js until a diagram's controller has loaded near
+then waits for the load event, an idle period and a pause in scrolling before it imports the
+scene's chunk: three.js 0.186 (named imports, about 146 KB compressed), the shared engine in
+`visuals/shared/three/` and the scene. The home page therefore never fetches three.js until a diagram's controller has loaded near
 the viewport, and a case study, whose diagram is above the fold, fetches it only after its page
 has loaded. The canvas is `aria-hidden` and fades in over the SVG, which keeps its place, so the
 card never changes size; the SVG, the copy and the tabs remain the content. The engine draws only
@@ -410,9 +410,9 @@ the X-ray HUD; they are typed in by hand after each run.
 | `/work/mcp` | 96          | 100           | 100            | 100 | 1.05 s | 2.78 s | 19 ms | 0   | 177,190 B  | 310,807 B |
 
 **3D diagrams** (2026-10-31, same settings, on a busier machine than the table above): moving the
-MCP diagram to Three.js left `/` (94 before and after, 168,351 B → 168,405 B of JavaScript; three.js
+MCP diagram to Three.js left `/` (94 before and after, 168,351 B → 168,394 B of JavaScript; three.js
 is not fetched) and `/colophon` (97, 158,306 B both) where they were. On `/work/mcp` the score held
-at 96 and LCP at 2.78 s; JavaScript grew from 178,653 B to 329,517 B and total blocking time from
+at 96 and LCP at 2.78 s; JavaScript grew from 178,653 B to 329,566 B and total blocking time from
 21 ms to 53 ms, as the scene's chunk loads and compiles after the load event. The table above is
 from the earlier run; re-measure all three pages together before updating it.
 

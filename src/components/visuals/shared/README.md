@@ -63,7 +63,7 @@ team-multiplier.tsx            Server Component. Renders everything that never c
 | `roving-tabs.ts`      | `rovingIndex` and `onRovingKeyDown`: Left/Up and Right/Down step and wrap, Home/End jump. Every tablist uses it.                                                                                 |
 | `hooks.ts`            | `useReducedMotion`, `usePageVisible`, `useInView`.                                                                                                                                               |
 | `tour/`               | `useTour`, `TourControls` and the shared wording (`TOUR_DWELL_MS`, `guidedTour`): the one tour every diagram plays.                                                                              |
-| `three/`              | The 3D engine (`engine.ts`, `shapes.ts`), camera math (`pose.ts`), the opt-out check (`support.ts`) and `SceneCanvas`. See [3D scenes](#3d-scenes).                                              |
+| `three/`              | The 3D engine (`engine.ts`, `shapes.ts`), camera math (`pose.ts`), tokens (`tokens.ts`), opt-outs and timing (`support.ts`) and `SceneCanvas`. See [3D scenes](#3d-scenes).                      |
 | `accent.ts`, `ids.ts` | Accent classes per theme colour; tab and panel ids.                                                                                                                                              |
 
 ## The tour
@@ -133,10 +133,10 @@ controller.tsx                     (already lazy, near the viewport)
 
 **Loading.** `SceneCanvas` (in the controller's chunk) asks `sceneOptOut()` first: Save-Data,
 `prefers-reduced-data`, `navigator.deviceMemory < 4`, or no WebGL 2 keep the 2D card and download
-nothing. Otherwise it waits for the load event and an idle period (`whenSettled`), so on a page
-where the card is above the fold (`/work/*`) the scene never competes with LCP or TBT, and on the
-home page, where controllers load only near the viewport, three.js is never fetched until the
-visitor scrolls towards a diagram. Every scene imports `three` and `engine.ts`, so a page shares
+nothing. Otherwise it waits for the load event, an idle period and 200 ms without scrolling
+(`whenStill`). Where the card is above the fold (`/work/*`) the scene arrives after LCP and the
+page's own work, and is never built under a scrolling reader; on the home page, where controllers
+load only near the viewport, three.js is never fetched until the visitor scrolls towards a diagram. Every scene imports `three` and `engine.ts`, so a page shares
 one chunk of them. Import named classes from `'three'`; no addons, react-three-fiber or
 post-processing.
 
@@ -165,9 +165,11 @@ update?(dt, now) }`. `step` sets targets (animate unless `instant`); `theme` sto
   and tubes in the dark theme and normal blending in the light one.
 
 **Theme.** `theme.color` holds the site's tokens (`bg`, `surface`, `elevated`, `line`,
-`lineStrong`, `fg`, `muted`, `subtle`, `green`, `amber`, `lilac`, `blue`) read from CSS at runtime,
-and `theme.dark`. A theme switch re-reads them and redraws at once, inside the theme's view
-transition. Never hard-code a colour.
+`lineStrong`, `fg`, `muted`, `subtle`, `green`, `amber`, `lilac`, `blue`) and `theme.dark`. The
+engine reads each token from `<html>` and picks its `light-dark()` half itself (`tokens.ts`), from
+`data-theme` or the system preference: Chromium resolves `light-dark()` for a new scheme only some
+frames after a switch. A theme switch recolours the scene at once, inside the theme's reveal. Never
+hard-code a colour.
 
 **Runtime.** One renderer per mounted scene, antialiased, transparent over the stage's dot grid,
 pixel ratio capped at 2 (1.5 on coarse pointers). It draws only while something moves (a flight,
@@ -180,9 +182,12 @@ scrolls. Pressing in the region holds the tour. Under reduced motion there are n
 inertia and no spring: steps cut, and a drag stays where it is left until the next step.
 
 **Checklist for a new scene:** the poses frame the scene at 390 and 1440 px wide; labels never
-overlap or leave their objects at 390; it reads in light and dark; it is static under reduced
-motion; and the initial page and `/` before scrolling do not request three.js (the end-to-end
-suite checks both).
+overlap or leave their objects at 390, and dim by colour (`text-subtle`), never by opacity, so they
+keep their contrast; it reads in light and dark; it is static under reduced motion; and the initial
+page and `/` before scrolling do not request three.js (the end-to-end suite checks both). Don't
+style anything from the scene's state with `:has()`: in Chromium a `:has()` rule restarts the
+evidence figures' scroll-triggered count-up. StepPanel puts the scene before the diagram, so CSS
+can follow it as a `peer`.
 
 ## Accessibility
 

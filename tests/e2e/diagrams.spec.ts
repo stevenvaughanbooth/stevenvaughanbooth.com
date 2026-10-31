@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { TOUR_DWELL_MS } from '@/components/visuals/shared/tour/wording';
-import { axeViolations, hydrated } from './helpers';
+import { axeViolations, hydrated, themeToggle } from './helpers';
 
 /** The three Work diagrams, which all play the same tour. */
 const tours = [
@@ -179,6 +179,66 @@ test.describe('the MCP diagram in 3D', () => {
     const empty = await stage.screenshot();
     expect(drawn.equals(empty)).toBe(false);
     expect(drawn.length).toBeGreaterThan(empty.length);
+  });
+
+  test('recolours the scene when the theme switches', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+    await page.goto('/work/mcp');
+    await hydrated(page);
+    const stage = page.getByRole('img', { name: /^(Describe|Search|Query):/ });
+    await expect(stage.locator('[data-scene="live"]')).toBeVisible({ timeout: 30_000 });
+
+    /** The stage's mean brightness on screen, 0 to 1, from a screenshot drawn into a canvas. */
+    const brightness = async () => {
+      const png = (await stage.screenshot()).toString('base64');
+      return page.evaluate(async (data) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${data}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0);
+        const { data: pixels } = context.getImageData(0, 0, canvas.width, canvas.height);
+        let sum = 0;
+        for (let i = 0; i < pixels.length; i += 4)
+          sum += pixels[i]! + pixels[i + 1]! + pixels[i + 2]!;
+        return sum / (pixels.length / 4) / 765;
+      }, png);
+    };
+    expect(await brightness()).toBeLessThan(0.3);
+    await themeToggle(page).click();
+    // The glass layers turn light with the page, not just the page around them.
+    await expect.poll(brightness).toBeGreaterThan(0.85);
+    await expect(stage.locator('[data-scene="live"]')).toBeVisible();
+  });
+
+  test('puts the 2D graph back if the WebGL context is lost, and the scene back on restore', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/work/mcp');
+    const stage = page.getByRole('img', { name: /^(Describe|Search|Query):/ });
+    await expect(stage.locator('[data-scene="live"]')).toBeVisible({ timeout: 30_000 });
+
+    // A lost context has no extensions, so keep the one that can restore it.
+    const loseContext = (lose: boolean) =>
+      stage.locator('canvas').evaluate((canvas: HTMLCanvasElement, lose) => {
+        const holder = window as Window & { __loseContext?: WEBGL_lose_context | null };
+        holder.__loseContext ??= canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context');
+        if (lose) holder.__loseContext?.loseContext();
+        else holder.__loseContext?.restoreContext();
+      }, lose);
+    await loseContext(true);
+    await expect(stage.locator('[data-scene="live"]')).toHaveCount(0);
+    await expect
+      .poll(() =>
+        stage.locator('svg').evaluate((svg) => getComputedStyle(svg.parentElement!).opacity),
+      )
+      .toBe('1');
+    await loseContext(false);
+    await expect(stage.locator('[data-scene="live"]')).toBeVisible({ timeout: 10_000 });
   });
 
   test('keeps the 2D graph, and never fetches three.js, where WebGL is unavailable', async ({
