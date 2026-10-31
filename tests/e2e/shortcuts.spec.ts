@@ -120,14 +120,19 @@ test('single-key shortcuts can be turned off, and the footer button still opens 
   await page.keyboard.press('Shift+Slash');
   const toggle = sheet(page).getByRole('switch', { name: 'Single-key shortcuts' });
   await expect(toggle).toBeChecked();
+  const xray = page.getByRole('banner').getByRole('button', { name: 'Under the hood' });
+  await expect(xray).toHaveAttribute('aria-keyshortcuts', 'X');
   await toggle.click();
   await expect(toggle).not.toBeChecked();
+  // A key that does nothing is no longer announced.
+  await expect(xray).not.toHaveAttribute('aria-keyshortcuts');
   await page.keyboard.press('Escape');
   await expect(sheet(page)).toBeHidden();
 
   // Off for good: across a reload, neither ?, T nor X does anything.
   await page.reload();
   await hydrated(page);
+  await expect(xray).not.toHaveAttribute('aria-keyshortcuts');
   await page.keyboard.press('Shift+Slash');
   await page.keyboard.press('t');
   await page.keyboard.press('x');

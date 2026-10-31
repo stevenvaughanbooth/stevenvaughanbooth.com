@@ -28,6 +28,8 @@ export function XrayToggle() {
       data-xray-build={build}
       aria-label="Under the hood"
       aria-pressed="false"
+      // Dropped while single keys are off (shortcuts/keys.ts).
+      data-keyshortcut="X"
       aria-keyshortcuts="X"
       title="Under the hood"
       className="group grid size-9 place-items-center rounded-full text-muted transition-colors hover:bg-elevated hover:text-fg aria-pressed:text-fg"

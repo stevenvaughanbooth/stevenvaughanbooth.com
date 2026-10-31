@@ -87,11 +87,23 @@ describe('placeLabels', () => {
     expect(narrow.map((place) => place.y)).toEqual([92, 67, 67]);
   });
 
-  it('runs a tall, narrow component’s label down its side', () => {
+  it('runs a tall, narrow component’s label down its side, outside it', () => {
     const box = { x: 140, y: 137, width: 36, height: 6000 };
     expect(runsDown(box)).toBe(true);
-    const [signal] = placeLabels([{ box, width: 22, height: 200, inset: 0, vertical: true }], page);
-    expect(signal).toEqual({ x: 140, y: 137, anchor: null });
+    const side = { box, width: 22, height: 200, inset: 0, vertical: true };
+    // To its left, clear of the text beside it.
+    expect(placeLabels([side], page)).toEqual([{ x: 115, y: 137, anchor: null }]);
+    // At the page's edge, over its own box rather than the text beside it.
+    const edge = { ...side, box: { ...box, x: 10 } };
+    expect(placeLabels([edge], page)).toEqual([{ x: 4, y: 137, anchor: null }]);
+    // Too narrow to hold it there either: it hangs below.
+    const tight = { ...side, box: { ...box, x: 10, width: 12 } };
+    expect(placeLabels([tight], page)[0]!.y).toBe(137 + 6000 + 5);
+  });
+
+  it('hangs the label of a small box inside another below it, off what it shows', () => {
+    const avatar = { x: 20, y: 140, width: 88, height: 88 };
+    expect(placeLabels([label(avatar)], { width: 390, top: 92 })[0]!.y).toBe(140 + 88 + 5);
   });
 
   it('knows a small component from a roomy one', () => {

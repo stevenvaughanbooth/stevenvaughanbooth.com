@@ -1,4 +1,7 @@
+'use client';
+
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
   useEffect,
@@ -9,6 +12,7 @@ import {
   useState,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { xrayMark, xrayStorageKey } from '@/components/shortcuts/keys';
 import type { XrayView } from '@/components/shortcuts/shortcuts';
 import { homeMeasurement, measured, measuredOn } from '@/components/story/measured';
 import { ArrowUpRight } from '@/components/ui/icons';
@@ -61,8 +65,25 @@ const kindName: Record<ComponentKind, string> = {
 const kindLetter: Record<ComponentKind, string> = { server: 'S', client: 'C', css: 'CSS' };
 
 let busy = false;
+// A press while the page is peeling: it runs once the peel ends; a second one cancels it.
+let queued = false;
 // Where the overlay goes: the listener's state, handed over on the first toggle.
 let shown: (view: XrayView) => void = () => {};
+
+/** Remembers the state for this tab, and drops ?xray from the address once X-ray is off. */
+function remember(on: boolean) {
+  try {
+    if (on) sessionStorage.setItem(xrayStorageKey, 'on');
+    else sessionStorage.removeItem(xrayStorageKey);
+  } catch {
+    // Without storage, a full page load starts with X-ray off.
+  }
+  const url = new URL(window.location.href);
+  if (on || !url.searchParams.has('xray')) return;
+  url.searchParams.delete('xray');
+  // Next.js keeps its own state in history.state; it goes back unchanged.
+  window.history.replaceState(window.history.state, '', url);
+}
 
 /**
  * Turns X-ray on or off, inside the peel: the document's state (data-xray), the blueprint styles,
@@ -71,9 +92,13 @@ let shown: (view: XrayView) => void = () => {};
  */
 export async function toggle(show: (view: XrayView) => void = shown): Promise<void> {
   shown = show;
-  if (busy) return;
+  if (busy) {
+    queued = !queued;
+    return;
+  }
   busy = true;
   const on = !document.documentElement.hasAttribute('data-xray');
+  remember(on);
   try {
     await peel({
       lifting: on,
@@ -89,6 +114,10 @@ export async function toggle(show: (view: XrayView) => void = shown): Promise<vo
     });
   } finally {
     busy = false;
+    if (queued) {
+      queued = false;
+      void toggle(show);
+    }
   }
 }
 
@@ -197,6 +226,9 @@ function XrayOverlay() {
   const focused = useRef<string | null>(null);
   const hovered = useRef<string | null>(null);
   const closing = useRef<number | undefined>(undefined);
+  // The one label in the tab order; the arrow keys move between the rest.
+  const [roving, setRoving] = useState<string | null>(null);
+  const hintId = useId();
 
   function sync(delay = 0) {
     window.clearTimeout(closing.current);
@@ -207,8 +239,9 @@ function XrayOverlay() {
 
   function closeCard() {
     const open = active ? parts.current.get(active) : undefined;
-    pinned.current = focused.current = hovered.current = null;
+    // Focus goes back to the label first: its focus event would otherwise open the card again.
     if (open?.card?.contains(document.activeElement)) open.label.focus();
+    pinned.current = focused.current = hovered.current = null;
     sync();
   }
 
@@ -242,12 +275,15 @@ function XrayOverlay() {
     };
   }, []);
 
-  // Places the labels before the first paint, then follows the page frame by frame: client
-  // navigations, controllers swapping in, menus opening, the viewport changing. Most labels live
-  // in page coordinates, so they only move when the layout does.
+  // Places the labels before the first paint, then follows the page while it moves: client
+  // navigations, controllers swapping in, scroll-driven reveals, the viewport changing. Most
+  // labels live in page coordinates, so they only move when the layout does. Once nothing has
+  // moved for half a second it stops, until a resize, a scroll, a change to the page's DOM or an
+  // animation starting wakes it again; an idle page costs nothing.
   useLayoutEffect(() => {
     let last = '';
     let frame = 0;
+    let still = 0;
 
     function layout(): boolean {
       const rects = targets.map((target) => target.element.getBoundingClientRect());
@@ -376,14 +412,70 @@ function XrayOverlay() {
     }
 
     function tick() {
-      if (layout()) frame = requestAnimationFrame(tick);
+      frame = 0;
+      const before = last;
+      // False: the overlay is about to render again, and this effect with it.
+      if (!layout()) return;
+      still = last === before ? still + 1 : 0;
+      if (still < 30) frame = requestAnimationFrame(tick);
     }
-    if (layout()) frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    function wake() {
+      still = 0;
+      if (!frame) frame = requestAnimationFrame(tick);
+    }
+
+    const root = overlay.current;
+    const resized = new ResizeObserver(wake);
+    resized.observe(document.body);
+    for (const target of targets) resized.observe(target.element);
+    // The overlay's own writes (every label it moves) are left out.
+    const changed = new MutationObserver((records) => {
+      if (records.some((record) => !root?.contains(record.target))) wake();
+    });
+    changed.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+    const onWindow = ['scroll', 'resize'] as const;
+    const onDocument = ['transitionrun', 'animationstart', 'toggle'] as const;
+    for (const type of onWindow) window.addEventListener(type, wake, { passive: true });
+    for (const type of onDocument) document.addEventListener(type, wake, true);
+
+    if (layout()) wake();
+    return () => {
+      cancelAnimationFrame(frame);
+      resized.disconnect();
+      changed.disconnect();
+      for (const type of onWindow) window.removeEventListener(type, wake);
+      for (const type of onDocument) document.removeEventListener(type, wake, true);
+    };
   }, [targets, active, path]);
 
   const shown = targets.filter((target) => target.boxed);
   const current = shown.find((target) => target.key === active);
+  const tabbable = shown.some((target) => target.key === roving) ? roving : shown[0]?.key;
+
+  /** Arrow keys, Home and End move focus between the labels, in the page's order. */
+  function onLabelKey(event: ReactKeyboardEvent<HTMLUListElement>) {
+    const steps: Record<string, number> = {
+      ArrowDown: 1,
+      ArrowRight: 1,
+      ArrowUp: -1,
+      ArrowLeft: -1,
+    };
+    const labels = shown.flatMap((target) => parts.current.get(target.key)?.label ?? []);
+    const from = labels.findIndex((label) => label === document.activeElement);
+    if (from === -1) return;
+    let to: number;
+    if (event.key === 'Home') to = 0;
+    else if (event.key === 'End') to = labels.length - 1;
+    else if (event.key in steps) to = (from + steps[event.key]! + labels.length) % labels.length;
+    else return;
+    event.preventDefault();
+    labels[to]?.focus();
+  }
 
   return (
     <div ref={overlay} className={styles.overlay}>
@@ -394,12 +486,17 @@ function XrayOverlay() {
       {/* The header's labels hang on a rail below it, which the page's pass under. */}
       <div ref={rail} aria-hidden className={styles.rail} />
       <section aria-label="Components on this page">
-        <ul className={styles.labels}>
+        <p id={hintId} hidden>
+          Arrow keys move between components.
+        </p>
+        <ul className={styles.labels} onKeyDown={onLabelKey}>
           {shown.map((target) => (
             <Label
               key={target.key}
               target={target}
               open={target.key === active}
+              tabbable={target.key === tabbable}
+              hint={hintId}
               register={(piece) => {
                 if (piece) parts.current.set(target.key, piece);
                 else parts.current.delete(target.key);
@@ -414,6 +511,7 @@ function XrayOverlay() {
               }}
               onFocusIn={() => {
                 focused.current = target.key;
+                setRoving(target.key);
                 sync();
               }}
               onFocusOut={() => {
@@ -446,6 +544,10 @@ function XrayOverlay() {
 interface LabelProps {
   target: Target;
   open: boolean;
+  /** The label the Tab key reaches; the others are a press of an arrow key away. */
+  tabbable: boolean;
+  /** The id of the hint that says so. */
+  hint: string;
   register: (parts: LabelParts | null) => void;
   onEnter: () => void;
   onLeave: () => void;
@@ -457,6 +559,8 @@ interface LabelProps {
 function Label({
   target,
   open,
+  tabbable,
+  hint,
   register,
   onEnter,
   onLeave,
@@ -508,6 +612,8 @@ function Label({
         type="button"
         // The name a voice user says comes first; the rest reads as a sentence, not as markup.
         aria-label={`${entry.name}, ${kindName[entry.kind]}, ${entry.loads}`}
+        aria-describedby={hint}
+        tabIndex={tabbable ? 0 : -1}
         aria-expanded={open}
         aria-controls={open ? cardId : undefined}
         className={styles.label}
@@ -620,12 +726,35 @@ interface PageStats extends ResourceSummary {
 
 function pageStats(overlay: HTMLElement | null): PageStats {
   const entries = (performance.getEntriesByType?.('resource') ?? []) as PerformanceResourceTiming[];
+  // The page's own downloads stop where X-ray was asked for (the listener marks it).
+  const since = performance.getEntriesByName?.(xrayMark)[0]?.startTime;
   // The page's own elements: X-ray's are left out.
   const own = overlay ? overlay.getElementsByTagName('*').length + 1 : 0;
   return {
-    ...summarizeResources(entries, location.origin),
+    ...summarizeResources(entries, location.origin, since),
     elements: document.getElementsByTagName('*').length - own,
   };
+}
+
+/** The path of the page this visit landed on: the one FCP and LCP were measured on. */
+function landingPath(): string {
+  const [navigation] = performance.getEntriesByType?.('navigation') ?? [];
+  try {
+    return navigation ? new URL(navigation.name).pathname : window.location.pathname;
+  } catch {
+    return window.location.pathname;
+  }
+}
+
+/** sessionStorage key: "open" once the visitor has opened the HUD's stats in this tab. */
+const hudStorageKey = 'xray-hud';
+
+function hudOpened(): boolean {
+  try {
+    return sessionStorage.getItem(hudStorageKey) === 'open';
+  } catch {
+    return false;
+  }
 }
 
 const sameStats = (a: PageStats, b: PageStats) =>
@@ -696,7 +825,10 @@ function Hud({ targets, overlay, path }: HudProps) {
   const build = useBuild();
   const [vitals, setVitals] = useState<Vitals>({ cls: 0, interactions: 0 });
   const [stats, setStats] = useState(() => pageStats(null));
-  const [collapsed, setCollapsed] = useState(() => matchMedia('(width < 48rem)').matches);
+  // A bar of the four vitals until the visitor asks for more: open, the stats would cover the
+  // components they describe. The choice holds for the rest of the visit.
+  const [collapsed, setCollapsed] = useState(() => !hudOpened());
+  const [landing] = useState(landingPath);
 
   useEffect(() => observeVitals(setVitals), []);
   useEffect(() => {
@@ -710,6 +842,16 @@ function Hud({ targets, overlay, path }: HudProps) {
     return () => window.clearInterval(timer);
   }, [overlay]);
 
+  function expand(open: boolean) {
+    setCollapsed(!open);
+    try {
+      if (open) sessionStorage.setItem(hudStorageKey, 'open');
+      else sessionStorage.removeItem(hudStorageKey);
+    } catch {
+      // Without storage the choice lasts until X-ray closes.
+    }
+  }
+
   const ids = new Set(targets.map((target) => target.entry.id));
   const count = (kind: ComponentKind) =>
     [...ids].filter((id) => componentById(id)?.kind === kind).length;
@@ -720,6 +862,44 @@ function Hud({ targets, overlay, path }: HudProps) {
     lighthouse.bestPractices,
     lighthouse.seo,
   ].join(' · ');
+  // FCP and LCP belong to the page the visit landed on, and the LCP is final only once the
+  // visitor has done something: the browser stops looking at the first input.
+  const elsewhere = path !== landing ? `on ${landing}` : undefined;
+  const lcpNote = [elsewhere, vitals.interactions === 0 ? 'provisional' : undefined]
+    .filter(Boolean)
+    .join(', ');
+  const vitalCells = [
+    {
+      term: 'FCP',
+      value: vitals.fcp === undefined ? undefined : formatSeconds(vitals.fcp),
+      rating: vitals.fcp === undefined ? undefined : rate('fcp', vitals.fcp),
+      note: vitals.fcp === undefined ? 'not reported' : elsewhere,
+    },
+    {
+      term: 'LCP',
+      value: vitals.lcp === undefined ? undefined : formatSeconds(vitals.lcp),
+      rating: vitals.lcp === undefined ? undefined : rate('lcp', vitals.lcp),
+      note: vitals.lcp === undefined ? 'not reported' : lcpNote || undefined,
+    },
+    {
+      term: 'CLS',
+      value: formatShift(vitals.cls),
+      rating: rate('cls', vitals.cls),
+    },
+    {
+      term: 'INP',
+      value: vitals.inp === undefined ? undefined : formatMilliseconds(vitals.inp),
+      rating: vitals.inp === undefined ? undefined : rate('inp', vitals.inp),
+      note:
+        vitals.inp === undefined
+          ? 'no interaction yet'
+          : `${vitals.interactions} interaction${vitals.interactions === 1 ? '' : 's'}`,
+    },
+  ];
+  // A non-breaking hyphen keeps X-ray whole in the narrow cells.
+  const later = stats.laterScriptBytes
+    ? ` · +${formatKilobytes(stats.laterScriptBytes)} since X‑ray`
+    : '';
 
   return (
     <section
@@ -732,13 +912,28 @@ function Hud({ targets, overlay, path }: HudProps) {
           Under the hood
         </p>
         <p className={styles.path}>{path}</p>
-        <Legend />
+        {collapsed ? (
+          // Folded, the bar still reports the visit; phones have room only for the title.
+          <dl className={styles.inline}>
+            {vitalCells.map((cell) => (
+              <div key={cell.term}>
+                <dt>{cell.term}</dt>
+                <dd>
+                  {cell.value ?? '—'}
+                  {cell.rating ? <Rated rating={cell.rating} /> : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <Legend />
+        )}
         <button
           type="button"
           className={styles.hudButton}
           aria-expanded={!collapsed}
           aria-controls={bodyId}
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => expand(collapsed)}
         >
           <svg
             aria-hidden
@@ -773,43 +968,26 @@ function Hud({ targets, overlay, path }: HudProps) {
         <Legend inBody />
         <p className={styles.caption}>This visit, measured in your browser</p>
         <dl className={styles.cells}>
-          <Cell term="FCP" note={vitals.fcp === undefined ? 'not reported' : undefined}>
-            {vitals.fcp === undefined ? '—' : formatSeconds(vitals.fcp)}
-            {vitals.fcp === undefined ? null : <Rated rating={rate('fcp', vitals.fcp)} />}
-          </Cell>
-          {/* The browser stops looking for the LCP at the first input, and may not have named one. */}
-          <Cell term="LCP" note={vitals.lcp === undefined ? 'not reported' : undefined}>
-            {vitals.lcp === undefined ? '—' : formatSeconds(vitals.lcp)}
-            {vitals.lcp === undefined ? null : <Rated rating={rate('lcp', vitals.lcp)} />}
-          </Cell>
-          <Cell term="CLS">
-            {formatShift(vitals.cls)}
-            <Rated rating={rate('cls', vitals.cls)} />
-          </Cell>
-          <Cell
-            term="INP"
-            note={
-              vitals.inp === undefined
-                ? 'no interaction yet'
-                : `${vitals.interactions} interaction${vitals.interactions === 1 ? '' : 's'}`
-            }
-          >
-            {vitals.inp === undefined ? '—' : formatMilliseconds(vitals.inp)}
-            {vitals.inp === undefined ? null : <Rated rating={rate('inp', vitals.inp)} />}
-          </Cell>
+          {vitalCells.map((cell) => (
+            <Cell key={cell.term} term={cell.term} note={cell.note}>
+              {cell.value ?? '—'}
+              {cell.rating ? <Rated rating={cell.rating} /> : null}
+            </Cell>
+          ))}
           <Cell
             term="JavaScript"
-            note={
-              stats.cachedScripts
-                ? `${stats.scripts} files, ${stats.cachedScripts} cached`
-                : `${stats.scripts} files`
-            }
+            note={`${stats.scripts} files${stats.cachedScripts ? `, ${stats.cachedScripts} cached` : ''}${later}`}
           >
             {formatKilobytes(stats.scriptBytes)}
           </Cell>
           <Cell
             term="Requests"
-            note={stats.opaque ? `${stats.opaque} cross-origin report 0 B` : undefined}
+            note={[
+              stats.laterRequests ? `+${stats.laterRequests} since X‑ray` : '',
+              stats.opaque ? `${stats.opaque} cross-origin report 0 B` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           >
             {formatCount(stats.requests)}
           </Cell>

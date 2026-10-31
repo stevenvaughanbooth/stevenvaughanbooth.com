@@ -4,13 +4,25 @@ import { Activity, type ComponentProps, type ComponentType, useEffect, useState 
 import { startQuestion } from '../ask/ask-events';
 import { switchTheme, themeToggleId } from '../theme-toggle';
 import { observeInteractions } from '../xray/interactions';
-import { characterKeysEnabled, sheetId, shortcutFor } from './keys';
+import {
+  announceKeys,
+  characterKeysEnabled,
+  sheetId,
+  shortcutFor,
+  xrayMark,
+  xrayStorageKey,
+  xrayWanted,
+} from './keys';
 import type { ShortcutsSheetProps } from './shortcuts-sheet';
 
 const SHORTCUTS_OPEN_EVENT = 'shortcuts:open';
 
 const loadSheet = () => import('./shortcuts-sheet');
-const loadXray = () => import('../xray/xray');
+// The HUD tells the page's own downloads from X-ray's, and what came after, by this mark.
+const loadXray = () => {
+  if (performance.getEntriesByName(xrayMark).length === 0) performance.mark(xrayMark);
+  return import('../xray/xray');
+};
 
 function warm() {
   loadSheet().catch(() => {
@@ -50,8 +62,8 @@ const sheetElement = () => document.getElementById(sheetId) as HTMLDialogElement
  * reopens at once.
  *
  * It is also X-ray's only code in the initial page: any <button data-xray-toggle> (the header's,
- * and any a page adds) and ?xray in the address turn it on, and a pointer or focus on a toggle
- * starts its download. Its overlay renders here, after the header, and stays mounted under
+ * and any a page adds) and ?xray in the address turn it on, as does a page loaded in a tab that
+ * left it on, and a pointer or focus on a toggle starts its download. Its overlay renders here, after the header, and stays mounted under
  * <Activity> once loaded. The listener starts the interaction log the HUD's INP comes from, too.
  */
 export function Shortcuts() {
@@ -101,10 +113,17 @@ export function Shortcuts() {
       if (onXrayToggle(event)) void toggleXray();
     };
     const onLoad = () => {
-      if (new URLSearchParams(window.location.search).has('xray')) void toggleXray();
+      let stored: string | null = null;
+      try {
+        stored = sessionStorage.getItem(xrayStorageKey);
+      } catch {
+        // Without storage, only ?xray turns it on.
+      }
+      if (xrayWanted(window.location.search, stored)) void toggleXray();
     };
 
     observeInteractions();
+    announceKeys();
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener(SHORTCUTS_OPEN_EVENT, show);
     document.addEventListener('pointerover', onIntent);

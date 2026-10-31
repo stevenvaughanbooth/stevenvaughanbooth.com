@@ -133,7 +133,8 @@ test('a label’s details open on focus, link to the source, and close on Escape
   const card = page.getByRole('group', { name: 'Hero', exact: true });
   await expect(card).toBeVisible();
   await expect(card).toContainText('Server');
-  await expect(card).toContainText('No JavaScript');
+  await expect(card).toContainText('Islands with the page');
+  await expect(card).toContainText('hero-ask-bar.tsx, arrival-shell.tsx');
   await expect(
     card.getByRole('link', { name: /src\/components\/sections\/hero\.tsx/ }),
   ).toHaveAttribute(
@@ -141,7 +142,28 @@ test('a label’s details open on focus, link to the source, and close on Escape
     'https://github.com/stevenvaughanbooth/stevenvaughanbooth.com/blob/main/src/components/sections/hero.tsx',
   );
 
-  // The card doesn't trap focus: Tab goes into it and on to the next label.
+  // The labels are one Tab stop: the arrow keys move between them, opening each one's card.
+  await expect(labels(page).locator('button[tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('ArrowDown');
+  await expect(label).not.toBeFocused();
+  await expect(card).toBeHidden();
+  await expect(labels(page).locator('button[aria-expanded="true"]')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(label).toBeFocused();
+  await expect(card).toBeVisible();
+
+  // The card doesn't trap focus: Tab goes into it, and Escape from there closes it at once,
+  // back on its label.
+  await page.keyboard.press('Tab');
+  await expect(card.getByRole('link')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(card).toBeHidden();
+  await expect(label).toBeFocused();
+  await expect(label).toHaveAttribute('aria-expanded', 'false');
+
+  // Tab from the card leaves the labels, and the card closes.
+  await label.blur();
+  await label.focus();
   await page.keyboard.press('Tab');
   await expect(card.getByRole('link')).toBeFocused();
   await page.keyboard.press('Tab');
@@ -159,15 +181,19 @@ test('a label’s details open on focus, link to the source, and close on Escape
   await expect(toggle(page)).toBeFocused();
 });
 
-test('the HUD reports this visit and the build in numbers', async ({ page }) => {
+test('the HUD reports this visit and the build in numbers', async ({ page, isMobile }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await hydrated(page);
   await page.keyboard.press('x');
   const panel = hud(page);
-  // Phones start with the sheet folded down.
+  // It starts folded: a bar with the visit's vitals, from tablets up.
   const stats = panel.getByRole('button', { name: 'Stats' });
-  if ((await stats.getAttribute('aria-expanded')) === 'false') await stats.click();
+  await expect(stats).toHaveAttribute('aria-expanded', 'false');
+  if (!isMobile) await expect(panel.getByRole('term').filter({ hasText: 'LCP' })).toBeVisible();
+  const box = await panel.boundingBox();
+  expect(box!.height).toBeLessThan(isMobile ? 64 : 48);
+  await stats.click();
   await expect(stats).toHaveAttribute('aria-expanded', 'true');
 
   const value = (term: string) =>
@@ -176,13 +202,54 @@ test('the HUD reports this visit and the build in numbers', async ({ page }) => 
   await expect(value('CLS')).toHaveText(/^(< )?\d/);
   // The X just pressed is an interaction.
   await expect(value('INP')).toHaveText(/^\d+ ms/);
-  await expect(value('JavaScript')).toHaveText(/^\d+ KB\d+ files/);
-  await expect(value('Requests')).toHaveText(/^\d+/);
+  // The page's own downloads, with X-ray's (and anything after it) apart.
+  await expect(value('JavaScript')).toHaveText(/^\d+ KB\d+ files.* · \+\d+ KB since X.ray/);
+  await expect(value('Requests')).toHaveText(/^\d+\+\d+ since X.ray/);
+  // No input before X-ray but the X: the LCP is final.
+  await expect(value('LCP')).not.toContainText('provisional');
   await expect(value('DOM elements')).toHaveText(/^\d[\d,]*/);
   await expect(value('Components')).toHaveText(/^\d+ client\d+ server · \d+ CSS only/);
   await expect(value('Lighthouse')).toHaveText(/^\d+ · \d+ · \d+ · \d+/);
   await expect(value('Tests')).toHaveText(/^[\d,]+ unit[\d,]+ end-to-end/);
   await expect(value('React')).toHaveText(/^19\.\d+\.\d+Next\.js 16\.\d+\.\d+/);
+
+  // Opened, it stays open for the rest of the visit.
+  await page.reload();
+  await hydrated(page);
+  await expect(hud(page).getByRole('button', { name: 'Stats' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+});
+
+test('X-ray follows the page while it moves, then does no work while it is still', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const frames = { count: 0 };
+    Object.assign(window, { frames });
+    const request = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => {
+      frames.count += 1;
+      return request(callback);
+    };
+  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await hydrated(page);
+  await page.keyboard.press('x');
+  await expect(hud(page)).toBeVisible();
+  const frames = () =>
+    page.evaluate(() => (window as unknown as { frames: { count: number } }).frames.count);
+  // Once the page settles, a second passes with next to no frames requested (60 if it polled).
+  await page.waitForTimeout(1500);
+  const before = await frames();
+  await page.waitForTimeout(1000);
+  expect((await frames()) - before).toBeLessThan(10);
+
+  // Scrolling wakes it: the labels move with the page.
+  await page.mouse.wheel(0, 900);
+  await expect.poll(frames).toBeGreaterThan(before + 1);
 });
 
 test('reduced motion switches at once; otherwise the page peels in a typed view transition', async ({
@@ -209,6 +276,13 @@ test('reduced motion switches at once; otherwise the page peels in a typed view 
   ]);
   // The flap and its shadow exist only for the transition.
   await expect(page.locator('[data-xray-peel]')).toHaveCount(0);
+
+  // A press during the peel waits for it, rather than being lost.
+  await page.keyboard.press('x');
+  await page.keyboard.press('x');
+  await expect.poll(transitions).toHaveLength(4);
+  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+  expect(await xrayOn(page)).toBe(false);
 });
 
 test('turning X-ray off restores the page as it was', async ({ page }) => {
@@ -254,6 +328,33 @@ test('any button marked data-xray-toggle turns it on, and ?xray opens it', async
   await page.goto('/?xray');
   await expect(hud(page)).toBeVisible();
   await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+
+  // Turned off, ?xray leaves the address, so a reload doesn't bring it back.
+  await toggle(page).click();
+  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+  expect(new URL(page.url()).search).toBe('');
+  await page.reload();
+  await hydrated(page);
+  expect(await xrayOn(page)).toBe(false);
+});
+
+test('?xray=0 keeps it off, and a full page load in the same tab keeps it on', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?xray=0');
+  await hydrated(page);
+  expect(await xrayOn(page)).toBe(false);
+
+  await page.keyboard.press('x');
+  await expect(hud(page)).toBeVisible();
+  // The header's section links load the home page afresh from a case study.
+  await page.goto('/work/mcp');
+  await expect(hud(page)).toBeVisible();
+  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('x');
+  await expect(hud(page)).toBeHidden();
+  await page.goto('/');
+  await hydrated(page);
+  expect(await xrayOn(page)).toBe(false);
 });
 
 test('X-ray’s code loads only on intent', async ({ page, isMobile }) => {

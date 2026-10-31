@@ -14,6 +14,7 @@ export interface Vitals {
   cls: number;
   /** Milliseconds; undefined until the first interaction. */
   inp?: number;
+  /** Interactions so far: the browser's own count where it keeps one. */
   interactions: number;
 }
 
@@ -48,16 +49,20 @@ export function cumulativeLayoutShift(shifts: readonly Shift[]): number {
 
 /**
  * Interaction to Next Paint: the slowest interaction, ignoring one for every 50 so a long visit
- * reports its 98th percentile, as web-vitals does. Undefined before any interaction.
+ * reports its 98th percentile, as web-vitals does. `count` is every interaction, the quick ones
+ * no entry was kept for included. Undefined before any interaction.
  */
-export function interactionToNextPaint(durations: Iterable<number>): number | undefined {
+export function interactionToNextPaint(
+  durations: Iterable<number>,
+  count?: number,
+): number | undefined {
   const sorted = [...durations].sort((a, b) => b - a);
   if (sorted.length === 0) return undefined;
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length / 50))];
+  return sorted[Math.min(sorted.length - 1, Math.floor((count ?? sorted.length) / 50))];
 }
 
 export interface ResourceSummary {
-  /** Every request Resource Timing saw, plus the document itself. */
+  /** Every request Resource Timing saw before `since`, plus the document itself. */
   requests: number;
   scripts: number;
   /** Compressed bytes of JavaScript over the network: transferSize, which is 0 from the cache. */
@@ -66,23 +71,39 @@ export interface ResourceSummary {
   cachedScripts: number;
   /** Cross-origin entries without Timing-Allow-Origin, which report 0 bytes whatever they cost. */
   opaque: number;
+  /** Requests, and bytes of JavaScript, from `since` on: X-ray's own and whatever came after. */
+  laterRequests: number;
+  laterScriptBytes: number;
 }
 
 const isScript = (entry: PerformanceResourceTiming) =>
   entry.initiatorType === 'script' || new URL(entry.name).pathname.endsWith('.js');
 
+/**
+ * What the page downloaded, in two parts: the requests that started before `since` (when X-ray
+ * was asked for), counted in full, and those from then on, which are X-ray's and anything later.
+ */
 export function summarizeResources(
   entries: readonly PerformanceResourceTiming[],
   origin: string,
+  since = Infinity,
 ): ResourceSummary {
   const summary: ResourceSummary = {
-    requests: entries.length + 1,
+    requests: 1,
     scripts: 0,
     scriptBytes: 0,
     cachedScripts: 0,
     opaque: 0,
+    laterRequests: 0,
+    laterScriptBytes: 0,
   };
   for (const entry of entries) {
+    if (entry.startTime >= since) {
+      summary.laterRequests += 1;
+      if (isScript(entry)) summary.laterScriptBytes += entry.transferSize;
+      continue;
+    }
+    summary.requests += 1;
     const sameOrigin = new URL(entry.name).origin === origin;
     const zero = entry.transferSize === 0;
     if (!sameOrigin && zero && entry.decodedBodySize === 0) summary.opaque += 1;
@@ -132,8 +153,10 @@ export function observeVitals(onChange: (vitals: Vitals) => void): () => void {
   const observers: PerformanceObserver[] = [];
   const update = () => {
     vitals.cls = cumulativeLayoutShift(shifts);
-    vitals.inp = interactionToNextPaint(interactionDurations.values());
-    vitals.interactions = interactionDurations.size;
+    // Event Timing keeps entries only for interactions of 16 ms or more; Chrome counts them all.
+    const counted = (performance as { interactionCount?: number }).interactionCount;
+    vitals.interactions = Math.max(counted ?? 0, interactionDurations.size);
+    vitals.inp = interactionToNextPaint(interactionDurations.values(), vitals.interactions);
     onChange({ ...vitals });
   };
 

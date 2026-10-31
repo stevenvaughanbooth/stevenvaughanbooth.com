@@ -6,8 +6,13 @@ import { ThemeToggle } from '../theme-toggle';
 import { shortcutsStorageKey } from './keys';
 import { Shortcuts, ShortcutsButton } from './shortcuts';
 
-// jsdom implements <dialog> without the modal API.
+// jsdom implements <dialog> without the modal API, and has no ResizeObserver for X-ray's labels.
 beforeAll(() => {
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
     this.open = true;
   };
@@ -31,6 +36,7 @@ afterEach(() => {
   document.documentElement.removeAttribute('class');
   window.history.replaceState(null, '', '/');
   localStorage.clear();
+  sessionStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -266,11 +272,29 @@ describe('X-ray', () => {
     other.remove();
   });
 
-  it('opens from ?xray in the address', async () => {
+  it('opens from ?xray in the address, and drops it once turned off', async () => {
     window.history.replaceState(null, '', '/?xray');
     const toggle = renderWithToggle();
     await waitFor(() => expect(xray()).toBe(true));
+    press('x');
+    await waitFor(() => expect(xray()).toBe(false));
+    expect(window.location.search).toBe('');
     toggle.remove();
+  });
+
+  it('stays off for ?xray=0, and comes back on in a tab that left it on', async () => {
+    window.history.replaceState(null, '', '/?xray=0');
+    sessionStorage.setItem('xray', 'on');
+    const toggle = renderWithToggle();
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(xray()).toBe(false);
+    cleanup();
+    toggle.remove();
+
+    window.history.replaceState(null, '', '/');
+    const again = renderWithToggle();
+    await waitFor(() => expect(xray()).toBe(true));
+    again.remove();
   });
 
   it('stays out of the way of typing and of the single-key switch', async () => {

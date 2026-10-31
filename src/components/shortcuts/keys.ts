@@ -34,6 +34,34 @@ export function setCharacterKeysEnabled(enabled: boolean): void {
   } catch {
     // Without storage the choice lasts until the page closes.
   }
+  announceKeys(enabled);
+}
+
+/**
+ * Keeps aria-keyshortcuts true: a control marked data-keyshortcut="X" announces its single key
+ * only while single keys are on.
+ */
+export function announceKeys(enabled = characterKeysEnabled()): void {
+  for (const element of document.querySelectorAll<HTMLElement>('[data-keyshortcut]')) {
+    if (enabled) element.setAttribute('aria-keyshortcuts', element.dataset.keyshortcut ?? '');
+    else element.removeAttribute('aria-keyshortcuts');
+  }
+}
+
+/** sessionStorage key: "on" while X-ray is on, so a full page load in the same tab keeps it. */
+export const xrayStorageKey = 'xray';
+
+/** The performance mark X-ray's HUD splits the page's downloads at: when X-ray was asked for. */
+export const xrayMark = 'xray-requested';
+
+/**
+ * Whether X-ray starts on as the page loads: ?xray (or ?xray=1) turns it on and ?xray=0 keeps it
+ * off; without either it is as this tab last left it.
+ */
+export function xrayWanted(search: string, stored: string | null): boolean {
+  const asked = new URLSearchParams(search).get('xray');
+  if (asked !== null) return !['0', 'false', 'off'].includes(asked.toLowerCase());
+  return stored === 'on';
 }
 
 // Inputs that take a character as text, rather than as a press (checkboxes, buttons, ranges...).

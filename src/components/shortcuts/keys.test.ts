@@ -5,6 +5,7 @@ import {
   setCharacterKeysEnabled,
   shortcutFor,
   shortcutsStorageKey,
+  xrayWanted,
 } from './keys';
 
 /** The shortcut a key pressed with focus on `target` asks for. */
@@ -107,5 +108,33 @@ describe('the single-key preference', () => {
     expect(characterKeysEnabled()).toBe(false);
     setCharacterKeysEnabled(true);
     expect(characterKeysEnabled()).toBe(true);
+  });
+});
+
+describe('xrayWanted', () => {
+  it('turns X-ray on for ?xray and ?xray=1, and keeps it off for ?xray=0', () => {
+    expect(xrayWanted('?xray', null)).toBe(true);
+    expect(xrayWanted('?xray=1', null)).toBe(true);
+    expect(xrayWanted('?a=b&xray', null)).toBe(true);
+    expect(xrayWanted('?xray=0', 'on')).toBe(false);
+    expect(xrayWanted('?xray=false', null)).toBe(false);
+    expect(xrayWanted('?xray=OFF', 'on')).toBe(false);
+  });
+
+  it('otherwise leaves it as the tab last had it', () => {
+    expect(xrayWanted('', 'on')).toBe(true);
+    expect(xrayWanted('', null)).toBe(false);
+    expect(xrayWanted('?q=1', 'off')).toBe(false);
+  });
+});
+
+describe('announceKeys', () => {
+  it('announces a single key only while single keys are on', () => {
+    document.body.innerHTML = '<button data-keyshortcut="X" aria-keyshortcuts="X">X-ray</button>';
+    const button = document.querySelector('button')!;
+    setCharacterKeysEnabled(false);
+    expect(button.hasAttribute('aria-keyshortcuts')).toBe(false);
+    setCharacterKeysEnabled(true);
+    expect(button.getAttribute('aria-keyshortcuts')).toBe('X');
   });
 });

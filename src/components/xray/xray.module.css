@@ -184,6 +184,13 @@
   display: none;
 }
 
+/* Below desktop widths the header's labels drop their load time, so they keep to one row. */
+@media (width < 64rem) {
+  .item[data-fixed] .loads {
+    display: none;
+  }
+}
+
 .rail {
   position: fixed;
   right: 0;
@@ -407,8 +414,9 @@
 }
 
 /*
- * The HUD: a drawing's title block, docked at the bottom right. On phones it is a sheet across the
- * bottom that opens from its title row.
+ * The HUD: a drawing's title block, docked at the bottom right. Folded, it is one row with the
+ * visit's four vitals, so it covers next to nothing; it opens upwards into the full stats. On
+ * phones it is a sheet across the bottom that opens from its title row.
  */
 .hud {
   position: fixed;
@@ -434,8 +442,41 @@
   border-bottom: 1px solid var(--xr-rule);
 }
 
+.hud[data-collapsed] {
+  width: auto;
+  max-width: calc(100vw - 2rem);
+}
+
 .hud[data-collapsed] .hudHead {
   border-bottom: 0;
+}
+
+/* The folded bar's vitals: term, value and rating on one line each. */
+.inline {
+  display: flex;
+  gap: 0.9rem;
+  margin: 0 0 0 auto;
+  white-space: nowrap;
+}
+
+.inline > div {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.inline dt {
+  letter-spacing: 0.08em;
+  color: var(--xr-dim);
+}
+
+.inline dd {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--xr-ink);
 }
 
 .hudTitle {
@@ -571,9 +612,6 @@
 }
 
 .note {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--xr-dim);
 }
 
@@ -620,7 +658,13 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  .legend {
+  .legend,
+  .inline {
+    display: none;
+  }
+
+  /* The header's labels are kind chips alone, in one row: names would wrap them over the page. */
+  .item[data-fixed] .name {
     display: none;
   }
 

@@ -73,6 +73,12 @@ describe('interactionToNextPaint', () => {
     expect(interactionToNextPaint(durations)).toBe(16);
     expect(interactionToNextPaint(durations.slice(1))).toBe(300);
   });
+
+  it('counts the quick interactions the browser kept no entry for', () => {
+    // Two slow ones on record out of 100: the slowest is set aside.
+    expect(interactionToNextPaint([400, 300], 100)).toBe(300);
+    expect(interactionToNextPaint([400, 300], 49)).toBe(400);
+  });
 });
 
 describe('recordInteraction', () => {
@@ -126,6 +132,30 @@ describe('summarizeResources', () => {
       scriptBytes: 49_000,
       cachedScripts: 0,
       opaque: 0,
+      laterRequests: 0,
+      laterScriptBytes: 0,
+    });
+  });
+
+  it('counts what started from `since` on apart: X-ray’s own and anything after it', () => {
+    const summary = summarizeResources(
+      [
+        resource(`${origin}/page.js`, { initiatorType: 'script', transferSize: 50_000 }),
+        resource(`${origin}/xray.js`, {
+          initiatorType: 'script',
+          transferSize: 15_000,
+          startTime: 2_000,
+        }),
+        resource(`${origin}/xray.css`, { initiatorType: 'link', startTime: 2_001 }),
+      ],
+      origin,
+      2_000,
+    );
+    expect(summary).toMatchObject({
+      requests: 2,
+      scriptBytes: 50_000,
+      laterRequests: 2,
+      laterScriptBytes: 15_000,
     });
   });
 

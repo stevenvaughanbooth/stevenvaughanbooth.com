@@ -4,8 +4,9 @@
  *
  * A component outlined around the whole width of the page (a section) carries its label as a tab
  * inside its top-left corner. One inside another sits on its own top edge, like a folder's tab,
- * so it covers none of its content. A small one (a button) hangs its label just below, and a
- * tall, narrow one (the signal line) runs it down its side. A label that would cover one already
+ * so it covers none of its content. A small one (a button, a phone's avatar) hangs its label just
+ * below, and a tall, narrow one (the signal line) runs it down its side, to its left, since the
+ * page's text runs to its right. A label that would cover one already
  * placed moves along, and anything moved off its component gets a leader line back to it, as
  * callouts do on a drawing.
  */
@@ -64,10 +65,22 @@ export const isSmall = (box: Box) => box.height < 50;
 
 type Shape = 'tab' | 'top' | 'hang' | 'side';
 
-function shapeOf({ box, inset, vertical }: LabelRequest, bounds: Bounds): Shape {
-  if (vertical) return 'side';
-  // Under a fixed header, every label hangs in a row below it: the header is full of controls.
-  if (isSmall(box) || bounds.hang !== undefined) return 'hang';
+/**
+ * Where a side label goes: to the left of its box, clear of the text beside it, or at the page's
+ * edge over the box itself; null if it would reach past the box into the text.
+ */
+function sideOf({ box, width }: LabelRequest): number | null {
+  const x = Math.max(MARGIN, box.x - width - GAP);
+  return x + width <= box.x + box.width ? x : null;
+}
+
+function shapeOf(request: LabelRequest, bounds: Bounds): Shape {
+  const { box, inset, vertical } = request;
+  if (vertical && sideOf(request) !== null) return 'side';
+  // Under a fixed header, every label hangs in a row below it: the header is full of controls. So
+  // does a side label with no room beside its box, and one on a small box inside another.
+  const smallSquare = inset === 0 && box.width <= 120 && box.height <= 120;
+  if (vertical || isSmall(box) || smallSquare || bounds.hang !== undefined) return 'hang';
   return inset > 0 ? 'tab' : 'top';
 }
 
@@ -86,13 +99,15 @@ export function placeLabels(requests: readonly LabelRequest[], bounds: Bounds): 
       shape === 'hang'
         ? { x: box.x + Math.min(box.width / 2, 12), y: box.y + box.height }
         : { x: box.x + inset, y: box.y + inset };
-    let x = shape === 'hang' ? box.x : corner.x;
+    let x = shape === 'hang' ? box.x : shape === 'side' ? sideOf(request)! : corner.x;
     let y =
-      shape === 'tab' || shape === 'side'
-        ? corner.y
-        : shape === 'top'
-          ? corner.y - height - 1
-          : Math.max(corner.y + GAP + 2, (bounds.hang ?? 0) + GAP);
+      shape === 'side'
+        ? box.y
+        : shape === 'tab'
+          ? corner.y
+          : shape === 'top'
+            ? corner.y - height - 1
+            : Math.max(corner.y + GAP + 2, (bounds.hang ?? 0) + GAP);
     // A tab with no room above its component goes inside its corner instead.
     if (shape === 'top' && y < bounds.top + GAP) y = corner.y + 1;
     x = Math.max(MARGIN, Math.min(x, bounds.width - width - MARGIN));
