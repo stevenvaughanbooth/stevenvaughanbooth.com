@@ -25,6 +25,7 @@ of the same material: every component, when its code loads, and why it is built 
 | Language     | TypeScript (`strict`, `noUncheckedIndexedAccess`, `typedRoutes`)                     |
 | Styling      | Tailwind CSS v4 over CSS custom properties, each colour set once with `light-dark()` |
 | Fonts/images | `next/font` (DM Sans, IBM Plex Mono); `next/image`'s `getImageProps()`               |
+| 3D           | Three.js 0.186 (named imports, loaded on demand), one shared engine for the diagrams |
 | Live answers | Route Handler → Anthropic Messages API (`claude-haiku-5-5`), streaming NDJSON        |
 | Abuse limits | Upstash Redis (`@upstash/ratelimit`), Vercel BotID                                   |
 | Tests        | Vitest + Testing Library, Playwright + axe-core, Lighthouse CI                       |
@@ -39,7 +40,10 @@ model and the full `/api/ask` contract. In short:
   including the list of page sections. The page, the navigation, the palette's curated answers,
   the Claude system prompt, JSON-LD, `/profile.json` and `/llms.txt` all read from it.
 - **HTML first.** Sections are Server Components. The diagrams render on the server too; a small
-  `'use client'` shell shows each one and loads its controller only as it nears the viewport. The
+  `'use client'` shell shows each one and loads its controller only as it nears the viewport.
+  Every diagram plays the same tour, with a Pause / Play / Replay control, and the MCP diagram
+  lays its steps out as a lit Three.js scene once the page has loaded and gone idle, where the
+  device can draw it. The 2D card stays the content and the fallback. The
   career timeline and the signal line ship no JavaScript at all. The other client modules are the
   theme toggle, the mobile Sections menu, the keyboard shortcuts, a copy button, the hero's ask
   bar, the Ask buttons and the palette loader, the hero's film frame, the "Scene by scene" dialog,
@@ -221,8 +225,11 @@ on desktop Chrome and an emulated Pixel 7. They check that:
   portrait and plays once a visit
 - the film's theater is a modal dialog that morphs from the frame, keeps focus and returns it, and
   "Scene by scene" opens over it as a modal of its own
-- the metadata tour never moves the selected tab under keyboard focus, and the career roles are
-  exclusive disclosures
+- every Work diagram tours itself in view, holds on hover and focus, pauses from its control,
+  rests under reduced motion, and never moves the selected tab under keyboard focus; the career
+  roles are exclusive disclosures
+- the MCP diagram's 3D scene draws real pixels over its graph without moving the page, the 2D
+  card stays with WebGL off, and three.js is never fetched on `/` before a diagram nears view
 - the hero's ask bar asks, and `/` focuses it; every allowlisted page target exists; "Show me"
   moves, focuses and marks the place, and a live answer's action outside the allowlist is dropped
 - each case study renders its four parts and metadata, morphs from the Work section and back,
@@ -256,15 +263,19 @@ pnpm exec playwright show-report                # open the last HTML report
 `/work/mcp` on the production server, with mobile emulation and simulated throttling, 3 runs per
 URL, asserting on the median run. These floors fail the build:
 
-| Assertion               | Floor    |
-| ----------------------- | -------- |
-| Performance             | ≥ 0.90   |
-| Accessibility           | 1        |
-| Best practices          | ≥ 0.95   |
-| SEO                     | 1        |
-| JavaScript transfer     | ≤ 180 KB |
-| Total transfer          | ≤ 600 KB |
-| Media requests (mobile) | 0        |
+| Assertion               | `/`, `/colophon` | Case studies (`/work/*`) |
+| ----------------------- | ---------------- | ------------------------ |
+| Performance             | ≥ 0.90           | ≥ 0.90                   |
+| Accessibility           | 1                | 1                        |
+| Best practices          | ≥ 0.95           | ≥ 0.95                   |
+| SEO                     | 1                | 1                        |
+| JavaScript transfer     | ≤ 180 KB         | ≤ 355 KB                 |
+| Total transfer          | ≤ 600 KB         | ≤ 500 KB                 |
+| Media requests (mobile) | 0                | 0                        |
+
+A case study's diagram is above the fold and draws in 3D once the page has loaded, so its page
+carries three.js (about 146 KB compressed) and has its own transfer budgets, set by an
+`assertMatrix` entry at the measured size plus about 10%.
 
 The media floor states a design rule: on a phone the portrait is an 88 px avatar, so the film
 never plays by itself there, and no video downloads until the visitor presses Play. This audit

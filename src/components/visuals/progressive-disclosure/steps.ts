@@ -1,3 +1,6 @@
+/** The name over the agent, in the 2D graph and the 3D scene. */
+export const agentLabel = 'Agent';
+
 /**
  * Progressive disclosure in three steps: a compact map, a relevant search, then specific detail.
  * Copy and tool wording are carried over from the previous site. The calls are conceptual,

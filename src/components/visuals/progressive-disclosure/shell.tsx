@@ -15,8 +15,8 @@ interface ProgressiveDisclosureShellProps extends ProgressiveDisclosureContent {
 }
 
 /**
- * The visual's only code in the initial page. It lays out the server-rendered card on its first
- * step and loads the controller as the card nears view.
+ * The visual's only code in the initial page. It lays out the server-rendered card, resting on
+ * the opened record, and loads the controller as the card nears view.
  */
 export function ProgressiveDisclosureShell({
   staticTabs,
@@ -29,8 +29,7 @@ export function ProgressiveDisclosureShell({
       fallback={
         <ProgressiveDisclosureView
           {...content}
-          step={0}
-          announcement=""
+          step={content.steps.length - 1}
           tabs={staticTabs}
           footer={staticFooter}
         />

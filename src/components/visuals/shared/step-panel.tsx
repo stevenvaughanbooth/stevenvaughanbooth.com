@@ -10,13 +10,18 @@ interface StepPanelProps {
   diagram: ReactNode;
   /** Step-specific copy below the diagram, usually StepStacks. */
   children?: ReactNode;
+  /**
+   * The controller's 3D scene (SceneCanvas), laid over the diagram. While it is live the
+   * diagram beneath fades out but keeps its place, so the stage never changes size.
+   */
+  scene?: ReactNode;
 }
 
 /**
  * The tabpanel of a stepped visual: the diagram stage, then the step's copy. The stage carries
  * `data-step`, so the server-rendered diagram changes state through CSS alone.
  */
-export function StepPanel({ id, step, description, diagram, children }: StepPanelProps) {
+export function StepPanel({ id, step, description, diagram, children, scene }: StepPanelProps) {
   return (
     <div
       role="tabpanel"
@@ -29,9 +34,15 @@ export function StepPanel({ id, step, description, diagram, children }: StepPane
         role="img"
         aria-label={description}
         data-step={step}
-        className="rounded-xl border border-line bg-bg bg-[radial-gradient(var(--line)_1px,transparent_1px)] [background-size:18px_18px] px-1 py-4 @sm:px-4 @sm:py-5"
+        className="relative rounded-xl border border-line bg-bg bg-[radial-gradient(var(--line)_1px,transparent_1px)] [background-size:18px_18px] px-1 py-4 @sm:px-4 @sm:py-5"
       >
-        {diagram}
+        {/* The scene comes first so the diagram can follow its state as a sibling: a :has()
+            selector here would restart the page's scroll-triggered count-up in Chromium. It is
+            absolutely positioned, so it still draws above the diagram. */}
+        {scene}
+        <div className="transition-opacity duration-700 peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
+          {diagram}
+        </div>
       </div>
       {children}
     </div>

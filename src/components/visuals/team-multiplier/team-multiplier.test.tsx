@@ -1,13 +1,14 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockIntersectionObserver, mockReducedMotion } from '@/test/browser-mocks';
+import { TOUR_DWELL_MS } from '../shared/tour/wording';
 import { TeamMultiplier } from '../team-multiplier';
 
 // The controller's first dynamic import is transformed on demand, which can take over a second
 // when the whole suite runs in parallel.
 const controllerLoad = { timeout: 5000 };
 
-const dwellMs = 5000;
+const dwellMs = TOUR_DWELL_MS;
 
 let page: ReturnType<typeof mockIntersectionObserver>;
 const selectedTab = () => screen.getByRole('tab', { selected: true });

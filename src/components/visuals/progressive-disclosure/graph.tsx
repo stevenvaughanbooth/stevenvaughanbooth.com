@@ -1,5 +1,5 @@
 import styles from './progressive-disclosure.module.css';
-import { steps } from './steps';
+import { agentLabel, steps } from './steps';
 
 /*
  * One composition for every width, in viewBox units (328 wide): the agent on top, then a row
@@ -156,7 +156,7 @@ export function Graph() {
           dy={middle}
           className="fill-subtle font-mono tracking-[0.12em] uppercase"
         >
-          Agent
+          {agentLabel}
         </text>
       </g>
 

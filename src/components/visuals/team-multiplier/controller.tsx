@@ -1,16 +1,12 @@
 import { SegmentedTabs } from '../shared/segmented-tabs';
-import { StepControls } from '../shared/step-controls';
-import { useAutoAdvance } from '../shared/use-auto-advance';
-import { tablistLabel, tourControls } from './controls';
+import { TourControls } from '../shared/tour/tour-controls';
+import { useTour } from '../shared/tour/use-tour';
+import { tablistLabel, wording } from './controls';
 import { type TeamMultiplierContent, TeamMultiplierView } from './view';
 
-/** How long each stage stays on screen while auto-advancing. */
-const dwellMs = 5000;
-
-/** Loaded lazily by the shell: live tabs plus a one-pass auto-advance through the stages. */
+/** Loaded lazily by the shell: live tabs plus the shared one-pass tour through the stages. */
 export function TeamMultiplierController(content: TeamMultiplierContent) {
-  const tour = useAutoAdvance({ steps: content.stages.length, durationMs: dwellMs });
-  const { status, action } = tourControls(tour.playback, tour.running);
+  const tour = useTour({ steps: content.stages.length });
 
   return (
     <TeamMultiplierView
@@ -25,17 +21,16 @@ export function TeamMultiplierController(content: TeamMultiplierContent) {
           selected={tour.step}
           accent="amber"
           onSelect={tour.select}
-          progress={
-            tour.playback === 'playing' ? { durationMs: dwellMs, running: tour.running } : null
-          }
+          progress={tour.progress}
         />
       }
       footer={
-        <StepControls
-          status={status}
+        <TourControls
           accent="amber"
-          live={tour.running}
-          action={{ ...action, onClick: tour.toggle }}
+          playback={tour.playback}
+          running={tour.running}
+          wording={wording}
+          onToggle={tour.toggle}
         />
       }
     />

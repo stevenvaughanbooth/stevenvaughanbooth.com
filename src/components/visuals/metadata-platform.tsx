@@ -1,11 +1,11 @@
 import { projects, themes } from '@/content/profile';
-import { tablistLabel, tourControls } from './metadata-platform/controls';
+import { tablistLabel, wording } from './metadata-platform/controls';
 import { PhaseSteps } from './metadata-platform/phase-steps';
 import { Scene } from './metadata-platform/scenes';
 import { MetadataPlatformShell } from './metadata-platform/shell';
 import { type Story, stories } from './metadata-platform/stories';
 import { SegmentedTabs } from './shared/segmented-tabs';
-import { StepControls } from './shared/step-controls';
+import { TourControls } from './shared/tour/tour-controls';
 
 const id = 'metadata-platform';
 
@@ -76,10 +76,11 @@ export function MetadataPlatform() {
           <Contribution key={story.id} story={story} />
         ))}
         staticControls={
-          <StepControls
+          <TourControls
             accent="lilac"
-            live={false}
-            {...tourControls('idle', false, last.story, stories.length)}
+            playback="idle"
+            running={false}
+            wording={wording(last.story, stories.length)}
           />
         }
         staticTabs={

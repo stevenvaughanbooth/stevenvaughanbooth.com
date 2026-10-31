@@ -1,10 +1,11 @@
+import { tablistLabel, wording } from './progressive-disclosure/controls';
 import { Graph } from './progressive-disclosure/graph';
+import { disclosureSceneData } from './progressive-disclosure/scene-data';
 import { ProgressiveDisclosureShell } from './progressive-disclosure/shell';
 import { steps } from './progressive-disclosure/steps';
-import { stepControls, tablistLabel } from './progressive-disclosure/controls';
 import { SegmentedTabs } from './shared/segmented-tabs';
-import { StepControls } from './shared/step-controls';
 import { StepCopy } from './shared/step-panel';
+import { TourControls } from './shared/tour/tour-controls';
 
 const id = 'progressive-disclosure';
 
@@ -44,11 +45,13 @@ function ToolCall({ call, returns, rows }: Step) {
 /**
  * An agent explores metadata through progressive disclosure: a compact map, then a relevant
  * search, then one specific detail. Each step narrows the graph and shows its (conceptual) tool
- * call. The server renders the graph, the copy and an inert card on the first step; a
- * controller, loaded as the card nears view, brings the tabs and the Next button to life.
+ * call. The server renders the graph, the copy and an inert card resting on the opened record; a
+ * controller, loaded as the card nears view, brings the tabs to life, tours the steps once and,
+ * where the device can draw it, lays the steps out in 3D.
  */
 export function ProgressiveDisclosure() {
   const names = steps.map((step) => step.name);
+  const last = names.length - 1;
   return (
     // The card is drawn by the client shell; this server-rendered root is what X-ray labels.
     <div data-component="progressive-disclosure" className="min-w-0">
@@ -56,7 +59,6 @@ export function ProgressiveDisclosure() {
         id={id}
         steps={names}
         descriptions={steps.map((step) => step.diagram)}
-        announcements={steps.map((step) => `${step.name}: ${step.title}`)}
         diagram={<Graph />}
         calls={steps.map((step) => (
           <ToolCall key={step.name} {...step} />
@@ -64,10 +66,24 @@ export function ProgressiveDisclosure() {
         copy={steps.map((step) => (
           <StepCopy key={step.name} title={step.title} body={step.copy} />
         ))}
+        sceneData={disclosureSceneData()}
         staticTabs={
-          <SegmentedTabs id={id} label={tablistLabel} items={names} selected={0} accent="green" />
+          <SegmentedTabs
+            id={id}
+            label={tablistLabel}
+            items={names}
+            selected={last}
+            accent="green"
+          />
         }
-        staticFooter={<StepControls accent="green" {...stepControls(names, 0)} />}
+        staticFooter={
+          <TourControls
+            accent="green"
+            playback="idle"
+            running={false}
+            wording={wording(last, names.length)}
+          />
+        }
       />
     </div>
   );

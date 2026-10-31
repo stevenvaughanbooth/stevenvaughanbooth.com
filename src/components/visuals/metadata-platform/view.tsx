@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StepPanel, StepStack } from '../shared/step-panel';
-import type { AutoAdvanceRegion } from '../shared/use-auto-advance';
+import type { TourRegion } from '../shared/tour/use-tour';
 import { VisualFrame } from '../shared/visual-frame';
 
 /** Every story moves through three phases; the tour steps through them all, story by story. */
@@ -30,18 +30,18 @@ interface MetadataPlatformViewProps extends MetadataPlatformContent {
   /** Story × phase, from 0 to stories × phasesPerStory − 1. */
   step: number;
   announcement: string;
-  /** StepControls: server-rendered and inert in the static card, live in the controller. */
+  /** TourControls, in the footer: server-rendered and inert in the static card, live in the controller. */
   controls: ReactNode;
   /** The tablist, likewise. */
   tabs: ReactNode;
   /** PhaseSteps, likewise. */
   phaseSteps: ReactNode;
-  region?: AutoAdvanceRegion;
+  region?: TourRegion;
 }
 
 /**
- * The platform card's layout around the server-rendered scenes and copy. The play control comes
- * first, before the tabs, so it is the first thing reached in the card.
+ * The platform card's layout around the server-rendered scenes and copy. The tour's control sits
+ * in the footer, where every diagram keeps it.
  */
 export function MetadataPlatformView({
   id,
@@ -60,8 +60,13 @@ export function MetadataPlatformView({
   const story = Math.floor(step / phasesPerStory);
   const phase = step % phasesPerStory;
   return (
-    <VisualFrame id={id} title="Inside the platform" accent="lilac">
-      <div className="mb-3 motion-reduce:hidden">{controls}</div>
+    <VisualFrame
+      id={id}
+      title="Inside the platform"
+      accent="lilac"
+      footer={controls}
+      footerClassName="motion-reduce:hidden"
+    >
       <div {...region}>
         {tabs}
         <StepPanel

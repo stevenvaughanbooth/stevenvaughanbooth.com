@@ -1,8 +1,9 @@
 # Visuals: the shared system
 
 Every interactive diagram on the page is built from the pieces in this folder, so they look and
-behave as one system and ship as little JavaScript as possible. TeamMultiplier and
-ProgressiveDisclosure are the reference implementations; MetadataPlatform shows a visual with sub-steps.
+behave as one system and ship as little JavaScript as possible. ProgressiveDisclosure is the
+reference implementation (the shared tour and a 3D scene); TeamMultiplier is the same pattern in
+2D; MetadataPlatform shows a tour with sub-steps; ReflexDemo plays a replay on the same tour.
 
 ## The pattern
 
@@ -27,8 +28,12 @@ team-multiplier.tsx            Server Component. Renders everything that never c
   kept. It adds a Suspense boundary only after the chunk has loaded (a boundary in the server
   render makes the prerender write the card twice). If the chunk fails or the controller throws,
   the static card stays.
-- **The static card is meaningful on its own**: tours rest on their end state (the complete
-  multiplier loop); steppers show their first step.
+- **The static card is meaningful on its own**: every tour rests on its end state (the complete
+  multiplier loop, the opened record, the last story's outcome, the finished session).
+- **3D is a layer, never the content.** A controller may add a `SceneCanvas` over its SVG (see
+  [3D scenes](#3d-scenes)). The SVG, the copy and the tabs stay in the DOM and are what assistive
+  technology reads; the canvas is `aria-hidden`, and wherever it can't or may not draw, the 2D
+  card simply stays.
 
 ## Diagrams
 
@@ -57,23 +62,50 @@ team-multiplier.tsx            Server Component. Renders everything that never c
 | `lazy-visual.tsx`     | The loader described above.                                                                                                                                                                      |
 | `roving-tabs.ts`      | `rovingIndex` and `onRovingKeyDown`: Left/Up and Right/Down step and wrap, Home/End jump. Every tablist uses it.                                                                                 |
 | `hooks.ts`            | `useReducedMotion`, `usePageVisible`, `useInView`.                                                                                                                                               |
-| `use-auto-advance.ts` | The guided tour.                                                                                                                                                                                 |
+| `tour/`               | `useTour`, `TourControls` and the shared wording (`TOUR_DWELL_MS`, `guidedTour`): the one tour every diagram plays.                                                                              |
+| `three/`              | The 3D engine (`engine.ts`, `shapes.ts`), camera math (`pose.ts`), the opt-out check (`support.ts`) and `SceneCanvas`. See [3D scenes](#3d-scenes).                                              |
 | `accent.ts`, `ids.ts` | Accent classes per theme colour; tab and panel ids.                                                                                                                                              |
+
+## The tour
+
+Every diagram plays the same way, from one hook and one footer: `tour/use-tour.ts` and
+`tour/tour-controls.tsx`. Do not write a timer in a controller.
+
+```tsx
+const tour = useTour({ steps: content.steps.length }); // dwell: TOUR_DWELL_MS (6 s) a step
+<div {...tour.region}>                                 // tabs + panel: what hover/focus/press hold
+  <SegmentedTabs selected={tour.step} onSelect={tour.select} progress={tour.progress} … />
+  …
+</div>
+footer={<TourControls accent="green" playback={tour.playback} running={tour.running}
+                      wording={guidedTour(rest)} onToggle={tour.toggle} />}
+```
+
+`useTour` follows the APG carousel rules:
+
+- plays one pass, from the first step to the last, starting as the card scrolls in, and rests on
+  the last step with **Replay** (one behaviour for every diagram; nothing loops);
+- counts down only while half the region is on screen (`threshold`) and the page can be seen;
+- holds while a mouse hovers the region, focus is inside it, or a pointer is pressed in it (a drag
+  to orbit a scene); the play button sits in the footer, outside the region, so pressing Play is
+  never held by its own focus;
+- stops for good when the visitor picks a step or focuses a tab, and never moves the selection
+  under focus;
+- never starts under reduced motion (the views hide the footer with `motion-reduce:hidden`).
+
+`start: 'unseen'` is for a replay whose text must not vanish under the reader (ReflexDemo): it
+resets to the first step only while out of sight, and rests if it is already on screen. A replay
+passes `dwellMs` as a function, one delay per frame.
+
+`TourControls` is the footer for every tour, server-rendered at rest and live in the controller:
+the status on the left (`Auto-advancing`, `Paused while you look`, `Paused`, `Ready`, or the
+diagram's rest label) and one Play / Pause / Replay button whose accessible name starts with its
+label. The words that differ (`TourWording`) live in each diagram's `controls.ts`.
 
 ## Hooks
 
 **Server-snapshot policy:** on the server and during hydration every hook reports the motionless
 state: reduced motion on, page hidden, out of view. Prerendered HTML is always the static state.
-
-`useAutoAdvance({ steps, durationMs })` follows the APG carousel rules:
-
-- plays one pass, from the first step to the last, starting as the card scrolls in;
-- counts down only while at least half the card is on screen and the page can be seen;
-- holds while a mouse hovers the tabs and panel, or focus is inside them (the play button is
-  outside, so pressing Play is never held by its own focus);
-- stops for good when the visitor picks a step or focuses a tab, and never moves the selection
-  under focus;
-- never starts under reduced motion (hide its controls with `footerClassName="motion-reduce:hidden"`).
 
 **Off screen, nothing runs.** `usePageVisible` is false while the browser tab is hidden or a modal
 dialog (the Ask palette, the shortcuts sheet) covers the page; it listens for `visibilitychange`
@@ -86,11 +118,79 @@ React's `<Activity>` was considered for this and not used: hiding a subtree appl
 `display: none`, which would collapse the card and shift the page. The shortcuts sheet uses it
 instead, where hiding is the point.
 
+## 3D scenes
+
+A diagram can draw its steps as a lit Three.js scene over its SVG. Three things are fixed: the
+SVG stays the content and the fallback, three.js never loads with the page, and one engine runs
+every scene.
+
+```
+controller.tsx                     (already lazy, near the viewport)
+  └─ <StepPanel scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}>
+       SceneCanvas                 no three.js; checks support, waits for load + idle, imports:
+         └─ scene.ts               defineScene({ poses, build }) — imports three and ../shared/three/engine
+```
+
+**Loading.** `SceneCanvas` (in the controller's chunk) asks `sceneOptOut()` first: Save-Data,
+`prefers-reduced-data`, `navigator.deviceMemory < 4`, or no WebGL 2 keep the 2D card and download
+nothing. Otherwise it waits for the load event and an idle period (`whenSettled`), so on a page
+where the card is above the fold (`/work/*`) the scene never competes with LCP or TBT, and on the
+home page, where controllers load only near the viewport, three.js is never fetched until the
+visitor scrolls towards a diagram. Every scene imports `three` and `engine.ts`, so a page shares
+one chunk of them. Import named classes from `'three'`; no addons, react-three-fiber or
+post-processing.
+
+**Mounting.** The engine appends a canvas, a label layer and a colour probe to `SceneCanvas`'s box,
+which covers the stage. It compiles every shader with `compileAsync` before the first frame, then
+sets `data-scene="live"`: the box fades in and the SVG after it, its `peer`, fades out (it keeps
+its place, so nothing moves). A failed import, a WebGL error or a lost context leaves or puts the
+2D card back; a restored context brings the scene back.
+
+**A scene** is `defineScene<Data>({ poses, fov?, framedAspect?, build })`:
+
+- `poses[i]` is the camera for step `i`: `{ target, distance, azimuth, elevation }` (see
+  `pose.ts`). Steps fly between poses in `FLIGHT_MS` (900 ms, eased); `framedAspect` is the canvas
+  shape the poses were framed for, and narrower canvases pull back to fit.
+- `build(context, data)` creates the objects once and returns `{ step(i, instant), theme(theme),
+update?(dt, now) }`. `step` sets targets (animate unless `instant`); `theme` stores the colours;
+  `update` eases towards the targets every frame and returns true while anything still moves.
+- `data` is plain strings from the server (labels, counts), passed through the shell as content.
+- `context.label(text, anchor, { align, className })` returns a DOM label that follows a 3D point,
+  in whole pixels, at least `text-micro` (11 px). Labels are aria-hidden with the canvas: they
+  repeat what the card's copy says. Style them with Tailwind classes and `data-*` attributes.
+- `context.own(resource)` disposes a texture or geometry with the scene; meshes in the scene are
+  disposed for you.
+- `shapes.ts` has rounded slabs, rims, flat panels and a radial texture for glows and contact
+  shadows. Light with a `HemisphereLight` and one `DirectionalLight`; glow with additive sprites
+  and tubes in the dark theme and normal blending in the light one.
+
+**Theme.** `theme.color` holds the site's tokens (`bg`, `surface`, `elevated`, `line`,
+`lineStrong`, `fg`, `muted`, `subtle`, `green`, `amber`, `lilac`, `blue`) read from CSS at runtime,
+and `theme.dark`. A theme switch re-reads them and redraws at once, inside the theme's view
+transition. Never hard-code a colour.
+
+**Runtime.** One renderer per mounted scene, antialiased, transparent over the stage's dot grid,
+pixel ratio capped at 2 (1.5 on coarse pointers). It draws only while something moves (a flight,
+an orbit, a scene's own easing), pauses off screen and in a hidden tab, and disposes everything,
+the WebGL context included, on unmount.
+
+**Motion and input.** Drag orbits the camera around the step's pose, coasts, holds for a moment
+and springs home; on touch only a sideways drag orbits (`touch-action: pan-y`), so the page still
+scrolls. Pressing in the region holds the tour. Under reduced motion there are no flights, no
+inertia and no spring: steps cut, and a drag stays where it is left until the next step.
+
+**Checklist for a new scene:** the poses frame the scene at 390 and 1440 px wide; labels never
+overlap or leave their objects at 390; it reads in light and dark; it is static under reduced
+motion; and the initial page and `/` before scrolling do not request three.js (the end-to-end
+suite checks both).
+
 ## Accessibility
 
 - Picking a tab announces nothing extra: focus already announces it. Controls that change the
-  step without moving focus (Next, Start again) announce the step name and title only.
+  step without moving focus (MetadataPlatform's phases) announce that step's copy only.
 - Autoplay is silent.
+- A 3D scene is `aria-hidden` and takes no focus; the stage's `role="img"` label and the copy
+  below it describe every step.
 - Every control has a visible label; fuller names start with it (WCAG 2.5.3).
 
 ## Testing
@@ -106,6 +206,8 @@ await waitFor(() => expect(staticTabs).not.toBeInTheDocument());
 ```
 
 Advance fake timers in slices (see the tests here), so each step's effect can schedule the next.
+jsdom has no WebGL, so `SceneCanvas` stays empty in unit tests; the end-to-end suite checks real
+pixels in headless Chromium (SwiftShader) and the 2D fallback with WebGL switched off.
 
 ## Migrating a visual
 
@@ -115,8 +217,11 @@ Advance fake timers in slices (see the tests here), so each step's effect can sc
    (hooks, live SegmentedTabs/StepControls), `controls.ts` (tab label and footer text, shared by
    the server and the controller) and a `'use client'` `shell.tsx` (LazyVisual + React.lazy).
    Everything the shell imports ships in the initial page; keep it to the view.
-3. Use VisualFrame, SegmentedTabs, StepPanel/StepStack and StepControls; delete local copies of
-   tabs, icons, observers and timers.
-4. Check at 360px (text ≥ 11px, no clipped labels), forced colours, reduced motion, keyboard,
+3. Use VisualFrame, SegmentedTabs, StepPanel/StepStack, `useTour` and TourControls; delete local
+   copies of tabs, icons, observers and timers.
+4. For 3D, add `scene-data.ts` (what the scene draws, built on the server), `scene.ts`
+   (`defineScene`), pass `sceneData` through the shell, and render `SceneCanvas` in StepPanel's
+   `scene` slot. Follow `progressive-disclosure/scene.ts`.
+5. Check at 360px (text ≥ 11px, no clipped labels), forced colours, reduced motion, keyboard,
    and that the page's initial JS does not include the controller (grep the initial chunks for
    one of its strings).

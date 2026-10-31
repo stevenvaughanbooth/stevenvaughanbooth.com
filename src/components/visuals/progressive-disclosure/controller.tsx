@@ -1,43 +1,46 @@
-import { useState } from 'react';
 import { SegmentedTabs } from '../shared/segmented-tabs';
-import { StepControls } from '../shared/step-controls';
-import { stepControls, tablistLabel } from './controls';
+import { SceneCanvas } from '../shared/three/scene-canvas';
+import { TourControls } from '../shared/tour/tour-controls';
+import { useTour } from '../shared/tour/use-tour';
+import { tablistLabel, wording } from './controls';
 import { type ProgressiveDisclosureContent, ProgressiveDisclosureView } from './view';
 
-/** Loaded lazily by the shell: live tabs and the Next / Start again button. */
+/** The 3D scene's chunk, with three.js. SceneCanvas imports it once the page has settled. */
+const loadScene = () => import('./scene');
+
+/**
+ * Loaded lazily by the shell: live tabs, the shared one-pass tour through describe, search and
+ * query, and the layered 3D scene over the graph where the device can draw it.
+ */
 export function ProgressiveDisclosureController(content: ProgressiveDisclosureContent) {
-  const [step, setStep] = useState(0);
-  const [announcement, setAnnouncement] = useState('');
-  const { status, action } = stepControls(content.steps, step);
-
-  // Focus on a tab already announces it, so picking a tab stays quiet.
-  function select(index: number) {
-    setStep(index);
-    setAnnouncement('');
-  }
-
-  function next() {
-    const target = step === content.steps.length - 1 ? 0 : step + 1;
-    setStep(target);
-    setAnnouncement(content.announcements[target] ?? '');
-  }
+  const tour = useTour({ steps: content.steps.length });
 
   return (
     <ProgressiveDisclosureView
       {...content}
-      step={step}
-      announcement={announcement}
+      step={tour.step}
+      region={tour.region}
       tabs={
         <SegmentedTabs
           id={content.id}
           label={tablistLabel}
           items={content.steps}
-          selected={step}
+          selected={tour.step}
           accent="green"
-          onSelect={select}
+          onSelect={tour.select}
+          progress={tour.progress}
         />
       }
-      footer={<StepControls status={status} accent="green" action={{ ...action, onClick: next }} />}
+      footer={
+        <TourControls
+          accent="green"
+          playback={tour.playback}
+          running={tour.running}
+          wording={wording(tour.step, content.steps.length)}
+          onToggle={tour.toggle}
+        />
+      }
+      scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}
     />
   );
 }

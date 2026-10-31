@@ -243,10 +243,30 @@ describe('measured', () => {
   });
 
   it('asserts every budget on the median run, as Under the hood says', () => {
-    const assertions: Record<string, unknown[]> = lighthouse.ci.assert.assertions;
-    for (const [id, [, options]] of Object.entries(assertions)) {
-      expect((options as { aggregationMethod?: string }).aggregationMethod, id).toBe('median-run');
+    for (const { assertions } of lighthouse.ci.assert.assertMatrix) {
+      for (const [id, [, options]] of Object.entries(assertions as Record<string, unknown[]>)) {
+        expect((options as { aggregationMethod?: string }).aggregationMethod, id).toBe(
+          'median-run',
+        );
+      }
     }
+  });
+
+  it('gives every audited page one set of budgets, the case study raising only its transfer', () => {
+    const matrix = lighthouse.ci.assert.assertMatrix;
+    const budgetsFor = (url: string) =>
+      matrix.filter(({ matchingUrlPattern }) => new RegExp(matchingUrlPattern).test(url));
+    for (const url of lighthouse.ci.collect.url) expect(budgetsFor(url), url).toHaveLength(1);
+    const [site, caseStudy] = matrix.map(
+      ({ assertions }) => assertions as Record<string, unknown[] | undefined>,
+    );
+    const differing = Object.keys(site ?? {}).filter(
+      (id) => JSON.stringify(site?.[id]) !== JSON.stringify(caseStudy?.[id]),
+    );
+    expect(differing.sort()).toEqual([
+      'resource-summary:script:size',
+      'resource-summary:total:size',
+    ]);
   });
 });
 

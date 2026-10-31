@@ -5,12 +5,12 @@ import {
   mockReducedMotion,
   setPageVisibility,
 } from '@/test/browser-mocks';
-import { useAutoAdvance } from './use-auto-advance';
+import { type TourOptions, useTour } from './use-tour';
 
 const durationMs = 1000;
 
-function Tour() {
-  const tour = useAutoAdvance({ steps: 4, durationMs });
+function Tour(options: Partial<TourOptions>) {
+  const tour = useTour({ steps: 4, dwellMs: durationMs, ...options });
   return (
     <>
       <div {...tour.region} data-testid="region">
@@ -30,6 +30,9 @@ function Tour() {
         <div role="tabpanel" tabIndex={0} />
       </div>
       <p data-testid="playback">{tour.playback}</p>
+      <p data-testid="progress">
+        {tour.progress ? `${tour.progress.key} ${tour.progress.durationMs}` : ''}
+      </p>
       <button type="button" onClick={tour.toggle}>
         Toggle
       </button>
@@ -56,7 +59,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('useAutoAdvance', () => {
+describe('useTour', () => {
   it('rests on the last step and never starts under reduced motion', () => {
     mockReducedMotion(true);
     render(<Tour />);
@@ -216,5 +219,81 @@ describe('useAutoAdvance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Toggle' }));
     tick(durationMs);
     expect(selected()).toBe('Step 2');
+  });
+
+  it('holds while a pointer is pressed in the region, until it is let go anywhere', () => {
+    mockReducedMotion(false);
+    render(<Tour />);
+    page.show(1);
+
+    fireEvent.pointerDown(screen.getByRole('tabpanel'), { pointerType: 'touch' });
+    tick(durationMs * 3);
+    expect(selected()).toBe('Step 0');
+    expect(playback()).toBe('playing');
+
+    act(() => {
+      window.dispatchEvent(new Event('pointerup'));
+    });
+    tick(durationMs);
+    expect(selected()).toBe('Step 1');
+  });
+
+  it('gives each step its own dwell when asked', () => {
+    mockReducedMotion(false);
+    render(<Tour dwellMs={(step) => (step + 1) * 500} />);
+    page.show(1);
+    expect(screen.getByTestId('progress').textContent).toMatch(/ 500$/);
+    tick(500);
+    expect(selected()).toBe('Step 1');
+    tick(900);
+    expect(selected()).toBe('Step 1');
+    tick(100);
+    expect(selected()).toBe('Step 2');
+  });
+
+  it('restarts the step’s progress when played again', () => {
+    mockReducedMotion(false);
+    render(<Tour />);
+    page.show(1);
+    const first = screen.getByTestId('progress').textContent;
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle' }));
+    expect(screen.getByTestId('progress').textContent).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle' }));
+    expect(screen.getByTestId('progress').textContent).not.toBe(first);
+    expect(selected()).toBe('Step 0');
+  });
+
+  describe("with start: 'unseen'", () => {
+    it('resets out of sight and plays once enough of it is on screen', () => {
+      mockReducedMotion(false);
+      render(<Tour start="unseen" threshold={0.4} />);
+      page.show(0);
+      expect(selected()).toBe('Step 0');
+      expect(playback()).toBe('ready');
+
+      page.show(0.2);
+      tick(durationMs * 2);
+      expect(playback()).toBe('ready');
+
+      page.show(0.6);
+      expect(playback()).toBe('playing');
+      tick(durationMs);
+      expect(selected()).toBe('Step 1');
+    });
+
+    it('rests where it is when it is already on screen as it loads', () => {
+      mockReducedMotion(false);
+      render(<Tour start="unseen" threshold={0.4} />);
+      page.show(1);
+      page.show(0);
+      page.show(1);
+      tick(durationMs * 3);
+      expect(selected()).toBe('Step 3');
+      expect(playback()).toBe('idle');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle' }));
+      expect(selected()).toBe('Step 0');
+      expect(playback()).toBe('playing');
+    });
   });
 });

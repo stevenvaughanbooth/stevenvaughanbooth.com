@@ -296,7 +296,7 @@ export const siteComponents: readonly SiteComponent[] = [
       'useSyncExternalStore',
       'Error boundary',
     ],
-    why: 'The server renders the finished session and a transcript; the replay’s controller loads within 200 px of view, and if it fails the session stays.',
+    why: 'The server renders the finished session and a transcript; the replay’s controller loads within 200 px of view and plays on the tour every diagram shares, and if it fails the session stays.',
     onPage: true,
   },
   {
@@ -343,7 +343,7 @@ export const siteComponents: readonly SiteComponent[] = [
     islands: ['visuals/team-multiplier/shell.tsx', 'visuals/team-multiplier/controller.tsx'],
     loads: 'Controller near the viewport',
     features: ['Server Component', 'React.lazy', 'useSyncExternalStore', 'useEffectEvent'],
-    why: 'One server-rendered SVG with every stage drawn and CSS picking the current one; the controller adds tabs and a tour that runs only on screen.',
+    why: 'One server-rendered SVG with every stage drawn and CSS picking the current one; the controller adds tabs and the shared tour, which plays only on screen.',
     onPage: true,
   },
   {
@@ -354,10 +354,19 @@ export const siteComponents: readonly SiteComponent[] = [
     islands: [
       'visuals/progressive-disclosure/shell.tsx',
       'visuals/progressive-disclosure/controller.tsx',
+      'visuals/shared/three/scene-canvas.tsx',
+      'visuals/progressive-disclosure/scene.ts',
     ],
-    loads: 'Controller near the viewport',
-    features: ['Server Component', 'React.lazy', 'startTransition'],
-    why: 'Every step is rendered on the server into one grid cell, so the card never changes height; the controller only wakes the tabs and Next.',
+    loads: 'Controller near the viewport; 3D after load and idle',
+    features: [
+      'Server Component',
+      'React.lazy',
+      'Three.js',
+      'WebGL',
+      'useEffectEvent',
+      'useSyncExternalStore',
+    ],
+    why: 'The server renders every step’s graph, call and copy, which stay the content and the fallback; the controller adds the shared tour and, where the device can draw it, a Three.js scene of the steps as layers the camera descends.',
     onPage: true,
   },
   {
@@ -368,7 +377,7 @@ export const siteComponents: readonly SiteComponent[] = [
     islands: ['visuals/metadata-platform/shell.tsx', 'visuals/metadata-platform/controller.tsx'],
     loads: 'Controller near the viewport',
     features: ['Server Component', 'React.lazy', 'useEffectEvent'],
-    why: 'Every scene of three stories is rendered on the server; the controller tours each phase once, holds on hover or focus, and stops when a visitor picks one.',
+    why: 'Every scene of three stories is rendered on the server; the controller runs the shared tour through each phase once, holds on hover or focus, and stops when a visitor picks one.',
     onPage: true,
   },
   {

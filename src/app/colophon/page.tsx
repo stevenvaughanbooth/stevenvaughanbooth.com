@@ -32,10 +32,18 @@ export const metadata: Metadata = {
 
 // Budgets and package versions are read from the files CI and the build use, so they always match
 // what CI enforces and what was installed. The measured results are typed into measured.ts by hand.
-function budget(id: string, key: 'minScore' | 'maxNumericValue'): number {
-  const assertions: Record<string, unknown[] | undefined> = lighthouse.ci.assert.assertions;
-  const value = (assertions[id]?.[1] as Record<string, unknown> | undefined)?.[key];
-  if (typeof value !== 'number') throw new Error(`lighthouserc.json has no ${key} for ${id}`);
+/** The budgets lighthouserc.json asserts for a page, from the matrix entry whose pattern it matches. */
+function budget(id: string, key: 'minScore' | 'maxNumericValue', path = '/'): number {
+  const matrix: {
+    matchingUrlPattern: string;
+    assertions: Record<string, unknown[] | undefined>;
+  }[] = lighthouse.ci.assert.assertMatrix;
+  const entry = matrix.find(({ matchingUrlPattern }) =>
+    new RegExp(matchingUrlPattern).test(`http://localhost${path}`),
+  );
+  const value = (entry?.assertions[id]?.[1] as Record<string, unknown> | undefined)?.[key];
+  if (typeof value !== 'number')
+    throw new Error(`lighthouserc.json has no ${key} for ${id} on ${path}`);
   return value;
 }
 
@@ -48,8 +56,8 @@ const scoreFloor = (category: string) => {
   const score = Math.round(budget(`categories:${category}`, 'minScore') * 100);
   return score === 100 ? '100' : `≥ ${score}`;
 };
-const kilobytes = (type: string) =>
-  `≤ ${Math.round(budget(`resource-summary:${type}:size`, 'maxNumericValue') / 1024)} KB`;
+const kilobytes = (type: string, path = '/') =>
+  `≤ ${Math.round(budget(`resource-summary:${type}:size`, 'maxNumericValue', path) / 1024)} KB`;
 
 const source = {
   repo: site.repo,
@@ -149,6 +157,15 @@ const scores = [
   { label: 'Best practices', value: scoreFloor('best-practices') },
   { label: 'SEO', value: scoreFloor('seo') },
 ];
+
+/** The case study Lighthouse CI audits, whose transfer budget the matrix sets apart. */
+const caseStudyPath = (() => {
+  const path = lighthouse.ci.collect.url
+    .map((url) => new URL(url).pathname)
+    .find((audited) => audited.startsWith('/work/'));
+  if (!path) throw new Error('lighthouserc.json audits no case study');
+  return path;
+})();
 
 const weights = [
   { label: 'JavaScript, compressed', value: kilobytes('script') },
@@ -360,6 +377,11 @@ export default function ColophonPage() {
               ))}
             </dl>
             <p className="mt-6 max-w-2xl text-sm leading-relaxed text-pretty text-muted">
+              A case study opens on its diagram, which draws in 3D once the page has loaded, so its
+              own budget allows {kilobytes('script', caseStudyPath)} of JavaScript and{' '}
+              {kilobytes('total', caseStudyPath)} in all; the score floors are the same.
+            </p>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-pretty text-muted">
               The targets sit above the floors: {measured.performanceTarget} for performance, 100 in
               the other three categories, no layout shift and under 100 ms of blocking time.
             </p>

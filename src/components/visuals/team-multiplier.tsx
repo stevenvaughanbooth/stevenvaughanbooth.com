@@ -1,7 +1,7 @@
 import { SegmentedTabs } from './shared/segmented-tabs';
-import { StepControls } from './shared/step-controls';
 import { StepCopy } from './shared/step-panel';
-import { tablistLabel, tourControls } from './team-multiplier/controls';
+import { TourControls } from './shared/tour/tour-controls';
+import { tablistLabel, wording } from './team-multiplier/controls';
 import { Network } from './team-multiplier/network';
 import { TeamMultiplierShell } from './team-multiplier/shell';
 import { stages } from './team-multiplier/stages';
@@ -12,7 +12,7 @@ const id = 'team-multiplier';
  * Discover → Share → Enable → Learn: a useful idea spreads from one champion to engineers and
  * teams, and what they learn flows back. The server renders the diagram, the copy and an inert
  * card resting on the complete loop; a controller, loaded as the card nears view, brings the
- * tabs to life and plays the stages once.
+ * tabs to life and tours the stages once, as every diagram's tour does.
  */
 export function TeamMultiplier() {
   const names = stages.map((stage) => stage.name);
@@ -36,7 +36,9 @@ export function TeamMultiplier() {
             accent="amber"
           />
         }
-        staticFooter={<StepControls accent="amber" live={false} {...tourControls('idle', false)} />}
+        staticFooter={
+          <TourControls accent="amber" playback="idle" running={false} wording={wording} />
+        }
       />
     </div>
   );

@@ -15,18 +15,9 @@ test('the metadata tour never changes the selected tab under keyboard focus', as
   const pause = card.getByRole('button', { name: 'Pause auto-advance' });
   await expect(pause).toBeVisible();
 
-  // The play control comes before the tabs, so it is reached first (APG carousel).
-  const playFirst = await card.evaluate((element) => {
-    const button = element.querySelector('button[aria-label="Pause auto-advance"]');
-    const list = element.querySelector('[role="tablist"]');
-    return Boolean(
-      list && button?.compareDocumentPosition(list) === Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-  expect(playFirst).toBe(true);
-
-  // Tab from the play control onto the selected tab, the tablist's only tab stop.
-  await pause.focus();
+  // Tab from the theme's last link onto the selected tab, the tablist's only tab stop. The play
+  // control is in the card's footer, as on every diagram.
+  await card.getByRole('button', { name: 'Ask about this' }).focus();
   await page.keyboard.press('Tab');
   const focused = tablist.locator('[role="tab"]:focus');
   await expect(focused).toHaveAttribute('aria-selected', 'true');

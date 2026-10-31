@@ -3,6 +3,7 @@ import { visualAccent } from './accent';
 import { panelId, tabId } from './ids';
 import { onRovingKeyDown } from './roving-tabs';
 import styles from './segmented-tabs.module.css';
+import type { TourProgress } from './tour/use-tour';
 
 /** Two-digit step numbers ('01', '02', …), the one format every visual uses. */
 export function formatIndex(index: number): string {
@@ -18,8 +19,8 @@ interface SegmentedTabsProps {
   accent: Accent;
   /** Omitted in the static server render, which has no behaviour. */
   onSelect?: (index: number) => void;
-  /** Auto-advance progress, drawn inside the selected tab. */
-  progress?: { durationMs: number; running: boolean } | null;
+  /** The tour's progress through the step on show, drawn inside the selected tab. */
+  progress?: TourProgress | null;
 }
 
 /**
@@ -72,6 +73,7 @@ export function SegmentedTabs({
             </span>
             {isSelected && progress ? (
               <span
+                key={progress.key}
                 aria-hidden
                 className={`${styles.progress} absolute inset-x-3 bottom-1 h-0.5 rounded-full ${tone.progress}`}
                 style={{

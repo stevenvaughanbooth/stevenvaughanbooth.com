@@ -22,6 +22,7 @@ Where it states a limit, a header or a load order, the code it names is the sour
 | Styling      | Tailwind CSS v4 over CSS custom properties                                | Each colour is defined once with `light-dark()`; utilities are generated from use.     |
 | Compiler     | React Compiler (`reactCompiler: true`)                                    | Memoizes client components automatically, with no hand-written `useMemo`.              |
 | Fonts        | `next/font` (DM Sans variable, IBM Plex Mono 500)                         | Self-hosted from this origin, subset, preloaded, with metric-matched fallbacks.        |
+| 3D           | Three.js 0.186, named imports, loaded on demand                           | Lit diagram scenes; one engine, one chunk, never in the initial page.                  |
 | Images       | `next/image`'s `getImageProps()` in Server Components                     | AVIF/WebP `srcset` as a plain `<img>`; no image component in client JavaScript.        |
 | Live answers | Route Handler → Anthropic Messages API, `claude-haiku-5-5`, NDJSON stream | The key stays server-side; see [Ask Steven](#ask-steven-security-model).               |
 | Abuse limits | Upstash Redis (`@upstash/ratelimit`) and Vercel BotID                     | Per-visitor, per-network, per-minute and per-day limits; bot filtering.                |
@@ -85,19 +86,20 @@ Under the hood are Server Components; the signal line is CSS only; the career ti
 too, built on native `<details name>` disclosures. These modules are the whole `'use client'`
 surface:
 
-| Module                                                                                     | Its job                                                                         | When its code loads                                                                                                 |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `theme-toggle.tsx`                                                                         | Switches theme, exposes `aria-pressed`                                          | With the page                                                                                                       |
-| `mobile-nav.tsx`                                                                           | Moves focus to the section heading from the Sections menu                       | With the page                                                                                                       |
-| `ui/copy-button.tsx`                                                                       | Copies Adage's install command                                                  | With the page                                                                                                       |
-| `ask/ask-button.tsx`, `ask/ask-shortcut.tsx`                                               | Ask buttons; the ⌘K or Ctrl K hint                                              | With the page                                                                                                       |
-| `ask/hero-ask-bar.tsx`                                                                     | The hero's ask bar and its suggestions; hands questions on                      | With the home page; it warms the palette's code on hover or focus                                                   |
-| `shortcuts/shortcuts.tsx`                                                                  | The `/`, `T`, `X` and `?` listener, the footer's sheet button, and X-ray's host | With the page; the sheet on `?`, or on hover, focus or press of the footer button; X-ray on intent                  |
-| `ask/palette-loader.tsx`                                                                   | ⌘K listener, error boundary, the palette's live region                          | With the page (root layout)                                                                                         |
-| `visuals/{team-multiplier,progressive-disclosure,metadata-platform,reflex-demo}/shell.tsx` | Show the server-rendered card, then swap in its controller                      | Shell with the page; controller when the card is within 200 px of the viewport, or on first focus or pointer inside |
-| `film/arrival-shell.tsx`                                                                   | The hero's film frame: its chip, autoplay policy and theater                    | With the page                                                                                                       |
-| `case-study/focus.tsx`                                                                     | Focus on arrival, and back on the link after Back                               | With the case-study pages only                                                                                      |
-| `app/error.tsx`, `app/global-error.tsx`                                                    | Error boundaries (themed, with a retry)                                         | With the page                                                                                                       |
+| Module                                                                                     | Its job                                                                         | When its code loads                                                                                                                      |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `theme-toggle.tsx`                                                                         | Switches theme, exposes `aria-pressed`                                          | With the page                                                                                                                            |
+| `mobile-nav.tsx`                                                                           | Moves focus to the section heading from the Sections menu                       | With the page                                                                                                                            |
+| `ui/copy-button.tsx`                                                                       | Copies Adage's install command                                                  | With the page                                                                                                                            |
+| `ask/ask-button.tsx`, `ask/ask-shortcut.tsx`                                               | Ask buttons; the ⌘K or Ctrl K hint                                              | With the page                                                                                                                            |
+| `ask/hero-ask-bar.tsx`                                                                     | The hero's ask bar and its suggestions; hands questions on                      | With the home page; it warms the palette's code on hover or focus                                                                        |
+| `shortcuts/shortcuts.tsx`                                                                  | The `/`, `T`, `X` and `?` listener, the footer's sheet button, and X-ray's host | With the page; the sheet on `?`, or on hover, focus or press of the footer button; X-ray on intent                                       |
+| `ask/palette-loader.tsx`                                                                   | ⌘K listener, error boundary, the palette's live region                          | With the page (root layout)                                                                                                              |
+| `visuals/{team-multiplier,progressive-disclosure,metadata-platform,reflex-demo}/shell.tsx` | Show the server-rendered card, then swap in its controller                      | Shell with the page; controller when the card is within 200 px of the viewport, or on first focus or pointer inside                      |
+| `visuals/shared/three/scene-canvas.tsx`, `visuals/progressive-disclosure/scene.ts`         | The MCP diagram's 3D scene: three.js, the shared engine and the scene           | With its controller, then only after the load event and an idle period, where WebGL 2 is available and no data or memory opt-out applies |
+| `film/arrival-shell.tsx`                                                                   | The hero's film frame: its chip, autoplay policy and theater                    | With the page                                                                                                                            |
+| `case-study/focus.tsx`                                                                     | Focus on arrival, and back on the link after Back                               | With the case-study pages only                                                                                                           |
+| `app/error.tsx`, `app/global-error.tsx`                                                    | Error boundaries (themed, with a retry)                                         | With the page                                                                                                                            |
 
 The palette itself (`ask-palette.tsx` with `use-ask`, `conversation`, `search`, `lib/ask-client` and
 `lib/page-actions`) is client code only by reachability: `palette-loader.tsx` imports it dynamically
@@ -138,7 +140,21 @@ The diagrams follow one pattern, documented in
 [`src/components/visuals/shared/README.md`](../src/components/visuals/shared/README.md): the SVG,
 copy and static controls render on the server, the `'use client'` shell shows them, and a
 `React.lazy` controller adds behaviour. If a controller's chunk fails or throws, the static card
-stays.
+stays. Every controller plays the same tour (`visuals/shared/tour/`): one pass as the card scrolls
+in, with a Pause / Play / Replay control in the footer.
+
+A controller may also lay a **3D scene** over its SVG (today the MCP diagram does). Its
+`SceneCanvas` checks first that the device may draw in 3D (no Save-Data, no
+`prefers-reduced-data`, at least 4 GB of device memory where the browser reports it, and WebGL 2),
+then waits for the load event and an idle period before it imports the scene's chunk: three.js
+0.186 (named imports, about 146 KB compressed), the shared engine in `visuals/shared/three/` and the
+scene. The home page therefore never fetches three.js until a diagram's controller has loaded near
+the viewport, and a case study, whose diagram is above the fold, fetches it only after its page
+has loaded. The canvas is `aria-hidden` and fades in over the SVG, which keeps its place, so the
+card never changes size; the SVG, the copy and the tabs remain the content. The engine draws only
+while something moves, pauses off screen and in a hidden tab, caps the pixel ratio, compiles its
+shaders before the first frame, reads the colour tokens from CSS (and again when the theme
+changes), and puts the 2D card back if the WebGL context is lost.
 
 The film, _Arrival_, opens the hero inside the portrait frame, and is built so it can never delay
 the portrait. Its server component renders the frame around the headshot, which paints first and is
@@ -186,7 +202,8 @@ Work theme at `/work/<theme>`, and Under the hood at `/colophon`:
 2. **Open source: Adage.** The flagship side project, with a replay of a reflex in a terminal and
    its evidence quoted with the caveats.
 3. **Work:** three themes (team multiplier, agent interfaces, Core Metadata Platform), each with an
-   interactive diagram, a "Read the case study" link and an "Ask about this" button.
+   interactive diagram that tours its steps (the agent-interfaces one in 3D, where the device can
+   draw it), a "Read the case study" link and an "Ask about this" button.
 4. **Experience:** career timeline, recognition (anchored at `#recognition`), builder note and
    education.
 5. **Contact:** email first, then LinkedIn, GitHub and Ask.
@@ -216,13 +233,15 @@ header marks the section being read with view timelines, and Adage's figures cou
 scroll-triggered animation. The theme switch reveals the new theme in a circle growing from the
 toggle (a View Transition of type `theme`), and the Work themes morph into their case studies. The
 hero's film plays once in the portrait frame, with a pause control, and its theater morphs from the
-frame with React's `<ViewTransition>`. The two guided tours (team multiplier, metadata platform)
-play once, count down only while on screen, hold on hover and focus, and stop for good when a
-visitor picks a step or focuses a tab. The Adage replay plays once as the terminal scrolls into
-view. Under `prefers-reduced-motion` none of these run; the film stays on the portrait until asked,
-the theater and the case studies open without the morph, the signal line is drawn in full, the
-figures show their value, and the tours and the replay show their finished state. Tours also hold
-while a modal dialog covers the page.
+frame with React's `<ViewTransition>`. The three Work diagrams and the Adage replay share
+one tour: each plays once as it scrolls into view, counts down only while on screen, holds on
+hover, focus or a press, has a Pause / Play / Replay control, and stops for good when a visitor
+picks a step or focuses a tab. The MCP diagram's 3D camera flies down its layers with the tour,
+and a drag orbits it and springs back. Under `prefers-reduced-motion` none of these run; the film
+stays on the portrait until asked, the theater and the case studies open without the morph, the
+signal line is drawn in full, the figures show their value, the tours and the replay show their
+finished state, and the 3D scene cuts between steps. Tours also hold while a modal dialog covers
+the page.
 
 ## Ask Steven: security model
 
@@ -350,15 +369,19 @@ three categories, CLS 0 and total blocking time under 100 ms. `measured.performa
 `/colophon` and `/work/mcp` on the production build, with mobile emulation and simulated throttling,
 3 runs per URL, asserting on the median run:
 
-| Assertion               | Floor    |
-| ----------------------- | -------- |
-| Performance             | ≥ 0.90   |
-| Accessibility           | 1        |
-| Best practices          | ≥ 0.95   |
-| SEO                     | 1        |
-| JavaScript transfer     | ≤ 180 KB |
-| Total transfer          | ≤ 600 KB |
-| Media requests (mobile) | 0        |
+| Assertion               | `/`, `/colophon` | Case studies (`/work/*`) |
+| ----------------------- | ---------------- | ------------------------ |
+| Performance             | ≥ 0.90           | ≥ 0.90                   |
+| Accessibility           | 1                | 1                        |
+| Best practices          | ≥ 0.95           | ≥ 0.95                   |
+| SEO                     | 1                | 1                        |
+| JavaScript transfer     | ≤ 180 KB         | ≤ 355 KB                 |
+| Total transfer          | ≤ 600 KB         | ≤ 500 KB                 |
+| Media requests (mobile) | 0                | 0                        |
+
+A case study's diagram is above the fold and draws in 3D once the page has loaded, so its page
+carries three.js (about 146 KB compressed) and has its own transfer budgets, set by an
+`assertMatrix` entry at the measured size plus about 10%.
 
 The media floor states a design rule: on a phone the portrait is an 88 px avatar, so the film
 never plays by itself there, and no video downloads until the visitor presses Play. Mobile
@@ -385,6 +408,13 @@ the X-ray HUD; they are typed in by hand after each run.
 | `/`         | 95          | 100           | 100            | 100 | 1.20 s | 2.93 s | 12 ms | 0   | 166,873 B  | 324,674 B |
 | `/colophon` | 97          | 100           | 100            | 100 | 1.05 s | 2.63 s | 19 ms | 0   | 156,811 B  | 265,402 B |
 | `/work/mcp` | 96          | 100           | 100            | 100 | 1.05 s | 2.78 s | 19 ms | 0   | 177,190 B  | 310,807 B |
+
+**3D diagrams** (2026-10-31, same settings, on a busier machine than the table above): moving the
+MCP diagram to Three.js left `/` (94 before and after, 168,351 B → 168,405 B of JavaScript; three.js
+is not fetched) and `/colophon` (97, 158,306 B both) where they were. On `/work/mcp` the score held
+at 96 and LCP at 2.78 s; JavaScript grew from 178,653 B to 329,517 B and total blocking time from
+21 ms to 53 ms, as the scene's chunk loads and compiles after the load event. The table above is
+from the earlier run; re-measure all three pages together before updating it.
 
 On every page the largest contentful paint is a text paragraph (on `/`, the hero's tagline), and
 most of it is render delay in Lighthouse's simulation. `/work/mcp` loads its diagram's controller

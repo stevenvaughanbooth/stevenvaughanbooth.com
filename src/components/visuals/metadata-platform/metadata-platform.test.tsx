@@ -64,13 +64,14 @@ describe('MetadataPlatform', () => {
     expect(screen.getByText(summary)).toBeVisible();
   });
 
-  it('puts the play control before the tabs, outside the region the tour holds for', () => {
+  it('keeps the play control in the footer, as every tour does, outside the region it holds for', () => {
     mockReducedMotion(false);
     render(<MetadataPlatform />);
     const play = screen.getByRole('button', { name: 'Play auto-advance' });
-    expect(play.compareDocumentPosition(screen.getByRole('tablist'))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
+    expect(play.compareDocumentPosition(screen.getByRole('tabpanel'))).toBe(
+      Node.DOCUMENT_POSITION_PRECEDING,
     );
+    expect(play.closest('[role="tabpanel"]')).toBeNull();
   });
 
   it('links the agent-context story to theme 02 instead of repeating its proof line', async () => {

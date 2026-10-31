@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { useInView, usePageVisible, useReducedMotion } from '../shared/hooks';
-import { StepControls } from '../shared/step-controls';
-import { type ReplayStatus, replayControls } from './controls';
+import { useInView, useReducedMotion } from '../shared/hooks';
+import { TourControls } from '../shared/tour/tour-controls';
+import { useTour } from '../shared/tour/use-tour';
+import { wording } from './controls';
 import { Terminal } from './terminal';
 import { beatsShown, buildFrames, finalFrame, type Step } from './timeline';
 import { type ReflexDemoContent, ReflexDemoView } from './view';
 
-/** Share of the terminal on screen before the replay starts by itself. */
+/** Share of the terminal on screen before the replay starts by itself, and while it plays. */
 const startAt = 0.4;
 
 interface ReflexDemoControllerProps extends ReflexDemoContent {
@@ -14,65 +14,27 @@ interface ReflexDemoControllerProps extends ReflexDemoContent {
 }
 
 /**
- * Loaded lazily by the shell: replays the session once as the card scrolls in. It starts on the
- * finished session the server rendered. If the card is already on screen when the controller
- * loads, it stays there and offers a replay, so the visitor never sees text vanish; otherwise it
- * resets out of sight and plays when enough of the terminal is in view. It counts down only while
- * the terminal is on screen and the tab is visible, and never animates under reduced motion.
+ * Loaded lazily by the shell: replays the session once as the card scrolls in, on the same tour
+ * as the diagrams, with each frame of the replay a step. It starts on the finished session the
+ * server rendered. If the card is already on screen when the controller loads, it stays there and
+ * offers to play, so the visitor never sees text vanish; otherwise it resets out of sight and
+ * plays when enough of the terminal is in view. It holds like every tour (off screen, hidden tab,
+ * hover, focus, a press) and never animates under reduced motion.
  */
 export function ReflexDemoController({ steps, ...content }: ReflexDemoControllerProps) {
-  const terminal = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
-  const pageVisible = usePageVisible();
   const frames = buildFrames(steps);
-  const last = frames.length - 1;
-  const [index, setIndex] = useState(last);
-  const [status, setStatus] = useState<ReplayStatus>('idle');
-
-  const onScreen = useInView(terminal, {
-    onChange(inView) {
-      if (status !== 'idle') return;
-      if (inView || reducedMotion) {
-        setStatus('done');
-      } else {
-        setIndex(0);
-        setStatus('ready');
-      }
-    },
-  });
-  useInView(terminal, {
+  const tour = useTour({
+    steps: frames.length,
+    dwellMs: (index) => frames[index + 1]?.delay ?? 0,
     threshold: startAt,
-    onChange(inView) {
-      if (inView && status === 'ready') setStatus('playing');
-    },
+    start: 'unseen',
   });
+  const onScreen = useInView(tour.region.ref);
+  const playing = tour.playback === 'playing' && !reducedMotion;
 
-  const playing = status === 'playing' && !reducedMotion;
-  const delay = frames[index + 1]?.delay;
-
-  // One timer at a time, only while playing where someone can see it.
-  useEffect(() => {
-    if (!playing || !onScreen || !pageVisible || delay === undefined) return;
-    const timer = window.setTimeout(() => {
-      setIndex(index + 1);
-      if (index + 1 === last) setStatus('done');
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [playing, onScreen, pageVisible, delay, index, last]);
-
-  function control() {
-    if (status === 'playing') {
-      setIndex(last);
-      setStatus('done');
-    } else {
-      setIndex(0);
-      setStatus('playing');
-    }
-  }
-
-  const frame = reducedMotion ? finalFrame(steps) : (frames[index] ?? finalFrame(steps));
+  const frame = reducedMotion ? finalFrame(steps) : (frames[tour.step] ?? finalFrame(steps));
   const reflex = steps.findIndex((step) => step.kind === 'reflex');
-  const { status: text, action } = replayControls(status);
 
   return (
     <ReflexDemoView
@@ -80,20 +42,22 @@ export function ReflexDemoController({ steps, ...content }: ReflexDemoController
       matched={reflex >= 0 && beatsShown(frame, reflex) >= 1}
       looping={frame.step === steps.length}
       terminal={
-        <Terminal
-          ref={terminal}
-          steps={steps}
-          frame={frame}
-          live={!reducedMotion && (status === 'ready' || playing) && onScreen}
-          flash={playing}
-        />
+        <div {...tour.region}>
+          <Terminal
+            steps={steps}
+            frame={frame}
+            live={!reducedMotion && (tour.playback === 'ready' || playing) && onScreen}
+            flash={playing}
+          />
+        </div>
       }
       footer={
-        <StepControls
-          status={text}
+        <TourControls
           accent="green"
-          live={playing && onScreen && pageVisible}
-          action={{ ...action, onClick: control }}
+          playback={tour.playback}
+          running={tour.running}
+          wording={wording}
+          onToggle={tour.toggle}
         />
       }
     />

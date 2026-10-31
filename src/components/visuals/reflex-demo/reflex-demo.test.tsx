@@ -24,7 +24,7 @@ const pendingText = () =>
 
 /** Brings the card near the viewport and waits for the controller to replace the static render. */
 async function loadController({ onScreen }: { onScreen: boolean }) {
-  const staticButton = button('Replay the session');
+  const staticButton = button('Play the session');
   page.show(onScreen ? 0.6 : 0, { near: true });
   await waitFor(() => expect(staticButton).not.toBeInTheDocument(), controllerLoad);
   // The controller's first report: where the card is as it takes over.
@@ -155,7 +155,7 @@ describe('<ReflexDemo />', () => {
     expect(button('Play the session')).toBeInTheDocument(); // not far enough on screen yet
 
     page.show(0.6);
-    expect(button('Skip to the end of the session')).toBeInTheDocument();
+    expect(button('Pause the session')).toBeInTheDocument();
     expect(screen.getByText('Replaying')).toBeInTheDocument();
     playToEnd();
     expect(button('Replay the session')).toBeInTheDocument();
@@ -172,12 +172,13 @@ describe('<ReflexDemo />', () => {
 
     expect(pendingText()).toBe('');
     expect(vi.getTimerCount()).toBe(0);
-    fireEvent.click(button('Replay the session'));
+    expect(screen.getByText('Full session')).toBeInTheDocument();
+    fireEvent.click(button('Play the session'));
     expect(pendingText()).not.toBe('');
-    expect(button('Skip to the end of the session')).toBeInTheDocument();
+    expect(button('Pause the session')).toBeInTheDocument();
   });
 
-  it('skips to the end on request', async () => {
+  it('pauses and resumes from the same control every tour has', async () => {
     mockReducedMotion(false);
     render(<ReflexDemo />);
     await loadController({ onScreen: false });
@@ -185,14 +186,20 @@ describe('<ReflexDemo />', () => {
     page.show(1);
 
     act(() => vi.runOnlyPendingTimers());
-    const control = button('Skip to the end of the session');
+    const control = button('Pause the session');
     act(() => control.focus());
     fireEvent.click(control);
-    expect(pendingText()).toBe('');
+    const shown = pendingText();
     // The same button changes its label, so focus stays on it.
-    expect(button('Replay the session')).toBe(control);
+    expect(button('Play the session')).toBe(control);
     expect(control).toHaveFocus();
+    expect(screen.getByText('Paused')).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(60_000));
+    expect(pendingText()).toBe(shown);
+
+    fireEvent.click(control);
+    playToEnd();
+    expect(pendingText()).toBe('');
     expect(button('Replay the session')).toBe(control);
   });
 
@@ -213,6 +220,6 @@ describe('<ReflexDemo />', () => {
     setPageVisibility('hidden');
     act(() => vi.advanceTimersByTime(60_000));
     expect(pendingText()).toBe(shown);
-    expect(button('Skip to the end of the session')).toBeInTheDocument();
+    expect(button('Pause the session')).toBeInTheDocument();
   });
 });

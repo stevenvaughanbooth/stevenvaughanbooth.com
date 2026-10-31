@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StepPanel, StepStack } from '../shared/step-panel';
-import type { AutoAdvanceRegion } from '../shared/use-auto-advance';
+import type { TourRegion } from '../shared/tour/use-tour';
 import { VisualFrame } from '../shared/visual-frame';
 
 /** Rendered once on the server and passed once: the static card and the controller share it. */
@@ -19,7 +19,7 @@ interface TeamMultiplierViewProps extends TeamMultiplierContent {
   tabs: ReactNode;
   /** StepControls, likewise. */
   footer: ReactNode;
-  region?: AutoAdvanceRegion;
+  region?: TourRegion;
 }
 
 /** The multiplier card's layout around the server-rendered diagram and copy. */

@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, type Ref } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import styles from './terminal.module.css';
 import { beatsShown, type Frame, runProgress, type Step } from './timeline';
 
@@ -23,7 +23,6 @@ interface TerminalProps {
   live?: boolean;
   /** Pulses the reflex as it appears. */
   flash?: boolean;
-  ref?: Ref<HTMLDivElement>;
 }
 
 /**
@@ -31,10 +30,9 @@ interface TerminalProps {
  * card; the controller renders it frame by frame. It is hidden from assistive technology, which
  * reads the transcript instead.
  */
-export function Terminal({ steps, frame, live = false, flash = false, ref }: TerminalProps) {
+export function Terminal({ steps, frame, live = false, flash = false }: TerminalProps) {
   return (
     <div
-      ref={ref}
       aria-hidden
       className="relative rounded-xl border border-line bg-bg p-3.5 font-mono text-xs leading-relaxed @md:p-4 @md:text-[0.8125rem]"
     >

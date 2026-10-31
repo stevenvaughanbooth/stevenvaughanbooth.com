@@ -1,34 +1,20 @@
 import { useState } from 'react';
 import { SegmentedTabs } from '../shared/segmented-tabs';
-import { StepControls } from '../shared/step-controls';
-import { useAutoAdvance } from '../shared/use-auto-advance';
-import { tablistLabel, tourControls } from './controls';
+import { TourControls } from '../shared/tour/tour-controls';
+import { useTour } from '../shared/tour/use-tour';
+import { tablistLabel, wording } from './controls';
 import { PhaseSteps } from './phase-steps';
 import { type MetadataPlatformContent, MetadataPlatformView, phasesPerStory } from './view';
 
-/** How long each phase stays on screen while auto-advancing. */
-const dwellMs = 6000;
-
 /**
- * Loaded lazily by the shell: live tabs and phases, and a one-pass tour through every phase of
- * every story.
+ * Loaded lazily by the shell: live tabs and phases, and the shared one-pass tour through every
+ * phase of every story.
  */
 export function MetadataPlatformController(content: MetadataPlatformContent) {
-  const tour = useAutoAdvance({
-    steps: content.stories.length * phasesPerStory,
-    durationMs: dwellMs,
-  });
+  const tour = useTour({ steps: content.stories.length * phasesPerStory });
   const [announcement, setAnnouncement] = useState('');
-  // Play restarts the current phase's timer, so it restarts the phase's progress bar too.
-  const [plays, setPlays] = useState(0);
   const story = Math.floor(tour.step / phasesPerStory);
   const phase = tour.step % phasesPerStory;
-  const { status, action } = tourControls(
-    tour.playback,
-    tour.running,
-    story,
-    content.stories.length,
-  );
 
   // A picked story opens on its last phase, its outcome. Focus on the tab already announces it.
   function selectStory(index: number) {
@@ -44,7 +30,6 @@ export function MetadataPlatformController(content: MetadataPlatformContent) {
 
   function toggle() {
     tour.toggle();
-    setPlays(plays + 1);
     setAnnouncement('');
   }
 
@@ -55,11 +40,12 @@ export function MetadataPlatformController(content: MetadataPlatformContent) {
       announcement={announcement}
       region={tour.region}
       controls={
-        <StepControls
-          status={status}
+        <TourControls
           accent="lilac"
-          live={tour.running}
-          action={{ ...action, onClick: toggle }}
+          playback={tour.playback}
+          running={tour.running}
+          wording={wording(story, content.stories.length)}
+          onToggle={toggle}
         />
       }
       tabs={
@@ -78,11 +64,7 @@ export function MetadataPlatformController(content: MetadataPlatformContent) {
           story={story}
           phase={phase}
           onSelect={selectPhase}
-          progress={
-            tour.playback === 'playing'
-              ? { key: `${tour.step}-${plays}`, durationMs: dwellMs, running: tour.running }
-              : null
-          }
+          progress={tour.progress}
         />
       }
     />

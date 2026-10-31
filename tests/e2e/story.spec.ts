@@ -7,7 +7,8 @@ import { hydrated } from './helpers';
 
 // The floor CI enforces, read from the same file Lighthouse CI uses.
 const lighthouse = JSON.parse(readFileSync('lighthouserc.json', 'utf8'));
-const floor: number = lighthouse.ci.assert.assertions['categories:performance'][1].minScore;
+const floor: number =
+  lighthouse.ci.assert.assertMatrix[0].assertions['categories:performance'][1].minScore;
 
 test('the footer’s “Under the hood” link opens the page', async ({ page }) => {
   await page.goto('/');

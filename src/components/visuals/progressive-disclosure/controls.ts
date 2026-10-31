@@ -1,4 +1,4 @@
-import type { StepAction } from '../shared/step-controls';
+import { guidedTour } from '../shared/tour/wording';
 
 /*
  * What the tabs and footer say, shared by the server's static render and the controller (and
@@ -7,11 +7,5 @@ import type { StepAction } from '../shared/step-controls';
 
 export const tablistLabel = 'Steps of progressive disclosure';
 
-/** The footer's status text and Next / Start again control for a step. */
-export function stepControls(steps: readonly string[], step: number) {
-  const next = steps[step + 1];
-  const action: StepAction = next
-    ? { label: `Next: ${next}`, icon: 'next' }
-    : { label: 'Start again', icon: 'replay' };
-  return { status: `Step ${step + 1} of ${steps.length}`, action };
-}
+/** The tour's footer, which at rest names the step on show. */
+export const wording = (step: number, count: number) => guidedTour(`Step ${step + 1} of ${count}`);
