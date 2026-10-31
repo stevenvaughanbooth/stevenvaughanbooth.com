@@ -38,9 +38,10 @@ export function StepPanel({ id, step, description, diagram, children, scene }: S
       >
         {/* The scene comes first so the diagram can follow its state as a sibling: a :has()
             selector here would restart the page's scroll-triggered count-up in Chromium. It is
-            absolutely positioned, so it still draws above the diagram. */}
+            absolutely positioned, so it still draws above the diagram; but the faded diagram's
+            opacity puts it above the scene for the pointer, so it lets drags through. */}
         {scene}
-        <div className="transition-opacity duration-700 peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
+        <div className="transition-opacity duration-700 peer-data-[scene=live]:pointer-events-none peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
           {diagram}
         </div>
       </div>

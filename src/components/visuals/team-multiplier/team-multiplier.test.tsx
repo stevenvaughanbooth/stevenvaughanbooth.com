@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockIntersectionObserver, mockReducedMotion } from '@/test/browser-mocks';
 import { TOUR_DWELL_MS } from '../shared/tour/wording';
 import { TeamMultiplier } from '../team-multiplier';
+import { multiplierSceneData } from './scene-data';
 
 // The controller's first dynamic import is transformed on demand, which can take over a second
 // when the whole suite runs in parallel.
@@ -44,6 +45,31 @@ describe('TeamMultiplier', () => {
     const diagram = within(card).getByRole('img', { name: /^Learn:/ });
     expect(diagram.querySelectorAll('svg')).toHaveLength(1);
     expect(screen.getByText('Let shared experience improve the practice.')).toBeVisible();
+  });
+
+  it('names the same parts in its 3D scene as in its SVG', () => {
+    render(<TeamMultiplier />);
+    // The SVG sets "Shared workflows" on two lines, so compare without spaces.
+    const drawn = screen.getByRole('img').querySelector('svg')?.textContent?.replace(/\s/g, '');
+    for (const name of Object.values(multiplierSceneData())) {
+      expect(drawn).toContain(name.replace(/\s/g, ''));
+    }
+  });
+
+  it('keeps the 2D network where WebGL is unavailable, loading no 3D scene', async () => {
+    mockReducedMotion(false);
+    render(<TeamMultiplier />);
+    await loadController();
+    // jsdom has no WebGL: the scene's box stays empty and the stage keeps its SVG.
+    const stage = screen.getByRole('img');
+    // The scene's box comes first in the stage, before the network it covers.
+    const scene = stage.firstElementChild;
+    expect(scene).toHaveAttribute('aria-hidden', 'true');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stage.querySelector('canvas')).toBeNull();
+    expect(stage.querySelector('[data-scene="live"]')).toBeNull();
+    expect(scene).toBeEmptyDOMElement();
+    expect(stage.querySelectorAll('svg')).toHaveLength(1);
   });
 
   it('rests on the complete loop under reduced motion and never auto-advances', async () => {

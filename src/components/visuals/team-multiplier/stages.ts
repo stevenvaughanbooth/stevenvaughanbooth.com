@@ -26,3 +26,13 @@ export const stages = [
     diagram: 'Learn: experience from engineers and teams feeds back into better workflows.',
   },
 ] as const;
+
+/** What the diagram names, in the SVG and the 3D scene alike. */
+export const parts = {
+  ideas: 'Useful ideas',
+  champion: 'Champion',
+  workflows: 'Shared workflows',
+  engineers: 'Engineers',
+  teams: 'Teams',
+  learning: 'Shared learning',
+} as const;

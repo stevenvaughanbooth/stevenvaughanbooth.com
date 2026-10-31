@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StepPanel, StepStack } from '../shared/step-panel';
 import type { TourRegion } from '../shared/tour/use-tour';
 import { VisualFrame } from '../shared/visual-frame';
+import type { MultiplierSceneData } from './scene-data';
 
 /** Rendered once on the server and passed once: the static card and the controller share it. */
 export interface TeamMultiplierContent {
@@ -11,6 +12,8 @@ export interface TeamMultiplierContent {
   descriptions: readonly string[];
   diagram: ReactNode;
   copy: readonly ReactNode[];
+  /** What the controller's 3D scene draws. */
+  sceneData: MultiplierSceneData;
 }
 
 interface TeamMultiplierViewProps extends TeamMultiplierContent {
@@ -20,6 +23,8 @@ interface TeamMultiplierViewProps extends TeamMultiplierContent {
   /** StepControls, likewise. */
   footer: ReactNode;
   region?: TourRegion;
+  /** The controller's 3D scene over the network. */
+  scene?: ReactNode;
 }
 
 /** The multiplier card's layout around the server-rendered diagram and copy. */
@@ -32,6 +37,7 @@ export function TeamMultiplierView({
   tabs,
   footer,
   region,
+  scene,
 }: TeamMultiplierViewProps) {
   return (
     <VisualFrame
@@ -43,7 +49,13 @@ export function TeamMultiplierView({
     >
       <div {...region}>
         {tabs}
-        <StepPanel id={id} step={step} description={descriptions[step] ?? ''} diagram={diagram}>
+        <StepPanel
+          id={id}
+          step={step}
+          description={descriptions[step] ?? ''}
+          diagram={diagram}
+          scene={scene}
+        >
           <StepStack step={step} items={copy} className="mt-5" />
         </StepPanel>
       </div>

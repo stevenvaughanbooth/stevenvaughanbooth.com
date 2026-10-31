@@ -1,3 +1,4 @@
+import { parts } from './stages';
 import styles from './team-multiplier.module.css';
 
 /*
@@ -131,7 +132,7 @@ export function Network() {
           textAnchor="middle"
           className={`${styles.accentInk} font-medium transition-[fill] ${ease}`}
         >
-          Shared learning
+          {parts.learning}
         </text>
       </g>
 
@@ -153,7 +154,7 @@ export function Network() {
           <Spark key={`${x}-${y}`} x={x} y={y} s={4.5 * k} className="fill-amber opacity-80" />
         ))}
         <text x={c.x} y={52} dy={middle} textAnchor="middle" className="fill-muted">
-          Useful ideas
+          {parts.ideas}
         </text>
         <text
           x={c.x}
@@ -162,7 +163,7 @@ export function Network() {
           textAnchor="middle"
           className="fill-fg text-[1.04em] font-semibold"
         >
-          Champion
+          {parts.champion}
         </text>
       </g>
 
@@ -191,12 +192,12 @@ export function Network() {
           textAnchor="middle"
           className={`${styles.ink} font-medium transition-[fill] ${ease}`}
         >
-          <tspan x={w.x + w.w / 2} dy="-0.25em">
-            Shared
-          </tspan>
-          <tspan x={w.x + w.w / 2} dy="1.2em">
-            workflows
-          </tspan>
+          {/* Two lines: "Shared" over "workflows". */}
+          {parts.workflows.split(' ').map((word, line) => (
+            <tspan key={word} x={w.x + w.w / 2} dy={line === 0 ? '-0.25em' : '1.2em'}>
+              {word}
+            </tspan>
+          ))}
         </text>
       </g>
 
@@ -234,10 +235,10 @@ export function Network() {
         </g>
         <g textAnchor="middle" className={`${styles.ink} font-medium transition-[fill] ${ease}`}>
           <text x={e.x} y={92} dy={middle}>
-            Engineers
+            {parts.engineers}
           </text>
           <text x={t.x} y={190} dy={middle}>
-            Teams
+            {parts.teams}
           </text>
         </g>
       </g>

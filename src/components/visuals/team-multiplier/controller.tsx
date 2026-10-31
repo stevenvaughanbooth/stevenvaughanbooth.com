@@ -1,10 +1,17 @@
 import { SegmentedTabs } from '../shared/segmented-tabs';
+import { SceneCanvas } from '../shared/three/scene-canvas';
 import { TourControls } from '../shared/tour/tour-controls';
 import { useTour } from '../shared/tour/use-tour';
 import { tablistLabel, wording } from './controls';
 import { type TeamMultiplierContent, TeamMultiplierView } from './view';
 
-/** Loaded lazily by the shell: live tabs plus the shared one-pass tour through the stages. */
+/** The 3D scene's chunk, with three.js. SceneCanvas imports it once the page has settled. */
+const loadScene = () => import('./scene');
+
+/**
+ * Loaded lazily by the shell: live tabs, the shared one-pass tour through the stages, and the
+ * network in 3D over the SVG where the device can draw it.
+ */
 export function TeamMultiplierController(content: TeamMultiplierContent) {
   const tour = useTour({ steps: content.stages.length });
 
@@ -33,6 +40,7 @@ export function TeamMultiplierController(content: TeamMultiplierContent) {
           onToggle={tour.toggle}
         />
       }
+      scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}
     />
   );
 }
