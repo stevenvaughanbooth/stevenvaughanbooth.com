@@ -37,7 +37,7 @@ export function HeroAskBar({ suggestions, className }: HeroAskBarProps) {
   }
 
   return (
-    <div className={className} onPointerEnter={warmAsk} onFocus={warmAsk}>
+    <div className={`@container ${className ?? ''}`} onPointerEnter={warmAsk} onFocus={warmAsk}>
       {/*
        * method="dialog" makes a submit before hydration a no-op (it closes only a dialog the form
        * is in), so an early Enter never reloads the page with the question in its URL.
@@ -82,9 +82,9 @@ export function HeroAskBar({ suggestions, className }: HeroAskBarProps) {
         <div
           role="group"
           aria-labelledby={`${id}-try`}
-          className="@container mt-3 flex flex-wrap items-center gap-2"
+          className="mt-3 flex flex-wrap items-center gap-2 @min-[43rem]:flex-nowrap"
         >
-          <p id={`${id}-try`} className="label mr-1">
+          <p id={`${id}-try`} className="label mr-1 shrink-0">
             Try
           </p>
           {suggestions.map((suggestion, index) => (
@@ -94,13 +94,15 @@ export function HeroAskBar({ suggestions, className }: HeroAskBarProps) {
               onClick={() => openAsk({ prompt: suggestion.text })}
               // All three fit on one row (about 42.6rem) only once the hero's text column is at its
               // widest (43.25rem). Anywhere narrower the middle one gives way, so the first and the
-              // last share a row, or take two in a column as narrow as a phone's, never three.
-              className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg ${index > 0 && index < suggestions.length - 1 ? '@max-[43rem]:hidden' : ''}`}
+              // last share a row, or take two in a column as narrow as a phone's, never three. Where
+              // all three show they never wrap: a classic scrollbar or wider font rendering narrows
+              // the column by a few pixels, and the middle one truncates instead.
+              className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1 text-sm whitespace-nowrap text-muted transition-colors hover:border-line-strong hover:text-fg ${index > 0 && index < suggestions.length - 1 ? 'min-w-0 @max-[43rem]:hidden' : 'shrink-0'}`}
             >
               {suggestion.shows ? (
                 <Locate width={14} height={14} className="shrink-0 text-green" />
               ) : null}
-              {suggestion.text}
+              <span className="truncate">{suggestion.text}</span>
             </button>
           ))}
         </div>

@@ -141,5 +141,6 @@ test('the page fits the viewport with no sideways scrolling', async ({ page }) =
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
-  expect(overflow).toBe(0);
+  // Negative where a classic scrollbar's stable gutter is reserved (Linux CI); never positive.
+  expect(overflow).toBeLessThanOrEqual(0);
 });
