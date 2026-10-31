@@ -59,8 +59,12 @@ export const componentGroups: readonly ComponentGroup[] = [
     id: 'intent',
     title: 'Loaded on intent',
     where: 'src/app/layout.tsx',
-    lede: 'No box of their own: listeners that load with every page, and what they fetch only when asked.',
-    tree: [{ id: 'palette-loader', children: ['ask-palette'] }, { id: 'shortcuts' }],
+    lede: 'No box of their own: listeners that load with every page, what they fetch only when asked, and the error page.',
+    tree: [
+      { id: 'palette-loader', children: ['ask-palette'] },
+      { id: 'shortcuts', children: ['shortcuts-sheet', 'xray-overlay'] },
+      { id: 'error-boundary' },
+    ],
   },
 ];
 

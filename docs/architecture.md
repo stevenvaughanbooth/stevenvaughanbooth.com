@@ -120,9 +120,11 @@ the server ones around them: its kind, when its code loads, the React and platfo
 relies on, and why it is built that way. Under the hood (`/colophon`) renders it as a map. Unit
 tests check that each entry names a real file, that an entry is `client` exactly when that file
 starts with `'use client'` or a client entry's file imports it on demand, and that only server
-entries list islands, each a real module. They do not check which element carries each
-`data-component`, or that a server entry lists every client module it renders; review keeps those
-true.
+entries list islands, each a real module. `components.test.ts` also parses the source: every
+`data-component` must be a literal id on an element rendered by the file its entry names, a `server`
+or `css` label must sit in a module no client code imports, and a server entry must list as islands
+every `'use client'` module rendered inside that element, following server components into their
+own files.
 
 The diagrams follow one pattern, documented in
 [`src/components/visuals/shared/README.md`](../src/components/visuals/shared/README.md): the SVG,

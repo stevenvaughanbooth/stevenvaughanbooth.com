@@ -67,6 +67,7 @@ export function HeroAskBar({ suggestions, className }: HeroAskBarProps) {
           maxLength={QUESTION_MAX}
           placeholder="Ask about my work…"
           aria-keyshortcuts="/"
+          data-keyshortcut="/"
           className="h-full min-w-0 flex-1 bg-transparent text-base text-fg outline-none placeholder:text-subtle focus-visible:outline-none md:text-[1.05rem]"
         />
         <kbd

@@ -15,7 +15,7 @@ export function SiteFooter() {
         <nav aria-label="Footer">
           <ul className="grid grid-cols-2 gap-x-10 gap-y-2.5">
             <li>
-              <Link href="/colophon" className="hover:text-fg">
+              <Link href="/colophon" prefetch={false} className="hover:text-fg">
                 Under the hood
               </Link>
             </li>

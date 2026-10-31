@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { componentById, siteComponents } from '@/content/components';
@@ -21,10 +21,10 @@ import { Results } from './results';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 
-/** Every file under src, by name, to find the islands a component lists. */
+/** Every file under `dir`, by its path from the repository, to find the islands a component lists. */
 function filesUnder(dir: string): string[] {
   return readdirSync(join(process.cwd(), dir), { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? filesUnder(join(dir, entry.name)) : [entry.name],
+    entry.isDirectory() ? filesUnder(join(dir, entry.name)) : [join(dir, entry.name)],
   );
 }
 
@@ -38,8 +38,11 @@ describe('siteComponents', () => {
       'xray-toggle',
       'site-footer',
       'shortcuts',
+      'shortcuts-sheet',
+      'xray-overlay',
       'palette-loader',
       'ask-palette',
+      'error-boundary',
       'hero',
       'hero-ask-bar',
       'arrival',
@@ -67,8 +70,11 @@ describe('siteComponents', () => {
   it('marks only the listeners and the lazily opened dialogs as having no box of their own', () => {
     expect(siteComponents.filter((c) => !c.onPage).map((c) => c.id)).toEqual([
       'shortcuts',
+      'shortcuts-sheet',
+      'xray-overlay',
       'palette-loader',
       'ask-palette',
+      'error-boundary',
       'case-study-focus',
     ]);
   });
@@ -92,11 +98,16 @@ describe('siteComponents', () => {
   });
 
   it('lists islands only for server components, and each one is a real module', () => {
-    const files = new Set(filesUnder('src/components'));
+    // An island is named by its path under src/components, or by its file name if that is unique.
+    const files = filesUnder('src/components');
+    const real = (island: string) =>
+      island.includes('/')
+        ? existsSync(join(process.cwd(), 'src/components', island))
+        : files.filter((file) => file.endsWith(`/${island}`)).length === 1;
     for (const component of siteComponents) {
       if (!component.islands) continue;
       expect(component.kind, component.id).toBe('server');
-      for (const island of component.islands) expect(files, island).toContain(island);
+      for (const island of component.islands) expect(real(island), island).toBe(true);
     }
   });
 
