@@ -97,15 +97,6 @@ test('“Skip to the colophon” moves keyboard focus there', async ({ page }) =
   ).toBeFocused();
 });
 
-test('the brief links to how the key is protected', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/colophon');
-  await page.getByRole('link', { name: 'How the key is protected' }).click();
-
-  await expect(page).toHaveURL(/#ask-steven$/);
-  await expect(page.locator('#ask-steven')).toBeInViewport();
-});
-
 test('the results show the measured numbers and the floor from lighthouserc.json', async ({
   page,
 }) => {

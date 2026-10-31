@@ -2,7 +2,6 @@
  * The "How I built this" story, in Steven's voice. Every statement is limited to what happened
  * and what the repository shows: no counts, dates or quotes beyond the ones recorded here.
  */
-import { VISITOR_LIMIT } from '@/lib/ask-contract';
 import { adage, careerSummary, film } from '@/content/profile';
 
 export type Who = 'me' | 'claude';
@@ -43,22 +42,6 @@ export const roles: Record<
   handoffs: [
     { from: 'me', to: 'claude', what: 'Goal and calls' },
     { from: 'claude', to: 'me', what: 'A preview to approve' },
-  ],
-};
-
-/** Steven's brief, quoted as he wrote it. */
-export const brief = {
-  goal: 'an exemplary site for how to do efficient web development',
-  qualities: ['industry standard WOW factors', 'programmed well', 'loads fast', 'ultra intuitive'],
-  conditions: [
-    {
-      title: 'A couple of questions, then email.',
-      body: `Each visitor gets ${VISITOR_LIMIT} live questions in any 24 hours. After that, Ask Steven points to my inbox.`,
-    },
-    {
-      title: 'The API key, “ultra protected”.',
-      body: 'It never reaches the browser, and bot checks, rate limits and a spend cap bound what anyone can cost me with it.',
-    },
   ],
 };
 
@@ -247,7 +230,8 @@ export const decisions: { call: string; detail: string }[] = [
   },
   {
     call: 'Ask Steven, as a ⌘K palette.',
-    detail: 'Curated answers first. Claude came later, on my two conditions.',
+    detail:
+      'Curated answers first. Claude came later, limited to a few questions per visitor, with the key kept on the server.',
   },
   {
     call: 'Claude Haiku 5.5 for live answers.',

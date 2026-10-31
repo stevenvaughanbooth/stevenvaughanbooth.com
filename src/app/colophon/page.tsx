@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { Brief } from '@/components/story/brief';
 import { Decisions } from '@/components/story/decisions';
 import { Findings } from '@/components/story/findings';
 import {
@@ -57,7 +56,6 @@ const source = {
 
 /** The story first, then the colophon. The page's navigation and section numbers come from here. */
 const sections = [
-  { id: 'brief', label: 'The brief', part: 'story' },
   { id: 'day', label: 'The day', part: 'story' },
   { id: 'review', label: 'What review caught', part: 'story' },
   { id: 'calls', label: 'My calls', part: 'story' },
@@ -419,14 +417,6 @@ export default function ColophonPage() {
           </nav>
 
           <div className="min-w-0">
-            <Section
-              id="brief"
-              title="I asked for an exemplary site."
-              lede="The goal, in the words I gave Claude Code, and the two conditions I added once Ask Steven was going to call a live model."
-            >
-              <Brief securityHref="#ask-steven" />
-            </Section>
-
             <Section
               id="day"
               title="From the first plan to production in about a day."
