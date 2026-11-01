@@ -13,14 +13,35 @@
   animation: blink 1.1s steps(1, end) 6;
 }
 
-/* One soft pulse when the reflex appears. */
+/* A line fading in as the replay prints it. */
+.enter {
+  animation: enter 300ms ease-out;
+}
+
+/* The reflex fades in with one soft pulse. */
 .matched {
-  animation: matched 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation:
+    enter 300ms ease-out,
+    matched 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter,
+  .matched {
+    animation: none;
+  }
 }
 
 @keyframes blink {
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
 }
 

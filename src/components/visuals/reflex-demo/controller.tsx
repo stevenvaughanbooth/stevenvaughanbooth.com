@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { useInView, useReducedMotion } from '../shared/hooks';
 import { SceneCanvas } from '../shared/three/scene-canvas';
 import { TourControls } from '../shared/tour/tour-controls';
@@ -11,7 +12,10 @@ import { type ReflexDemoContent, ReflexDemoView } from './view';
 /** The 3D scene's chunk, with three.js. SceneCanvas imports it once the page has settled. */
 const loadScene = () => import('./scene');
 
-/** Share of the stage and terminal on screen before the replay starts by itself, and while it plays. */
+/**
+ * Share of the stage and terminal on screen before the replay starts by itself, and while it
+ * plays. Both fit on one screen at every width, and either one alone is more than this.
+ */
 const startAt = 0.4;
 
 interface ReflexDemoControllerProps extends ReflexDemoContent {
@@ -43,12 +47,24 @@ export function ReflexDemoController({ steps, ...content }: ReflexDemoController
   const frame = reducedMotion ? finalFrame(steps) : (frames[tour.step] ?? finalFrame(steps));
   const reflex = steps.findIndex((step) => step.kind === 'reflex');
 
+  // The console follows the newest line, as a terminal does: scrolling, never moving the page.
+  const consoleBox = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = consoleBox.current;
+    if (!element) return;
+    const top = element.scrollHeight;
+    if (playing && typeof element.scrollTo === 'function')
+      element.scrollTo({ top, behavior: 'smooth' });
+    else element.scrollTop = top;
+  }, [frame.step, frame.beat, playing]);
+
   return (
     <ReflexDemoView
       {...content}
       matched={reflex >= 0 && beatsShown(frame, reflex) >= 1}
       looping={frame.step === steps.length}
       region={tour.region}
+      consoleRef={consoleBox}
       terminal={
         <Terminal
           steps={steps}

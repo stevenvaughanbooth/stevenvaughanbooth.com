@@ -20,9 +20,11 @@ let page: ReturnType<typeof mockIntersectionObserver>;
 
 const card = () => screen.getByRole('group', { name: 'Session replay, illustrative' });
 const button = (name: string) => screen.getByRole('button', { name });
-/** Text the terminal is holding back: hidden lines and untyped characters. */
+/** Text the terminal is holding back: lines not printed yet, untyped characters, a status. */
 const pendingText = () =>
-  [...card().querySelectorAll('.invisible')].map((element) => element.textContent).join('');
+  [...card().querySelectorAll('div[aria-hidden="true"].font-mono :is(.hidden, .invisible)')]
+    .map((element) => element.textContent)
+    .join('');
 
 /** Brings the card near the viewport and waits for the controller to replace the static render. */
 async function loadController({ onScreen }: { onScreen: boolean }) {

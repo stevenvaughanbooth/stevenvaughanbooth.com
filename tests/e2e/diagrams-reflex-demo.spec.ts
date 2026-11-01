@@ -120,6 +120,79 @@ test.describe('the Adage replay in 3D', () => {
     await expect(card.getByText('Replaying')).toBeVisible();
   });
 
+  test('plays while any good part of the stage and terminal is in view, and holds once it is not', async ({
+    page,
+  }, testInfo) => {
+    const phone = testInfo.project.name === 'mobile';
+    if (!phone) await page.setViewportSize({ width: 1280, height: 800 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await hydrated(page);
+    const { card } = replay(page);
+    const terminal = card.getByRole('region', { name: 'Terminal' });
+    const status = card.getByText(/^(Replaying|Paused while you look|Paused|Ready)$/);
+    // Just below the fold, the controller loads and resets the replay out of sight.
+    await card.evaluate((element) =>
+      scrollTo(0, element.getBoundingClientRect().top + scrollY - innerHeight - 50),
+    );
+    await expect(status).toHaveText('Ready');
+
+    // Only the terminal in view on a phone, where it sits under the stage; on a wide screen, where
+    // they sit side by side, only their lower half.
+    await terminal.evaluate((element, phone) => {
+      const band = element.parentElement!.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      const top = phone ? box.top : band.top + band.height / 2;
+      scrollTo(0, top + scrollY - 70);
+    }, phone);
+    await page.mouse.move(0, 0);
+    await expect(status).toHaveText('Replaying');
+    const printed = () => terminal.evaluate((element) => (element as HTMLElement).innerText.length);
+    const before = await printed();
+    await expect.poll(printed).toBeGreaterThan(before);
+
+    // Out of sight, it holds where it was.
+    await page.evaluate(() => scrollTo(0, 0));
+    await expect(status).toHaveText('Paused while you look');
+    const held = await printed();
+    await page.waitForTimeout(1_500);
+    expect(await printed()).toBe(held);
+  });
+
+  test('keeps the terminal to a fixed height that scrolls, resting on the end of the session', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await hydrated(page);
+    await showCard(page);
+    const { card } = replay(page);
+    const terminal = card.getByRole('region', { name: 'Terminal' });
+    // How far the console is scrolled up from its end, whether it is the static card's reversed
+    // column or the controller's.
+    const fromEnd = () =>
+      terminal.evaluate((element) => {
+        const max = element.scrollHeight - element.clientHeight;
+        const reversed = getComputedStyle(element).flexDirection === 'column-reverse';
+        return { max, up: Math.round(reversed ? -element.scrollTop : max - element.scrollTop) };
+      });
+    // The session is longer than the console: it shows the end, the match and the passing run.
+    await expect.poll(async () => (await fromEnd()).max).toBeGreaterThan(0);
+    expect((await fromEnd()).up).toBeLessThanOrEqual(1);
+    await expect(terminal).toContainText('reflex matched');
+    // Keyboard users reach it and scroll back through the session.
+    await terminal.focus();
+    await expect(terminal).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect.poll(async () => (await fromEnd()).up).toBeGreaterThan(100);
+    // The whole replay, stage and terminal, fits on one screen.
+    const band = await terminal.evaluate((element) => {
+      const { top, bottom } = element.parentElement!.getBoundingClientRect();
+      return bottom - top;
+    });
+    expect(band).toBeLessThan(page.viewportSize()!.height - 80);
+  });
+
   test('keeps the 2D pipeline, and never fetches three.js, where WebGL is unavailable', async ({
     page,
   }) => {

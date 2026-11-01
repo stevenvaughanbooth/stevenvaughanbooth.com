@@ -41,95 +41,92 @@ export function OpenSource() {
         </ul>
 
         {/*
-         * From lg the install row sits under the replay and the evidence fills the right column.
-         * The 1fr second row absorbs the evidence column's extra height, so nothing stretches.
-         * Below lg the one column is capped at the page's width, so the install row cannot widen
-         * it, and the cards with it, past a 320px screen.
+         * The intro ends with the install command and the links. It wraps rather than scroll, and
+         * min-w-0 keeps the install box from widening the page past a 320px screen.
          */}
-        <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr] lg:grid-rows-[auto_1fr]">
-          <div className="lg:col-start-1 lg:row-start-1">
-            <ReflexDemo />
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="flex max-w-full min-w-0 items-center gap-2 rounded-xl border border-line bg-surface py-1.5 pr-1.5 pl-4 font-mono text-sm">
+            <span className="text-subtle select-none" aria-hidden>
+              $
+            </span>
+            {/*
+             * One line wherever it fits. On the narrowest phones it wraps rather than scroll,
+             * and only between words, never at a hyphen inside the package name.
+             */}
+            <code className="min-w-0 flex-1">
+              {adage.install.split(' ').map((word, index) => (
+                <Fragment key={`${index}-${word}`}>
+                  {index > 0 ? ' ' : null}
+                  <span className="whitespace-nowrap">{word}</span>
+                </Fragment>
+              ))}
+            </code>
+            <CopyButton
+              value={adage.install}
+              label="Copy install command"
+              icon={<Copy />}
+              copiedIcon={<Check className="text-green" />}
+              className="grid size-9 place-items-center rounded-lg text-muted hover:bg-elevated hover:text-fg"
+            />
           </div>
+          <div className="flex flex-wrap gap-3">
+            <a href={adage.links.repo} className="pill pill-solid">
+              <GitHub /> View on GitHub
+            </a>
+            <a href={adage.links.site} className="pill pill-outline">
+              Project site <ArrowUpRight />
+            </a>
+          </div>
+        </div>
 
-          <div className="flex flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            <blockquote className="rounded-2xl border border-line bg-surface p-6 shadow-card">
-              <p className="label">The question behind it</p>
-              <p className="mt-3 text-xl leading-snug font-medium text-balance">
-                “{adage.question}”
-              </p>
-            </blockquote>
+        {/* The replay has the content width to itself, so it fits on one screen while it plays. */}
+        <div className="mt-12">
+          <ReflexDemo />
+        </div>
 
-            <section
-              aria-labelledby="adage-evidence-title"
-              className="rounded-2xl border border-line bg-surface p-6 shadow-card"
+        {/* Then the question behind the project and the evidence so far, side by side from lg. */}
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_3fr] lg:items-start">
+          {/* The question stays in view while the evidence beside it is read. */}
+          <blockquote className="rounded-2xl border border-line bg-surface p-6 shadow-card lg:sticky lg:top-24">
+            <p className="label">The question behind it</p>
+            <p className="mt-3 text-xl leading-snug font-medium text-balance">“{adage.question}”</p>
+          </blockquote>
+
+          <section
+            aria-labelledby="adage-evidence-title"
+            className="rounded-2xl border border-line bg-surface p-6 shadow-card"
+          >
+            <h3 id="adage-evidence-title" className="label">
+              Evidence so far
+            </h3>
+            <ul className="mt-5 divide-y divide-line">
+              {adage.evidence.results.map((result) => (
+                <li key={result.study} className="py-5 first:pt-0">
+                  <p className="text-sm font-medium text-green">{result.study}</p>
+                  <p className="mt-1 flex flex-wrap items-baseline gap-x-3">
+                    <CountUp
+                      text={result.value}
+                      className="text-5xl font-semibold tracking-tight tabular-nums"
+                    />
+                    <span className="text-lg font-medium">{result.label}</span>
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-pretty">{result.detail}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-pretty text-muted">
+                    {result.caveat}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="border-t border-line pt-5 text-sm leading-relaxed text-pretty text-muted">
+              {adage.evidence.candor}
+            </p>
+            <a
+              href={adage.links.evidence}
+              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-green hover:underline"
             >
-              <h3 id="adage-evidence-title" className="label">
-                Evidence so far
-              </h3>
-              <ul className="mt-5 divide-y divide-line">
-                {adage.evidence.results.map((result) => (
-                  <li key={result.study} className="py-5 first:pt-0">
-                    <p className="text-sm font-medium text-green">{result.study}</p>
-                    <p className="mt-1 flex flex-wrap items-baseline gap-x-3">
-                      <CountUp
-                        text={result.value}
-                        className="text-5xl font-semibold tracking-tight tabular-nums"
-                      />
-                      <span className="text-lg font-medium">{result.label}</span>
-                    </p>
-                    <p className="mt-2 text-sm leading-relaxed text-pretty">{result.detail}</p>
-                    <p className="mt-2 text-sm leading-relaxed text-pretty text-muted">
-                      {result.caveat}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <p className="border-t border-line pt-5 text-sm leading-relaxed text-pretty text-muted">
-                {adage.evidence.candor}
-              </p>
-              <a
-                href={adage.links.evidence}
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-green hover:underline"
-              >
-                Methods and limitations <ArrowUpRight width={16} height={16} />
-              </a>
-            </section>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-4 lg:col-start-1 lg:row-start-2 lg:self-start">
-            <div className="flex max-w-full min-w-0 items-center gap-2 rounded-xl border border-line bg-surface py-1.5 pr-1.5 pl-4 font-mono text-sm">
-              <span className="text-subtle select-none" aria-hidden>
-                $
-              </span>
-              {/*
-               * One line wherever it fits. On the narrowest phones it wraps rather than scroll,
-               * and only between words, never at a hyphen inside the package name.
-               */}
-              <code className="min-w-0 flex-1">
-                {adage.install.split(' ').map((word, index) => (
-                  <Fragment key={`${index}-${word}`}>
-                    {index > 0 ? ' ' : null}
-                    <span className="whitespace-nowrap">{word}</span>
-                  </Fragment>
-                ))}
-              </code>
-              <CopyButton
-                value={adage.install}
-                label="Copy install command"
-                icon={<Copy />}
-                copiedIcon={<Check className="text-green" />}
-                className="grid size-9 place-items-center rounded-lg text-muted hover:bg-elevated hover:text-fg"
-              />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <a href={adage.links.repo} className="pill pill-solid">
-                <GitHub /> View on GitHub
-              </a>
-              <a href={adage.links.site} className="pill pill-outline">
-                Project site <ArrowUpRight />
-              </a>
-            </div>
-          </div>
+              Methods and limitations <ArrowUpRight width={16} height={16} />
+            </a>
+          </section>
         </div>
       </div>
     </section>

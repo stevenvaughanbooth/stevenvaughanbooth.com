@@ -37,8 +37,8 @@ import type { ReflexSceneData } from './scene-data';
 
 const CARD = { width: 1.6, height: 1.12, depth: 0.05, radius: 0.1 };
 /** The history: the latest session in front, each older one further back and to the left. */
-const DECK = { x: -1.75, z: 0, count: 5, gap: 0.36, fan: 0.14 };
-const LIVE = { x: 1.55, z: 0.7 };
+const DECK = { x: -1.6, z: 0, count: 5, gap: 0.36, fan: 0.14 };
+const LIVE = { x: 1.4, z: 0.7 };
 const REFLEX = { x: -0.1, y: 1.9, z: -0.6, width: 2.3, height: 1.15, depth: 0.08 };
 const ROW = { height: 0.068, x: -CARD.width / 2 + 0.16 };
 /** Where a card's rows sit, from the top, in the card's own (flat) coordinates. */
@@ -134,20 +134,22 @@ const arc = (start: Vector3, end: Vector3, lift: number, forward = 0) =>
 
 export const scene = defineScene<ReflexSceneData>({
   fov: 30,
-  framedAspect: 16 / 9,
+  framedAspect: 1.45,
+  // Every pose frames the whole loop, so nothing is ever cut off; the camera only leans towards
+  // the part of the pipeline being shown.
   poses: [
-    // Reading the history, then the step it repeats: close on the stack.
-    { target: [-1.3, 0.75, -0.4], distance: 5.6, azimuth: 0.4, elevation: 0.24 },
-    { target: [-1.3, 0.75, -0.4], distance: 5.6, azimuth: 0.4, elevation: 0.24 },
-    { target: [-1.3, 0.75, -0.4], distance: 5.6, azimuth: 0.4, elevation: 0.24 },
+    // Reading the history, then the step it repeats: from the right, along the stack.
+    { target: [0.2, 1, 0.2], distance: 7.6, azimuth: 0.3, elevation: 0.26 },
+    { target: [0.2, 1, 0.2], distance: 7.6, azimuth: 0.3, elevation: 0.26 },
+    { target: [0.2, 1, 0.2], distance: 7.6, azimuth: 0.3, elevation: 0.26 },
     // The reflex takes shape above the history.
-    { target: [-0.45, 1.15, -0.2], distance: 6.4, azimuth: 0.2, elevation: 0.2 },
-    // The session's failures, the match and the firing.
-    { target: [0.5, 1.15, 0.1], distance: 6.4, azimuth: -0.18, elevation: 0.2 },
-    { target: [0.5, 1.15, 0.1], distance: 6.4, azimuth: -0.18, elevation: 0.2 },
-    { target: [0.5, 1.15, 0.1], distance: 6.4, azimuth: -0.18, elevation: 0.2 },
-    // The whole loop.
-    { target: [-0.2, 1.0, 0.05], distance: 7, azimuth: 0.04, elevation: 0.24 },
+    { target: [0.1, 1, 0.2], distance: 7.5, azimuth: 0.2, elevation: 0.24 },
+    // The session's failures, the match and the firing: square on, a step back.
+    { target: [0.1, 0.9, 0.2], distance: 8.1, azimuth: 0.02, elevation: 0.24 },
+    { target: [0.1, 0.9, 0.2], distance: 8.1, azimuth: 0.02, elevation: 0.24 },
+    { target: [0.1, 0.9, 0.2], distance: 8.1, azimuth: 0.02, elevation: 0.24 },
+    // The whole loop, from a little higher.
+    { target: [0.1, 1, 0.2], distance: 7.8, azimuth: 0.12, elevation: 0.28 },
   ],
   build({ scene: root, label, own }, data) {
     const glowTexture = own(radialTexture(2.4));
