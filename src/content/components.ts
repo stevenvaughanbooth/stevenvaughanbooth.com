@@ -386,7 +386,7 @@ export const siteComponents: readonly SiteComponent[] = [
       'useEffectEvent',
       'useSyncExternalStore',
     ],
-    why: 'The server renders every step’s graph, call and copy, which stay the content and the fallback; the controller adds the shared tour and, where the device can draw it, a Three.js scene of the steps as layers the camera descends.',
+    why: 'The server renders every step’s graph, call and copy, which stay the content and the fallback; the controller adds the shared tour and, where the device can draw it, a Three.js scene of the steps as glass layers a pulse runs down.',
     onPage: true,
   },
   {

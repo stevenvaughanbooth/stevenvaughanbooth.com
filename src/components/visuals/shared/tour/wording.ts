@@ -10,7 +10,8 @@ export const TOUR_DWELL_MS = 6000;
 
 /**
  * idle: not started; rests on its rest step (the static card's state).
- * ready: reset out of sight to the first step, waiting to be seen (the Adage replay).
+ * ready: about to start: reset out of sight to the first step, or still on the whole picture
+ *   while the visitor arrives.
  * playing: touring the steps (it may be held: off screen, tab hidden, hovered, focused, pressed).
  * paused: stopped by the visitor; only the play control restarts it.
  * done: reached the last step and rests there.
@@ -39,12 +40,16 @@ function action(label: 'Play' | 'Pause' | 'Replay', wording: TourWording): StepA
   return { label, icon, name: `${label} ${wording.object}` };
 }
 
-/** The footer's status text and its one control, for a playback state. */
-export function tourStatus(playback: TourPlayback, running: boolean, wording: TourWording) {
+/**
+ * The footer's status text and its one control, for a playback state. `looking` is true while the
+ * visitor holds a playing tour (hover, focus, a press); held only because it is out of view or
+ * waiting for its scene, a tour says nothing new.
+ */
+export function tourStatus(playback: TourPlayback, looking: boolean, wording: TourWording) {
   switch (playback) {
     case 'playing':
       return {
-        status: running ? wording.running : 'Paused while you look',
+        status: looking ? 'Paused while you look' : wording.running,
         action: action('Pause', wording),
       };
     case 'paused':

@@ -73,19 +73,29 @@ Every diagram plays the same way, from one hook and one footer: `tour/use-tour.t
 `tour/tour-controls.tsx`. Do not write a timer in a controller.
 
 ```tsx
-const tour = useTour({ steps: content.steps.length }); // dwell: TOUR_DWELL_MS (6 s) a step
+const [settled, setSettled] = useState(false);        // the 3D scene is in, or won't be
+const tour = useTour({ steps: content.steps.length, hold: !settled }); // TOUR_DWELL_MS (6 s) a step
 <div {...tour.region}>                                 // tabs + panel: what hover/focus/press hold
   <SegmentedTabs selected={tour.step} onSelect={tour.select} progress={tour.progress} … />
   …
 </div>
 footer={<TourControls accent="green" playback={tour.playback} running={tour.running}
-                      wording={guidedTour(rest)} onToggle={tour.toggle} />}
+                      looking={tour.looking} wording={guidedTour(rest)} onToggle={tour.toggle} />}
+scene={<SceneCanvas … step={tour.step} running={tour.running} onSettle={() => setSettled(true)} />}
 ```
 
 `useTour` follows the APG carousel rules:
 
-- plays one pass, from the first step to the last, starting as the card scrolls in, and rests on
-  the last step with **Replay** (one behaviour for every diagram; nothing loops);
+- plays one pass, from the first step to the last, and rests on the last step with **Replay** (one
+  behaviour for every diagram; nothing loops);
+- starts one way everywhere. Out of sight when the controller loads (a scroll down the home page),
+  it resets to the first step there and starts once `threshold` of it is on screen. Already on
+  screen (a case study's opening diagram, a jump to it, Back), the whole picture the page showed
+  stays; once the visitor has arrived (on screen, not hovering, focusing or pressing, and the 3D
+  scene in) it holds for `TOUR_OVERVIEW_MS` more, then opens on the first step: in 3D the camera
+  flies in from the overview. It never rests on its end state and then snaps back to step one;
+- waits while `hold` is true (until its 3D scene has swapped in, or won't), at most
+  `TOUR_HOLD_MAX_MS`, so the scene never swaps in mid-step;
 - counts down only while half the region is on screen (`threshold`) and the page can be seen;
 - holds while a mouse hovers the region, focus is inside it, or a pointer is pressed in it (a drag
   to orbit a scene); the play button sits in the footer, outside the region, so pressing Play is
@@ -94,13 +104,13 @@ footer={<TourControls accent="green" playback={tour.playback} running={tour.runn
   under focus;
 - never starts under reduced motion (the views hide the footer with `motion-reduce:hidden`).
 
-`start: 'unseen'` is for a replay whose text must not vanish under the reader (ReflexDemo, whose region is its stage and terminal together): it
-resets to the first step only while out of sight, and rests if it is already on screen. A replay
-passes `dwellMs` as a function, one delay per frame.
+A replay passes `dwellMs` as a function, one delay per frame (ReflexDemo, whose region is its stage
+and terminal together).
 
 `TourControls` is the footer for every tour, server-rendered at rest and live in the controller:
-the status on the left (`Auto-advancing`, `Paused while you look`, `Paused`, `Ready`, or the
-diagram's rest label) and one Play / Pause / Replay button whose accessible name starts with its
+the status on the left (`Auto-advancing`, `Paused while you look` while the visitor holds it with a
+hover, focus or press, `Paused`, `Ready`, or the diagram's rest label; held only because it is off
+screen, behind a dialog or waiting for its scene, it says nothing new) and one Play / Pause / Replay button whose accessible name starts with its
 label. The words that differ (`TourWording`) live in each diagram's `controls.ts`.
 
 ## Hooks
@@ -129,7 +139,7 @@ every scene.
 controller.tsx                     (already lazy, near the viewport)
   └─ <StepPanel scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}>
        SceneCanvas                 no three.js; checks support, waits for load + idle, imports:
-         └─ scene.ts               defineScene({ poses, build }) — imports three and ../shared/three/engine
+         └─ scene.ts               defineScene({ views, build }) — imports three and ../shared/three/engine
 ```
 
 **Loading.** `SceneCanvas` (in the controller's chunk) asks `sceneOptOut()` first: Save-Data,
@@ -142,20 +152,28 @@ one chunk of them. Import named classes from `'three'`; no addons, react-three-f
 post-processing.
 
 **Mounting.** The engine appends a canvas, a label layer and a colour probe to `SceneCanvas`'s box,
-which covers the stage. It compiles every shader with `compileAsync` before the first frame, then
-sets `data-scene="live"`: the box fades in and the SVG after it, its `peer`, fades out (it keeps
-its place, so nothing moves). A failed import, a WebGL error or a lost context leaves or puts the
+which covers the stage, and mounts the scene at the step on show. It compiles every shader with
+`compileAsync` before the first frame. The swap then waits until it interrupts nothing: at once if
+the stage is out of sight or the tour is not counting down, otherwise as the next step begins
+(`running`). Then `data-scene="live"`: the SVG after it, its `peer`, fades out in 150 ms, and only
+then does the scene fade in, so two diagrams are never seen through each other; the SVG keeps its
+place, so nothing moves. `onSettle` tells the controller, whose tour holds until then. A failed import, a WebGL error or a lost context leaves or puts the
 2D card back; a restored context brings the scene back. While the scene is live the diagram also
 stops taking the pointer (`peer-data-[scene=live]:pointer-events-none`): its opacity puts it above
 the canvas in paint order. A software renderer (SwiftShader, llvmpipe) keeps the 2D card unless
 `localStorage.scene` is `'force'`, as in the end-to-end tests; forced, the engine draws at 1x and
 cuts between steps, as under reduced motion.
 
-**A scene** is `defineScene<Data>({ poses, fov?, framedAspect?, build })`:
+**A scene** is `defineScene<Data>({ views, fov?, build })`:
 
-- `poses[i]` is the camera for step `i`: `{ target, distance, azimuth, elevation }` (see
-  `pose.ts`). Steps fly between poses in `FLIGHT_MS` (900 ms, eased); `framedAspect` is the canvas
-  shape the poses were framed for, and narrower canvases pull back to fit.
+- `views[i]` is how the camera sees step `i`: the direction it looks from (`azimuth`,
+  `elevation`) and `fit`, the world points that must be in view (box corners from `boxCorners`,
+  and the anchors of labels at the edges). The engine solves for the closest camera that keeps
+  every point in view, centred, with a margin for labels, at the canvas's own shape
+  (`framePose` in `pose.ts`), so no step is cropped at any width. List only what the step shows:
+  what lies outside its view should not be drawn there (a ghost of the next stage only where the
+  camera frames it, a floor only where the whole floor is in view). Steps fly between views in
+  `FLIGHT_MS` (900 ms, eased).
 - `build(context, data)` creates the objects once and returns `{ step(i, instant), theme(theme),
 update?(dt, now) }`. `step` sets targets (animate unless `instant`); `theme` stores the colours;
   `update` eases towards the targets every frame and returns true while anything still moves.
@@ -163,18 +181,26 @@ update?(dt, now) }`. `step` sets targets (animate unless `instant`); `theme` sto
 - `context.label(text, anchor, { align, className })` returns a DOM label that follows a 3D point,
   in whole pixels, at least `text-micro` (11 px). Labels are aria-hidden with the canvas: they
   repeat what the card's copy says. Style them with Tailwind classes and `data-*` attributes.
-- `context.own(resource)` disposes a texture or geometry with the scene; meshes in the scene are
-  disposed for you.
-- `shapes.ts` has rounded slabs, rims, flat panels and a radial texture for glows and contact
-  shadows. Light with a `HemisphereLight` and one `DirectionalLight`; glow with additive sprites
-  and tubes in the dark theme and normal blending in the light one.
+- `context.own(resource)` disposes a texture or geometry with the scene; everything in the scene
+  graph (meshes, sprites, lines, points, their materials and textures) is disposed for you. That
+  includes the geometry three.js shares between all sprites: left alone, its listeners keep every
+  disposed renderer, and the page that held it, alive across client navigations.
+- `kit.ts` has what every scene builds with: `Eased` (a number easing to a target, after a
+  delay), `mix`, `lightRig` (a `HemisphereLight` with the background from below and one sun),
+  `glowTextures`, `glowBlending` (additive on a dark ground, normal on a light one) and
+  `drawTubes` (a stroke drawing in along a tube). `shapes.ts` has rounded slabs, rims, flat
+  panels and the radial texture.
 
 **Theme.** `theme.color` holds the site's tokens (`bg`, `surface`, `elevated`, `line`,
 `lineStrong`, `fg`, `muted`, `subtle`, `green`, `amber`, `lilac`, `blue`) and `theme.dark`. The
 engine reads each token from `<html>` and picks its `light-dark()` half itself (`tokens.ts`), from
 `data-theme` or the system preference: Chromium resolves `light-dark()` for a new scheme only some
-frames after a switch. A theme switch recolours the scene at once, inside the theme's reveal. Never
-hard-code a colour.
+frames after a switch. It parses colours itself (hex of every length, `rgb()`), never through
+three.js, and lays a translucent token over the background, as the page shows it. Under X-ray
+(`data-xray` on `<html>`) `theme.blueprint` is set and the scene is drawn as line art on the
+blueprint's paper in both themes: glass in translucent blues, pale edges, every accent one cyan
+(`blueprintPalette`); scenes thin their glass there. A theme switch recolours the scene at once,
+inside the theme's reveal. Never hard-code a colour.
 
 **Runtime.** One renderer per mounted scene, antialiased, transparent over the stage's dot grid,
 pixel ratio capped at 2 (1.5 on coarse pointers). It draws only while something moves (a flight,
@@ -186,7 +212,8 @@ and springs home; on touch only a sideways drag orbits (`touch-action: pan-y`), 
 scrolls. Pressing in the region holds the tour. Under reduced motion there are no flights, no
 inertia and no spring: steps cut, and a drag stays where it is left until the next step.
 
-**Checklist for a new scene:** the poses frame the scene at 390 and 1440 px wide; labels never
+**Checklist for a new scene:** each step's view lists everything it shows, and nothing is cut at
+390, 768, 1440 or 1920 px wide; labels never
 overlap or leave their objects at 390, and dim by colour (`text-subtle`), never by opacity, so they
 keep their contrast; it reads in light and dark; it is static under reduced motion; and the initial
 page and `/` before scrolling do not request three.js (the end-to-end suite checks both). Don't

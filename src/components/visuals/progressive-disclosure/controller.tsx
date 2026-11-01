@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SegmentedTabs } from '../shared/segmented-tabs';
 import { SceneCanvas } from '../shared/three/scene-canvas';
 import { TourControls } from '../shared/tour/tour-controls';
@@ -13,7 +14,9 @@ const loadScene = () => import('./scene');
  * query, and the layered 3D scene over the graph where the device can draw it.
  */
 export function ProgressiveDisclosureController(content: ProgressiveDisclosureContent) {
-  const tour = useTour({ steps: content.steps.length });
+  // The tour waits for the 3D scene to swap in (or not), so it never swaps in mid-step.
+  const [settled, setSettled] = useState(false);
+  const tour = useTour({ steps: content.steps.length, hold: !settled });
 
   return (
     <ProgressiveDisclosureView
@@ -36,11 +39,20 @@ export function ProgressiveDisclosureController(content: ProgressiveDisclosureCo
           accent="green"
           playback={tour.playback}
           running={tour.running}
+          looking={tour.looking}
           wording={wording(tour.step, content.steps.length)}
           onToggle={tour.toggle}
         />
       }
-      scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}
+      scene={
+        <SceneCanvas
+          load={loadScene}
+          data={content.sceneData}
+          step={tour.step}
+          running={tour.running}
+          onSettle={() => setSettled(true)}
+        />
+      }
     />
   );
 }

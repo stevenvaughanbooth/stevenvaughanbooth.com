@@ -82,13 +82,13 @@ test.describe('the platform diagram in 3D', () => {
     await expect.poll(async () => (await stage(page).screenshot()).equals(migration)).toBe(false);
     await expect(live(page).locator('canvas[data-kept="yes"]')).toHaveCount(1);
 
-    // So does a phase within a story.
-    const outcome = await stage(page).screenshot();
+    // So does a phase within a story: a picked story opens at its first phase, then its outcome.
+    const opening = await stage(page).screenshot();
     await card(page)
       .getByRole('list', { name: 'Phases of this story' })
-      .getByRole('button', { name: 'Extract' })
+      .getByRole('button', { name: 'Ground agents' })
       .click();
-    await expect.poll(async () => (await stage(page).screenshot()).equals(outcome)).toBe(false);
+    await expect.poll(async () => (await stage(page).screenshot()).equals(opening)).toBe(false);
     await expect(live(page).locator('canvas[data-kept="yes"]')).toHaveCount(1);
   });
 
@@ -166,5 +166,25 @@ test.describe('the platform diagram in 3D', () => {
       // No CSP report or WebGL error on the way.
       expect(errors).toEqual([]);
     });
+  }
+});
+
+test('keeps to a 320px page with WCAG text spacing on', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const path of ['/', '/work/platform']) {
+    await page.goto(path);
+    await hydrated(page);
+    // WCAG 1.4.12's spacing. Every story's copy shares one cell, so the longest line of any of
+    // them sizes the card, static or live.
+    await page.addStyleTag({
+      content:
+        '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }',
+    });
+    await card(page).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      320,
+    );
   }
 });

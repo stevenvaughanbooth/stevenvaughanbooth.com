@@ -1,21 +1,16 @@
 import {
-  AdditiveBlending,
-  type Blending,
   type BufferGeometry,
   CatmullRomCurve3,
   Color,
   CubicBezierCurve3,
   type Curve,
-  DirectionalLight,
   Fog,
-  HemisphereLight,
   InstancedMesh,
   LineCurve3,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  NormalBlending,
   OctahedronGeometry,
   PlaneGeometry,
   SphereGeometry,
@@ -25,8 +20,9 @@ import {
   Vector3,
 } from 'three';
 import { defineScene, type Theme } from '../shared/three/engine';
-import { damp, easeInOutCubic } from '../shared/three/pose';
-import { panelGeometry, radialTexture, rimGeometry, slabGeometry } from '../shared/three/shapes';
+import { drawTubes, Eased, glowBlending, glowTextures, lightRig, mix } from '../shared/three/kit';
+import { boxCorners, easeInOutCubic, type Vec3 } from '../shared/three/pose';
+import { panelGeometry, rimGeometry, slabGeometry } from '../shared/three/shapes';
 import type { PlatformSceneData } from './scene-data';
 
 /*
@@ -62,29 +58,6 @@ const LEG_MS = 1100;
 const STAGGER_MS = 90;
 
 type Beat = readonly [story: number, phase: number];
-
-/** A number that eases towards its target, optionally after a delay. */
-class Eased {
-  value: number;
-  target: number;
-  private from = 0;
-  constructor(value: number) {
-    this.value = value;
-    this.target = value;
-  }
-  set(target: number, instant: boolean, at = 0) {
-    this.target = target;
-    this.from = at;
-    if (instant) this.value = target;
-  }
-  /** True while it still moves. */
-  update(dt: number, now: number, tau = 0.24): boolean {
-    if (now < this.from) return true;
-    this.value = damp(this.value, this.target, dt, tau);
-    if (Math.abs(this.value - this.target) < 0.002) this.value = this.target;
-    return this.value !== this.target;
-  }
-}
 
 /** Progress along a path of legs, timed and eased, so a jump of two legs passes the middle. */
 class Travel {
@@ -192,7 +165,6 @@ function arc(a: Vector3, b: Vector3, lift: number, land: number) {
   );
 }
 
-const mix = (a: Color, b: Color, t: number, out: Color) => out.copy(a).lerp(b, t);
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 /** Builds a label's content from lines of text, each with its classes, and returns the lines. */
@@ -207,26 +179,69 @@ function fill(element: HTMLElement, lines: readonly (readonly [string, string])[
   return spans;
 }
 
+/*
+ * What each story keeps in view: the whole platform and the story's own parts above it with their
+ * captions, and at its last phase the result set under it. Each phase looks from its own angle.
+ */
+const platformView: Vec3[] = [
+  ...boxCorners(
+    [-FOUNDATION.width / 2, -FOUNDATION.height, -FOUNDATION.depth / 2],
+    [FOUNDATION.width / 2, 0.2, FOUNDATION.depth / 2],
+  ),
+];
+/** A caption or result centred on `x`, `half` world units either side of it. */
+const caption = (x: number, y: number, z: number, half: number): Vec3[] => [
+  [x - half, y, z],
+  [x + half, y, z],
+];
+const storyViews: readonly Vec3[][] = [
+  // Agent context: its two plates and their captions.
+  [
+    ...platformView,
+    ...boxCorners([-3.05, 1.6, -0.9], [3.05, 2.1, 0.5]),
+    ...caption(-1.9, 2.55, -0.9, 1.25),
+    ...caption(1.9, 2.55, -0.9, 1.25),
+  ],
+  // Schema Evolution: both schemas, the coordination over them and its note.
+  [
+    ...platformView,
+    ...boxCorners([-3.35, 0, -0.8], [3.35, 1.7, 0.8]),
+    ...caption(0, 3.15, 0, 1.4),
+    ...caption(2.02, 2.25, -0.6, 1.2),
+  ],
+  // Metadata migration: the definitions' plate and its caption, and the lane.
+  [
+    ...platformView,
+    ...boxCorners([-2.95, 1.1, -1.2], [0.9, 2.15, 0.25]),
+    ...caption(-1.7, 2.85, -1.2, 1.2),
+  ],
+];
+/** Each story's result, under the platform or in front of it, which arrives at its last phase. */
+const resultViews: readonly Vec3[][] = [
+  [...caption(0, -1.25, FOUNDATION.depth / 2, 2.4), [0, -1.55, FOUNDATION.depth / 2]],
+  [...caption(0, -1.25, FOUNDATION.depth / 2, 2.4), [0, -1.55, FOUNDATION.depth / 2]],
+  [...caption(0, -0.6, FOUNDATION.depth / 2 + 1.9, 2.4), [0, -0.6, FOUNDATION.depth / 2 + 2.3]],
+];
+const outcome = (story: number) => [...storyViews[story]!, ...resultViews[story]!];
+
 export const scene = defineScene<PlatformSceneData>({
   fov: 30,
-  framedAspect: 1.42,
-  poses: [
+  views: [
     // Agent context: from the front left, following the metadata left to right.
-    { target: [-0.3, 0.75, 0], distance: 10.6, azimuth: -0.34, elevation: 0.38 },
-    { target: [0, 0.6, 0], distance: 10.4, azimuth: -0.14, elevation: 0.46 },
-    { target: [0.25, 0.75, 0], distance: 10.8, azimuth: 0.06, elevation: 0.38 },
+    { azimuth: -0.34, elevation: 0.38, fit: storyViews[AGENTS]! },
+    { azimuth: -0.14, elevation: 0.46, fit: storyViews[AGENTS]! },
+    { azimuth: 0.06, elevation: 0.38, fit: outcome(AGENTS) },
     // Schema Evolution: low from the right, turning to face both schemas as their levels align.
-    { target: [-0.3, 0.95, 0], distance: 11.2, azimuth: 0.26, elevation: 0.24 },
-    { target: [0, 1, 0], distance: 10.8, azimuth: 0.13, elevation: 0.2 },
-    { target: [0, 0.9, 0], distance: 11.2, azimuth: 0, elevation: 0.2 },
+    { azimuth: 0.26, elevation: 0.24, fit: storyViews[SCHEMA]! },
+    { azimuth: 0.13, elevation: 0.2, fit: storyViews[SCHEMA]! },
+    { azimuth: 0, elevation: 0.2, fit: outcome(SCHEMA) },
     // Metadata migration: high from the left, rising to take in the whole foundation.
-    { target: [-0.45, 0.8, 0], distance: 11.8, azimuth: -0.42, elevation: 0.56 },
-    { target: [-0.2, 0.62, 0], distance: 11.8, azimuth: -0.34, elevation: 0.64 },
-    { target: [0.1, -0.05, 0.3], distance: 13, azimuth: -0.24, elevation: 0.78 },
+    { azimuth: -0.42, elevation: 0.56, fit: storyViews[MIGRATION]! },
+    { azimuth: -0.34, elevation: 0.64, fit: storyViews[MIGRATION]! },
+    { azimuth: -0.24, elevation: 0.78, fit: outcome(MIGRATION) },
   ],
   build({ scene: root, label, own }, data) {
-    const glowTexture = own(radialTexture(2.4));
-    const shadowTexture = own(radialTexture(1.6));
+    const { glow: glowTexture, shadow: shadowTexture } = glowTextures(own);
     let theme: Theme | undefined;
     let story = STORIES - 1;
     let phase = PHASES - 1;
@@ -238,10 +253,10 @@ export const scene = defineScene<PlatformSceneData>({
     const presenceOf = (owner: number | null) => (owner === null ? 1 : presence[owner]!.value);
 
     // Light from above and in front, with a cool fill from below.
-    const sky = new HemisphereLight(0xffffff, 0x000000, 2.1);
-    const sun = new DirectionalLight(0xffffff, 1.7);
-    sun.position.set(4, 10, 8);
-    root.add(sky, sun);
+    const light = lightRig(root, [4, 10, 8], {
+      light: { sky: 2.1, sun: 1.7 },
+      dark: { sky: 1.25, sun: 1.15 },
+    });
     root.fog = new Fog(0x000000, 14, 36);
 
     // Parts of the same size share one geometry: the scene builds in one task, and fewer
@@ -407,7 +422,8 @@ export const scene = defineScene<PlatformSceneData>({
       const tag = addTag(
         index,
         resultAt[index] ?? resultAt[0]!,
-        'text-xs font-medium text-fg @md:text-sm',
+        // A result can run to a sentence: it wraps, balanced, under the platform.
+        'w-max max-w-[15rem] text-center text-xs font-medium text-balance whitespace-normal text-fg @md:max-w-[22rem] @md:text-sm',
         text,
       );
       tag.shown.set(0, true);
@@ -468,7 +484,8 @@ export const scene = defineScene<PlatformSceneData>({
         rim,
         halo,
         tag: label(letter, anchor, {
-          className: 'font-mono text-micro font-semibold text-lilac',
+          // On a lit key the letter needs the foreground's contrast in the dark theme.
+          className: 'font-mono text-micro font-semibold text-lilac dark:text-fg',
         }),
         anchor,
         legs,
@@ -778,6 +795,8 @@ export const scene = defineScene<PlatformSceneData>({
     arrow.renderOrder = 3;
     root.add(arrow);
     const arrowDrawn = new Eased(0);
+    /** The migrated definitions' paths, quietened once the grid has risen at scale. */
+    const pathsQuiet = new Eased(0);
 
     // The grid on the platform: dormant cells that rise, in a wave from the seeds, at scale.
     const cellAt = (col: number, row: number) =>
@@ -908,6 +927,7 @@ export const scene = defineScene<PlatformSceneData>({
       for (const cell of cells) {
         cell.rise.set(migration && done ? 1 : 0, instant, done ? at(enter + cell.delay) : 0);
       }
+      pathsQuiet.set(migration && done ? 1 : 0, instant, done ? at(enter + 1.2) : 0);
       for (const [title] of platformTitles) {
         if (title) title.dataset.lit = String(onBeat(foundation.beats));
       }
@@ -920,14 +940,12 @@ export const scene = defineScene<PlatformSceneData>({
 
     function paint(dt: number, now: number): boolean {
       if (!theme) return false;
-      const { color, dark } = theme;
-      const additive: Blending = dark ? AdditiveBlending : NormalBlending;
+      const { color, dark, blueprint } = theme;
+      const additive = glowBlending(theme);
       let moving = false;
 
       root.fog?.color.copy(color.bg);
-      sky.groundColor.copy(color.bg);
-      sky.intensity = dark ? 1.25 : 2.1;
-      sun.intensity = dark ? 1.15 : 1.7;
+      light.paint(theme);
 
       for (const value of presence) moving = value.update(dt, now, 0.2) || moving;
 
@@ -944,10 +962,11 @@ export const scene = defineScene<PlatformSceneData>({
         if (slab.solid) {
           // The platform's beat shows in its rim and glow; its mass stays neutral.
           mix(dark ? color.elevated : color.surface, color.lilac, lit * 0.02, body.color);
-          body.opacity = p;
+          // On X-ray's blueprint even the platform is drawn in glass, over the paper's grid.
+          body.opacity = p * (blueprint ? 0.55 : 1);
         } else {
           mix(glass, tint, slab.tint, body.color);
-          body.opacity = (dark ? 0.62 : 0.74) * p;
+          body.opacity = (dark ? 0.62 : 0.74) * p * (blueprint ? 0.7 : 1);
         }
         body.emissive.copy(color.lilac);
         body.emissiveIntensity = dark && !slab.solid ? lit * 0.05 + slab.tint * 0.06 : 0;
@@ -1018,11 +1037,7 @@ export const scene = defineScene<PlatformSceneData>({
       placeholder.material.opacity = schemaP * placeholderShown.value;
       placeholder.visible = placeholder.material.opacity > 0.003;
       moving = ringDrawn.update(dt, now, 0.45) || moving;
-      const ringSegments = ring.geometry.parameters.tubularSegments;
-      const ringRadial = ring.geometry.parameters.radialSegments;
-      const ringCount = Math.round(ringDrawn.value * ringSegments) * ringRadial * 6;
-      ring.geometry.setDrawRange(0, ringCount);
-      ringGlow.geometry.setDrawRange(0, ringCount);
+      drawTubes(ringDrawn.value, ring, ringGlow);
       ringTrack.material.color.copy(color.lineStrong);
       ringTrack.material.opacity = schemaP;
       ring.material.color.copy(color.lilac);
@@ -1072,8 +1087,17 @@ export const scene = defineScene<PlatformSceneData>({
       cellRim.opacity = migrationP;
       cellBodies.visible = cellRims.visible = migrationP > 0.003;
 
+      // Once the definitions have landed and the grid has risen, their paths step back, so
+      // the arcs no longer cross the keys at the end of them.
+      moving = pathsQuiet.update(dt, now, 0.4) || moving;
+      const quiet = pathsQuiet.value;
+
       // The travellers, and the paths they draw behind them.
       for (const traveller of travellers) {
+        const settled =
+          traveller.story === MIGRATION
+            ? { track: 1 - quiet, trace: 1 - 0.8 * quiet }
+            : { track: 1, trace: 1 };
         moving = traveller.travel.update(now) || moving;
         const p = presenceOf(traveller.story);
         const t = traveller.travel.value;
@@ -1131,18 +1155,14 @@ export const scene = defineScene<PlatformSceneData>({
           const drawn = t > index + 1 ? 1 : clamp01(t - index) * 0.92;
           // A leg left behind stays drawn, quieter than the one just travelled.
           const behind = t >= index + 2 ? 0.45 : 1;
-          const segments = trail.trace.geometry.parameters.tubularSegments;
-          const radial = trail.trace.geometry.parameters.radialSegments;
-          const count = Math.round(drawn * segments) * radial * 6;
-          trail.trace.geometry.setDrawRange(0, count);
-          trail.glow.geometry.setDrawRange(0, count);
+          drawTubes(drawn, trail.trace, trail.glow);
           trail.track.material.color.copy(color.lineStrong);
-          trail.track.material.opacity = p * (dark ? 0.7 : 0.85);
+          trail.track.material.opacity = p * settled.track * (dark ? 0.7 : 0.85);
           trail.trace.material.color.copy(color.lilac);
-          trail.trace.material.opacity = p * behind;
+          trail.trace.material.opacity = p * behind * settled.trace;
           trail.glow.material.color.copy(color.lilac);
           trail.glow.material.blending = additive;
-          trail.glow.material.opacity = p * behind * (dark ? 0.2 : 0.1);
+          trail.glow.material.opacity = p * behind * settled.trace * (dark ? 0.2 : 0.1);
           trail.track.visible = trail.trace.visible = trail.glow.visible = visible;
         });
       }

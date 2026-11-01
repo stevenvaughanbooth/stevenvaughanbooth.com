@@ -232,7 +232,10 @@ test('a diagram tour holds while a dialog covers the page', async ({ page }) => 
   await tablist.evaluate((element) =>
     scrollTo(0, element.getBoundingClientRect().top + scrollY - 120),
   );
-  await expect(card.getByRole('button', { name: 'Pause auto-advance' })).toBeVisible();
+  // Jumped to, it shows the whole picture for a beat (and waits for its 3D scene) first.
+  await expect(card.getByRole('button', { name: 'Pause auto-advance' })).toBeVisible({
+    timeout: 15_000,
+  });
   const phase = card.locator('[aria-current="step"]');
   const before = await phase.textContent();
 
@@ -243,7 +246,11 @@ test('a diagram tour holds while a dialog covers the page', async ({ page }) => 
   const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await page.keyboard.press('Shift+Slash');
   await expect(sheet).toBeVisible();
-  await expect(status).toHaveText('Paused while you look');
+  // Held, but not by the visitor's look at it: the status says nothing new, the phase's progress
+  // bar stops.
+  const progress = (state: string) => phase.locator(`[style*="animation-play-state: ${state}"]`);
+  await expect(status).toHaveText('Auto-advancing');
+  await expect(progress('paused')).toBeAttached();
   await page.clock.runFor(30_000);
   await expect(phase).toHaveText(before!);
 
@@ -251,6 +258,7 @@ test('a diagram tour holds while a dialog covers the page', async ({ page }) => 
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
   await expect(status).toHaveText('Auto-advancing');
+  await expect(progress('running')).toBeAttached();
   await page.clock.runFor(7_000);
   await expect(phase).not.toHaveText(before!);
 });

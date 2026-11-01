@@ -78,16 +78,20 @@ export function Roles({ steps }: { steps: readonly Step[] }) {
                   </p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm text-muted">
-                    {step.title === step.displayTitle ? null : (
-                      <>
-                        {step.title}
-                        <span aria-hidden> · </span>
-                        <span className="sr-only">. </span>
-                      </>
-                    )}
-                    {step.tenure}
-                  </p>
+                  {step.title === step.displayTitle ? (
+                    <p className="text-sm text-muted">{step.tenure}</p>
+                  ) : (
+                    // Seen with a middle dot, heard as one sentence: a visually hidden span in
+                    // the middle of the line was read with a stray space ("Staff . Current role").
+                    <p className="text-sm text-muted">
+                      <span aria-hidden>
+                        {step.title} · {step.tenure}
+                      </span>
+                      <span className="sr-only">
+                        {step.title}. {step.tenure}
+                      </span>
+                    </p>
+                  )}
                   {step.focus ? (
                     <p className="mt-2 leading-relaxed text-pretty">
                       <span className="sr-only">Focus: </span>

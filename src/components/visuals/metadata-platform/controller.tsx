@@ -15,14 +15,16 @@ const loadScene = () => import('./scene');
  * of every story, and the 3D platform scene over the diagrams where the device can draw it.
  */
 export function MetadataPlatformController(content: MetadataPlatformContent) {
-  const tour = useTour({ steps: content.stories.length * phasesPerStory });
+  // The tour waits for the 3D scene to swap in (or not), so it never swaps in mid-step.
+  const [settled, setSettled] = useState(false);
+  const tour = useTour({ steps: content.stories.length * phasesPerStory, hold: !settled });
   const [announcement, setAnnouncement] = useState('');
   const story = Math.floor(tour.step / phasesPerStory);
   const phase = tour.step % phasesPerStory;
 
-  // A picked story opens on its last phase, its outcome. Focus on the tab already announces it.
+  // A picked story opens at its beginning, as the tour does. Focus on the tab already announces it.
   function selectStory(index: number) {
-    tour.select(index * phasesPerStory + phasesPerStory - 1);
+    tour.select(index * phasesPerStory);
     setAnnouncement('');
   }
 
@@ -48,6 +50,7 @@ export function MetadataPlatformController(content: MetadataPlatformContent) {
           accent="lilac"
           playback={tour.playback}
           running={tour.running}
+          looking={tour.looking}
           wording={wording(story, content.stories.length)}
           onToggle={toggle}
         />
@@ -71,7 +74,15 @@ export function MetadataPlatformController(content: MetadataPlatformContent) {
           progress={tour.progress}
         />
       }
-      scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}
+      scene={
+        <SceneCanvas
+          load={loadScene}
+          data={content.sceneData}
+          step={tour.step}
+          running={tour.running}
+          onSettle={() => setSettled(true)}
+        />
+      }
     />
   );
 }

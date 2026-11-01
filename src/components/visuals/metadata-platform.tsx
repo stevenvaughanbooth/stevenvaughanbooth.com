@@ -10,6 +10,19 @@ import { TourControls } from './shared/tour/tour-controls';
 
 const id = 'metadata-platform';
 
+/** `text` with its last word and an arrow kept together on one line. */
+function ArrowTail({ text }: { text: string }) {
+  const split = text.lastIndexOf(' ');
+  return (
+    <>
+      {split < 0 ? '' : text.slice(0, split + 1)}
+      <span className="whitespace-nowrap">
+        {text.slice(split + 1)} <span aria-hidden>→</span>
+      </span>
+    </>
+  );
+}
+
 /** Steven's part in a story: the matching project in profile.ts, or a link to its theme. */
 function Contribution({ story }: { story: Story }) {
   const project = projects.find((entry) => entry.id === story.project);
@@ -23,9 +36,10 @@ function Contribution({ story }: { story: Story }) {
           {project.title}.{' '}
           <a
             href={`#work-${theme.id}`}
-            className="font-medium whitespace-nowrap text-muted underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg hover:decoration-current"
+            className="font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg hover:decoration-current"
           >
-            See {theme.index}: {theme.kicker} <span aria-hidden>→</span>
+            {/* It may wrap, as wider text spacing needs at 320px; the arrow stays with its word. */}
+            See {theme.index}: <ArrowTail text={theme.kicker} />
           </a>
         </p>
       ) : (

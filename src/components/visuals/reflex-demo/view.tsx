@@ -1,6 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import type { TourRegion } from '../shared/tour/use-tour';
 import { VisualFrame } from '../shared/visual-frame';
+import consoleStyles from './console.module.css';
 import type { ReflexSceneData } from './scene-data';
 
 /** The id of the pipeline's heading, which names its list. */
@@ -81,23 +82,35 @@ export function ReflexDemoView({
                 absolutely positioned, so it still draws above the pipeline; the faded pipeline
                 lets drags through to it. */}
             {scene}
-            <div className="w-full transition-opacity duration-700 peer-data-[scene=live]:pointer-events-none peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
+            <div className="w-full transition-opacity duration-150 peer-data-[scene=live]:pointer-events-none peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
               {pipeline}
             </div>
           </div>
-          {/* Focusable, so keyboard users can scroll back through the session. */}
+          {/* The fade follows the controller's console as it scrolls. The static console is a
+              reversed column, whose scroll starts at its end, so there the fade simply stays. */}
           <div
-            ref={consoleRef}
-            role="region"
-            aria-label="Terminal"
-            tabIndex={0}
-            className={`relative h-72 overflow-y-auto rounded-xl border border-line bg-bg p-3.5 @md:h-64 @md:p-4 @3xl:col-start-2 @3xl:row-start-2 @3xl:h-auto ${consoleRef ? '' : 'flex flex-col-reverse'}`}
+            className={`${consoleRef ? consoleStyles.frame : ''} relative @3xl:col-start-2 @3xl:row-start-2`}
           >
-            {/* Without script, a reversed column rests on the end of the session. */}
-            <div className={consoleRef ? '' : 'mb-auto'}>
-              {terminal}
-              {transcript}
+            {/* Focusable, so keyboard users can scroll back through the session. */}
+            <div
+              ref={consoleRef}
+              role="region"
+              aria-label="Terminal"
+              tabIndex={0}
+              className={`${consoleRef ? consoleStyles.scroller : ''} relative h-72 overflow-y-auto rounded-xl border border-line bg-bg p-3.5 @md:h-64 @md:p-4 @3xl:h-full ${consoleRef ? '' : 'flex flex-col-reverse'}`}
+            >
+              {/* Without script, a reversed column rests on the end of the session. */}
+              <div className={consoleRef ? '' : 'mb-auto'}>
+                {terminal}
+                {transcript}
+              </div>
             </div>
+            {/* The console's top edge: lines scrolled past fade out under it, rather than being cut
+                mid-glyph, which also says there is more of the session above. */}
+            <div
+              aria-hidden
+              className={`${consoleStyles.fade} pointer-events-none absolute inset-x-px top-px h-6 rounded-t-[11px]`}
+            />
           </div>
         </div>
       </div>

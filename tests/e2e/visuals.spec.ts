@@ -12,8 +12,9 @@ test('the metadata tour never changes the selected tab under keyboard focus', as
   await tablist.evaluate((element) =>
     scrollTo(0, element.getBoundingClientRect().top + scrollY - 120),
   );
+  // Jumped to, it shows the whole picture for a beat (and waits for its 3D scene) first.
   const pause = card.getByRole('button', { name: 'Pause auto-advance' });
-  await expect(pause).toBeVisible();
+  await expect(pause).toBeVisible({ timeout: 15_000 });
 
   // Tab from the theme's last link onto the selected tab, the tablist's only tab stop. The play
   // control is in the card's footer, as on every diagram.

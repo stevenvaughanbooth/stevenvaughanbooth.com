@@ -1,0 +1,31 @@
+/*
+ * The terminal's console scrolls. Its top edge fades what has scrolled past into the background,
+ * so a line is never seen cut mid-glyph and the fade says there is more above. The fade appears
+ * only once the console has scrolled, driven by the scroll itself; where scroll-driven animations
+ * are not supported it simply stays.
+ */
+.fade {
+  background: linear-gradient(var(--bg) 25%, transparent);
+}
+
+@supports (animation-timeline: scroll()) {
+  .frame {
+    timeline-scope: --console;
+  }
+
+  .scroller {
+    scroll-timeline: --console block;
+  }
+
+  .fade {
+    animation: appear linear both;
+    animation-timeline: --console;
+    animation-range: 0 1.5rem;
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}

@@ -1,10 +1,11 @@
 import {
+  type BufferGeometry,
   Color,
   type Material,
-  Mesh,
   type Object3D,
   PerspectiveCamera,
   Scene,
+  SRGBColorSpace,
   type Texture,
   Vector3,
   WebGLRenderer,
@@ -12,13 +13,14 @@ import {
 import {
   type CameraPose,
   easeInOutCubic,
-  fitDistance,
+  framePose,
   lerpPose,
   posePosition,
   rubberBand,
   spring,
+  type Vec3,
 } from './pose';
-import { themeValue } from './tokens';
+import { blueprintPalette, over, parseColor, type Rgba, themeValue, toHex } from './tokens';
 
 /*
  * The 3D engine every diagram's scene runs on. It owns the WebGL renderer and everything around
@@ -51,7 +53,13 @@ export type TokenName = keyof typeof tokens;
 
 /** The theme on show, read from the page's CSS: colours in three's working (linear) space. */
 export interface Theme {
+  /** A dark ground: glows add light and shadows take the background's colour. */
   dark: boolean;
+  /**
+   * X-ray's blueprint is on (`data-xray` on <html>): the scene is drawn as line art on the paper,
+   * in the blueprint's palette, the same in both themes. `dark` is true with it.
+   */
+  blueprint: boolean;
   color: Readonly<Record<TokenName, Color>>;
   /** The same colours as CSS strings, for comparing themes. */
   css: Readonly<Record<TokenName, string>>;
@@ -98,13 +106,25 @@ export interface SceneParts {
   update?(dt: number, now: number): boolean;
 }
 
+/**
+ * How the camera sees one step: the direction it looks from, and what must be in view. The engine
+ * stands it as close as it can with every point in view, centred, at the canvas's shape, so a
+ * step is never cropped at any width.
+ */
+export interface StepView {
+  /** Radians around the vertical axis (0 looks along -z, from +z), as in a pose. */
+  azimuth: number;
+  /** Radians above the horizon. */
+  elevation: number;
+  /** World points to keep in view: the step's content and its labels' anchors (see `boxCorners`). */
+  fit: readonly Vec3[];
+}
+
 export interface SceneDefinition<Data> {
-  /** The camera's pose for each step. */
-  poses: readonly CameraPose[];
+  /** How the camera sees each step. */
+  views: readonly StepView[];
   /** Vertical field of view, in degrees. */
   fov?: number;
-  /** The canvas aspect ratio the poses were framed for; narrower canvases pull back to fit. */
-  framedAspect?: number;
   build(context: SceneContext, data: Data): SceneParts;
 }
 
@@ -159,31 +179,49 @@ function tokenProbe(): HTMLElement {
   return probe;
 }
 
+const BLACK: Rgba = { r: 0, g: 0, b: 0, a: 1 };
+
 /**
  * The site's colour tokens for the theme on show. Each is read from <html> and its light-dark()
  * half picked here: Chromium resolves light-dark() for a new color-scheme only some frames after
- * the switch, so the browser's own resolution would still give the old colours.
+ * the switch, so the browser's own resolution would still give the old colours. Values this
+ * parser does not know are read from the probe, as the browser resolves them. A translucent token
+ * (X-ray's surfaces and lines) is laid over the background, as the page shows it. Under X-ray the
+ * blueprint's own palette replaces the surfaces, lines and accents.
  */
 function readTheme(probe: HTMLElement): Theme {
+  const html = document.documentElement;
+  const blueprint = html.hasAttribute('data-xray');
   const dark = prefersDark();
-  const root = getComputedStyle(document.documentElement);
+  const root = getComputedStyle(html);
+  const read = (name: TokenName, index: number): Rgba => {
+    const swatch = probe.children[index];
+    return (
+      parseColor(themeValue(root.getPropertyValue(tokens[name]), dark)) ??
+      (swatch ? parseColor(getComputedStyle(swatch).color) : null) ??
+      BLACK
+    );
+  };
+  const bg = { ...read('bg', tokenNames.indexOf('bg')), a: 1 };
+  const values = {} as Record<TokenName, Rgba>;
+  tokenNames.forEach((name, index) => {
+    values[name] = over(read(name, index), bg);
+  });
+  if (blueprint) Object.assign(values, blueprintPalette(bg, values.fg));
   const color = {} as Record<TokenName, Color>;
   const css = {} as Record<TokenName, string>;
-  tokenNames.forEach((name, index) => {
-    let value = themeValue(root.getPropertyValue(tokens[name]), dark);
-    if (!/^#[\da-f]{3,8}$/i.test(value)) {
-      const swatch = probe.children[index];
-      value = swatch ? getComputedStyle(swatch).color : '#000';
-    }
-    css[name] = value;
-    // Color parses an sRGB value and converts it to the linear working space.
-    color[name] = new Color(value);
-  });
-  return { dark, color, css };
+  for (const name of tokenNames) {
+    const { r, g, b } = values[name];
+    css[name] = toHex(values[name]);
+    // From sRGB to three's linear working space.
+    color[name] = new Color().setRGB(r / 255, g / 255, b / 255, SRGBColorSpace);
+  }
+  return { dark: dark || blueprint, blueprint, color, css };
 }
 
 const sameTheme = (a: Theme, b: Theme) =>
   a.dark === b.dark &&
+  a.blueprint === b.blueprint &&
   (Object.keys(a.css) as TokenName[]).every((name) => a.css[name] === b.css[name]);
 
 interface PlacedLabel {
@@ -194,18 +232,29 @@ interface PlacedLabel {
   height: number;
 }
 
+/**
+ * Disposes everything under `root` that holds GPU resources: meshes, sprites, lines and points,
+ * their materials and textures. A sprite's geometry is one module-level object three.js shares
+ * between every sprite; disposing it makes each renderer let go of it (it is uploaded again on
+ * next use), which matters: otherwise its listeners keep every disposed renderer, its canvas and
+ * the page that held it alive across client navigations.
+ */
 function disposeObject(root: Object3D) {
   root.traverse((object) => {
-    if (!(object instanceof Mesh)) return;
-    object.geometry.dispose();
-    const materials: Material[] = Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-    for (const material of materials) {
-      for (const value of Object.values(material)) {
+    const { geometry, material } = object as Object3D & {
+      geometry?: BufferGeometry;
+      material?: Material | Material[];
+    };
+    geometry?.dispose();
+    // Instanced meshes hold their own buffers for each instance's matrix and colour.
+    const instanced = object as Object3D & { isInstancedMesh?: boolean; dispose?: () => void };
+    if (instanced.isInstancedMesh) instanced.dispose?.();
+    const materials = material ? (Array.isArray(material) ? material : [material]) : [];
+    for (const each of materials) {
+      for (const value of Object.values(each)) {
         if ((value as Texture | null)?.isTexture) (value as Texture).dispose();
       }
-      material.dispose();
+      each.dispose();
     }
   });
 }
@@ -215,8 +264,8 @@ async function mountScene<Data>(
   definition: SceneDefinition<Data>,
   options: MountOptions<Data>,
 ): Promise<SceneHandle> {
-  const { poses } = definition;
-  const poseAt = (index: number) => poses[Math.min(Math.max(index, 0), poses.length - 1)]!;
+  const { views } = definition;
+  const fov = definition.fov ?? 30;
 
   const canvas = document.createElement('canvas');
   // Vertical swipes still scroll the page on touch screens; a sideways drag orbits.
@@ -251,7 +300,7 @@ async function mountScene<Data>(
   renderer.setClearColor(0x000000, 0);
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(definition.fov ?? 30, 1, 0.1, 200);
+  const camera = new PerspectiveCamera(fov, 1, 0.1, 200);
   const owned: { dispose(): void }[] = [];
   const labels: PlacedLabel[] = [];
   let reducedMotion = options.reducedMotion || software;
@@ -305,10 +354,28 @@ async function mountScene<Data>(
     throw error;
   }
 
+  // Each step's pose, framed for the canvas's current shape: cleared when it changes.
+  let framed: (CameraPose | undefined)[] = [];
+  function poseAt(index: number): CameraPose {
+    const at = Math.min(Math.max(index, 0), views.length - 1);
+    let pose = framed[at];
+    if (!pose) {
+      const view = views[at]!;
+      const { width, height } = size;
+      // A share of each half of the view kept clear, with room for the labels at the edges.
+      const margin = {
+        x: Math.min(0.3, 0.04 + 18 / Math.max(1, width / 2)),
+        y: Math.min(0.3, 0.05 + 14 / Math.max(1, height / 2)),
+      };
+      pose = framePose(view.azimuth, view.elevation, view.fit, fov, width / height, margin);
+      framed[at] = pose;
+    }
+    return pose;
+  }
+
   // The camera: a flight from one pose to the next, plus the visitor's orbit on top.
   let step = options.step;
-  let from = poseAt(step);
-  let to = from;
+  let from: CameraPose | null = null;
   let flight: { start: number; duration: number } | null = null;
   parts.step(step, true);
 
@@ -322,7 +389,8 @@ async function mountScene<Data>(
   });
 
   function poseNow(now: number): CameraPose {
-    if (!flight) return to;
+    const to = poseAt(step);
+    if (!flight || !from) return to;
     const t = (now - flight.start) / flight.duration;
     if (t >= 1) {
       flight = null;
@@ -385,11 +453,6 @@ async function mountScene<Data>(
     const turned = orbitView();
     const view = {
       ...pose,
-      distance: fitDistance(
-        pose.distance,
-        size.width / size.height,
-        definition.framedAspect ?? 1.5,
-      ),
       azimuth: pose.azimuth + turned.azimuth,
       elevation: Math.min(1.45, Math.max(0.05, pose.elevation + turned.elevation)),
     };
@@ -437,6 +500,7 @@ async function mountScene<Data>(
     const height = Math.max(1, container.clientHeight);
     if (width === size.width && height === size.height) return;
     size = { width, height };
+    framed = [];
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -529,7 +593,7 @@ async function mountScene<Data>(
   const themeObserver = new MutationObserver(retheme);
   themeObserver.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['data-theme', 'class', 'style'],
+    attributeFilter: ['data-theme', 'data-xray', 'class', 'style'],
   });
   const scheme = window.matchMedia('(prefers-color-scheme: dark)');
   scheme.addEventListener('change', retheme);
@@ -544,15 +608,16 @@ async function mountScene<Data>(
   return {
     setStep(next) {
       if (next === step) return;
-      step = next;
       const now = performance.now();
+      // Where the camera is now, on its way to the step it was showing.
+      const here = poseNow(now);
+      step = next;
       if (reducedMotion) {
-        to = poseAt(step);
+        from = null;
         flight = null;
         orbit.azimuth = orbit.elevation = 0;
       } else {
-        from = poseNow(now);
-        to = poseAt(step);
+        from = here;
         flight = { start: now, duration: FLIGHT_MS };
         // The visitor's orbit springs home with the flight.
         orbit.released = now - RELEASE.coastMs - RELEASE.holdMs;
@@ -575,6 +640,10 @@ async function mountScene<Data>(
       themeObserver.disconnect();
       scheme.removeEventListener('change', retheme);
       document.removeEventListener('visibilitychange', onVisibility);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('webglcontextlost', onContextLost);
       canvas.removeEventListener('webglcontextrestored', onContextRestored);
       disposeObject(scene);

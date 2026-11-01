@@ -19,6 +19,8 @@ async function loadController() {
   const staticTabs = screen.getByRole('tablist');
   page.show(0, { near: true });
   await waitFor(() => expect(staticTabs).not.toBeInTheDocument(), controllerLoad);
+  // The controller's first report: still out of sight, so the tour resets to its first step.
+  page.show(0);
 }
 
 beforeEach(() => {
