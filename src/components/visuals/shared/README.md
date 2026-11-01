@@ -4,7 +4,7 @@ Every interactive diagram on the page is built from the pieces in this folder, s
 behave as one system and ship as little JavaScript as possible. ProgressiveDisclosure is the
 reference implementation (the shared tour and a 3D scene); TeamMultiplier draws its network in 3D
 on the same engine; MetadataPlatform shows a tour with sub-steps, and one 3D scene that follows
-story × phase from outside its per-story diagram; ReflexDemo plays a replay on the same tour.
+story × phase from outside its per-story diagram; ReflexDemo plays a replay on the same tour, with its pipeline in 3D above the terminal.
 
 ## The pattern
 
