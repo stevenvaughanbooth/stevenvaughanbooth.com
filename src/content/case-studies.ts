@@ -6,7 +6,9 @@
  * facts: do not add a claim, a metric or an internal detail that the rest of the site does not
  * already make. Like the page, the copy speaks as Steven; `summary` restates each case study in
  * the third person for metadata and /llms.txt. The header above the four parts repeats the
- * theme's lede and body, so the parts avoid repeating them.
+ * theme's lede and body, and the diagram beside it its own step copy and Steven's contribution, so
+ * the parts avoid repeating them. Where the site has no public outcome to report, the third part
+ * says what the work looks like in practice rather than claim a measured change.
  */
 import type { Route } from 'next';
 import { stories } from '@/components/visuals/metadata-platform/stories';
@@ -20,7 +22,7 @@ export type CaseStudyId = Theme['id'];
 export const caseStudyParts = [
   { id: 'problem', label: 'The problem' },
   { id: 'approach', label: 'The approach' },
-  { id: 'impact', label: 'What changed' },
+  { id: 'impact', label: 'In practice' },
   { id: 'next', label: 'What’s next' },
 ] as const;
 
@@ -58,6 +60,8 @@ export interface CaseStudyPart {
 export interface CaseStudy {
   id: CaseStudyId;
   theme: Theme;
+  /** When the case study went live, as an ISO date, for its Article JSON-LD. */
+  published: string;
   /** One sentence in the third person, for the meta description, Open Graph and /llms.txt. */
   summary: string;
   parts: Record<CaseStudyPartId, CaseStudyPart>;
@@ -98,6 +102,7 @@ const mcpTools = project('mcp');
 const devtools: CaseStudy = {
   id: 'devtools',
   theme: theme('devtools'),
+  published: '2026-10-30',
   summary: `How ${person.name} helps useful AI tools and workflows take hold across his organization, as a Productivity Champion and developer tooling advocate.`,
   parts: {
     problem: {
@@ -108,21 +113,21 @@ const devtools: CaseStudy = {
       ],
     },
     approach: {
-      title: 'Discover. Share. Enable. Learn.',
-      paragraphs: ['The work runs as a loop, and each turn starts from what the last one taught.'],
+      title: 'The work runs as a loop: discover, share, enable, learn.',
+      paragraphs: ['Each turn starts from what the last one taught.'],
       steps: stages.map((stage) => ({ name: stage.name, title: stage.title, body: stage.detail })),
     },
     impact: {
-      title: 'The multiplier is in the adoption.',
+      title: 'Adoption is the part that counts.',
       paragraphs: [
-        'A useful idea spreads, teams build on it, and more people benefit.',
-        project('devtools').summary,
+        'I share and promote AI tools, skills, and workflows throughout my organization, and help other engineers adopt better ways of working.',
+        'Then they build on what each other learns: one engineer’s idea becomes a team’s practice, and more people benefit.',
       ],
     },
     next: {
-      title: 'Keep the practice evolving.',
+      title: 'The loop doesn’t end.',
       paragraphs: [
-        'The loop doesn’t end. What teams learn comes back into the conversation, so useful practices keep evolving.',
+        'What teams learn feeds the next round of discovery.',
         `${adage.name}, my open-source experiment, takes the same idea to agents: learn the repeatable parts of agent work, and reuse them next time.`,
       ],
       link: { label: `See ${adage.name}`, href: '/#open-source' },
@@ -133,13 +138,14 @@ const devtools: CaseStudy = {
 const mcp: CaseStudy = {
   id: 'mcp',
   theme: theme('mcp'),
+  published: '2026-10-30',
   summary: `How ${person.name} designs MCP tools around progressive disclosure, so agents and builders can discover and use Salesforce metadata.`,
   parts: {
     problem: {
-      title: 'An agent has to decide what to ask next.',
+      title: 'Too much context is as unhelpful as too little.',
       paragraphs: [
         extract.copy,
-        'Handing an agent everything at once doesn’t help it decide what to ask next. Handing it too little leaves it guessing.',
+        'Hand an agent all of it at once and it has to dig for what matters. Hand it too little and it guesses.',
       ],
     },
     approach: {
@@ -164,10 +170,10 @@ const mcp: CaseStudy = {
       facts: [{ value: mcpTools.status, label: 'MCP tools for Salesforce metadata' }],
     },
     next: {
-      title: 'Context, one useful step at a time.',
+      title: 'Agent-facing APIs stay in my focus.',
       paragraphs: [
-        'My foundation is backend engineering, distributed systems, and APIs. This work brings that experience to agent-facing tools.',
-        'Agent-facing APIs are part of my focus as a principal engineer, alongside the Core Metadata Platform and developer productivity.',
+        `They are part of my current role as a ${person.role}, alongside the Core Metadata Platform and developer productivity.`,
+        'My foundation is backend engineering, distributed systems, and APIs, and this work brings it to the tools agents use.',
       ],
       link: { label: 'Read about the platform behind it', href: caseStudyPath('platform') },
     },
@@ -177,6 +183,7 @@ const mcp: CaseStudy = {
 const platform: CaseStudy = {
   id: 'platform',
   theme: theme('platform'),
+  published: '2026-10-30',
   summary: `${person.name}’s work on the Core Metadata Platform: a metadata migration that enabled Data 360 scale, Schema Evolution for Marketing Cloud Next, and faster metadata APIs.`,
   parts: {
     problem: {
@@ -187,9 +194,9 @@ const platform: CaseStudy = {
       ],
     },
     approach: {
-      title: `${theme('platform').tag}.`,
+      title: 'One platform, four projects.',
       paragraphs: [
-        'My work there connects three stories: getting useful metadata to agents, building Schema Evolution for Marketing Cloud Next, and leading a metadata migration that enabled Data 360 scale.',
+        'My work on the platform spans the metadata migration that enabled Data 360 scale, Schema Evolution for Marketing Cloud Next, faster metadata APIs, and getting useful metadata to agents.',
       ],
       steps: [
         {
@@ -215,10 +222,9 @@ const platform: CaseStudy = {
       ],
     },
     impact: {
-      title: story('migration').result,
+      title: 'Data 360 got room to grow, and builders kept what they knew.',
       paragraphs: [
-        `The migration enabled the scale needed by Data 360 while preserving a familiar platform experience for Salesforce builders. It earned me the ${presidentsAward.year} ${presidentsAward.name}, recognition for the top 1% of Salesforce engineers.`,
-        'Schema Evolution gives teams a shared foundation for coordinating schema changes, and faster metadata APIs help builders work with complex applications at enterprise scale.',
+        `The migration earned me the ${presidentsAward.year} ${presidentsAward.name}, recognition for the top 1% of Salesforce engineers.`,
       ],
       facts: [
         {

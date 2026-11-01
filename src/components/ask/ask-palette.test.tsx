@@ -173,7 +173,7 @@ describe('AskLauncher', () => {
     // Not in the same moment the dialog appears: a region that appears already full is not read.
     expect(liveRegion()).toBeEmptyDOMElement();
     await act(async () => vi.advanceTimersByTime(200));
-    expect(liveRegion()).toHaveTextContent(/^Context, one useful step at a time\. Steven designed/);
+    expect(liveRegion()).toHaveTextContent(/^Context, one useful step at a time\. Steven designs/);
     // Then cleared, so the answer isn't left in the page to be read twice.
     await act(async () => vi.advanceTimersByTime(6000));
     expect(liveRegion()).toBeEmptyDOMElement();
@@ -466,7 +466,7 @@ describe('AskPalette live answers', () => {
     await user.keyboard('{Enter}');
     const view = await thread();
     expect(view.getByText(/Live answers are off right now/)).toBeInTheDocument();
-    expect(view.getByText('Backend foundations. Agent-first thinking.')).toBeInTheDocument();
+    expect(view.getByText('Rooted in backend engineering.')).toBeInTheDocument();
     expect(posts(fetchMock)).toHaveLength(0);
   });
 

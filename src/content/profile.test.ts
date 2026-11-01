@@ -56,30 +56,46 @@ describe('profile content', () => {
 });
 
 describe('Adage evidence', () => {
-  const { results, headline, context, candor } = adage.evidence;
-  const prose = `${headline}. ${context} ${candor}`;
+  const { results, summary, candor } = adage.evidence;
+  const prose = `${summary} ${candor}`;
+  const [modPrototype, heldOut] = results;
 
-  it('never shows a figure without its caveat', () => {
+  it('never shows a figure without its caveat, directly after it', () => {
     for (const result of results) {
       expect(result.caveat.length).toBeGreaterThan(40);
       expect(prose).toContain(result.value);
       expect(prose).toContain(result.caveat);
+      // The figure's own sentence, then its caveat, with no other figure between them.
+      const at = prose.indexOf(`${result.value} ${result.label}`);
+      const between = prose.slice(at, prose.indexOf(result.caveat));
+      expect(between.split('. ')).toHaveLength(2);
     }
   });
 
-  it('states that the headline is development evidence on the mod prototype', () => {
-    expect(context).toContain('Development evidence, not a held-out result');
-    expect(context).toContain('runs 1–3');
-    expect(context).toContain('Claude Sonnet 5.5');
-    expect(context).toContain('mod prototype supplied approved steps');
-    expect(context).toContain('command hooks cut requests by about 14%');
+  it('leads with the held-out result, then the development evidence', () => {
+    expect(prose.indexOf(heldOut.value)).toBeLessThan(prose.indexOf(modPrototype.value));
+    expect(summary).toMatch(/^In a held-out advisory comparison/);
+  });
+
+  it('states that the mod prototype’s result is development evidence', () => {
+    expect(summary).toContain('development evidence, not a held-out result');
+    expect(summary).toContain('runs 1–3');
+    expect(summary).toContain('Claude Sonnet 5.5');
+    expect(summary).toContain('mod prototype supplied approved steps');
+    expect(summary).toContain('command hooks cut requests by about 14%');
   });
 
   it('includes the held-out advisory comparison and the negative results', () => {
-    expect(context).toContain('held-out advisory comparison');
-    expect(context).toContain('Claude Haiku 4.5');
-    expect(context).toContain('19 of 20 runs');
+    expect(summary).toContain('held-out advisory comparison');
+    expect(summary).toContain('Claude Haiku 4.5');
+    expect(summary).toContain('19 of 20 runs');
     expect(candor).toMatch(/negative results/);
+  });
+
+  it('writes the passage in sentences, each figure once', () => {
+    expect(prose.split('48%')).toHaveLength(2);
+    // Every sentence starts with a capital and has a verb-bearing length, not a caption.
+    for (const sentence of prose.split(/(?<=\.)\s+/)) expect(sentence).toMatch(/^[A-Z].{30,}\.$/);
   });
 
   it('quotes the README’s privacy principle exactly', () => {

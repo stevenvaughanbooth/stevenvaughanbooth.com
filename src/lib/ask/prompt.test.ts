@@ -37,8 +37,7 @@ describe('system prompt', () => {
       adage.summary,
       adage.install,
       // Every result with its caveat, as the prose passage words them.
-      adage.evidence.headline,
-      adage.evidence.context,
+      adage.evidence.summary,
       adage.evidence.candor,
       ...adage.evidence.results.flatMap((result) => [result.value, result.caveat]),
       adage.links.repo,

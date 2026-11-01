@@ -151,7 +151,7 @@ export default async function CaseStudyImage({ params }: { params: Promise<{ slu
             {caseStudyPath(study.id)}
           </span>
           <span>
-            {person.name} · {person.shortRole}
+            {person.name} · {person.role}
           </span>
         </div>
       </div>

@@ -19,6 +19,8 @@ const mono = IBM_Plex_Mono({
   display: 'swap',
 });
 
+// What every page shares. Each page names its own canonical URL and share card, so the 404 page,
+// which has neither, claims no other page's address or card.
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: { default: site.title, template: `%s — ${person.name}` },
@@ -26,19 +28,7 @@ export const metadata: Metadata = {
   applicationName: person.name,
   authors: [{ name: person.name, url: site.url }],
   creator: person.name,
-  alternates: {
-    canonical: '/',
-    types: { 'application/json': '/profile.json' },
-  },
-  openGraph: {
-    type: 'profile',
-    siteName: person.name,
-    title: site.title,
-    description: site.description,
-    firstName: person.givenName,
-    lastName: person.familyName,
-  },
-  twitter: { card: 'summary_large_image', title: site.title, description: site.description },
+  alternates: { types: { 'application/json': '/profile.json' } },
 };
 
 export const viewport: Viewport = {

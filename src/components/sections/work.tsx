@@ -55,7 +55,12 @@ export function Work() {
                         className="transition-transform motion-safe:group-hover:translate-x-0.5"
                       />
                     </Link>
-                    <AskButton prompt={theme.prompt} className="pill pill-ghost pill-sm">
+                    {/* Named apart like the link beside it, starting with the visible label. */}
+                    <AskButton
+                      prompt={theme.prompt}
+                      aria-label={`Ask about this: ${theme.title}`}
+                      className="pill pill-ghost pill-sm"
+                    >
                       <Sparkle width={16} height={16} /> Ask about this
                     </AskButton>
                   </div>

@@ -78,7 +78,7 @@ export const measured = {
    * the local score measured in the same round. It is an older run than `pages`, so the three
    * numbers travel together: re-measure them together, and never pair the range with `pages`.
    */
-  ciRunners: { round: 'the first pass', low: 0.91, high: 0.93, localThen: 95 },
+  ciRunners: { round: 'an earlier round', low: 0.91, high: 0.93, localThen: 95 },
   /** The performance score the site aims for on mobile. A goal, not a measurement. */
   performanceTarget: 95,
   /** Playwright's are per project: the tests that ran and passed, and the ones a project skips. */
@@ -93,15 +93,17 @@ function measurementOf(path: PageMeasurement['path']): PageMeasurement {
 
 export const homeMeasurement = measurementOf('/');
 
-/** "30 October 2026". Fixed to UTC so the build machine's zone cannot move the day. */
+/** "October 31, 2026". Fixed to UTC so the build machine's zone cannot move the day. */
 export const measuredOn = (iso: string = measured.date) =>
-  new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(iso));
+  new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(iso));
 
 export const seconds = (value: number) => `${value.toFixed(2)} s`;
 export const milliseconds = (value: number) => `${Math.round(value)} ms`;
 export const kilobytes = (bytes: number) => `${Math.round(bytes / 1024)} KB`;
 /** A Lighthouse score as the 0–1 fraction CI asserts on: 95 → "0.95". */
 export const fraction = (score: number) => (score / 100).toFixed(2);
+/** A 0–1 score as Lighthouse shows it: 0.91 → 91. */
+export const percent = (score: number) => Math.round(score * 100);
 
 /** One value when accessibility, best practices and SEO agree, otherwise all three in order. */
 export function otherCategories(page: PageMeasurement): string {

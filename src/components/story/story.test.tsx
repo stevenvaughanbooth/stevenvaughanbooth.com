@@ -14,6 +14,7 @@ import {
   measuredOn,
   milliseconds,
   otherCategories,
+  percent,
   seconds,
 } from './measured';
 import { ReactIdeas, reactIdeas } from './react-ideas';
@@ -226,7 +227,7 @@ describe('measured', () => {
     expect(milliseconds(21)).toBe('21 ms');
     expect(kilobytes(162_659)).toBe('159 KB');
     expect(fraction(95)).toBe('0.95');
-    expect(measuredOn('2026-10-30')).toBe('30 October 2026');
+    expect(measuredOn('2026-10-30')).toBe('October 30, 2026');
   });
 
   it('shows one value when the other categories agree, and all three when they do not', () => {
@@ -289,7 +290,7 @@ describe('Results', () => {
       String(measured.tests.e2e.passed),
     ]);
     const caveat = screen.getByRole('region', { name: 'The caveat' });
-    expect(caveat).toHaveTextContent('So CI enforces a floor of 0.90');
+    expect(caveat).toHaveTextContent('So CI’s floor is 90');
     expect(within(caveat).getByRole('link')).toHaveAttribute('href', '#budgets');
   });
 
@@ -297,12 +298,18 @@ describe('Results', () => {
     render(<Results floor={0.9} detailsHref="#budgets" />);
     const { round, low, high, localThen } = measured.ciRunners;
     const caveat = screen.getByRole('region', { name: 'The caveat' });
-    expect(caveat).toHaveTextContent(
-      `On GitHub’s runners in ${round}, Lighthouse scored the home page ${low.toFixed(2)} to ${high.toFixed(2)}, where my local build scored ${fraction(localThen)}.`,
+    const sentences = (caveat.querySelector('p')?.textContent ?? '').split(/(?<=\.)\s+/);
+    const range = sentences.find((sentence) => sentence.includes(String(percent(low))));
+    expect(range).toBe(
+      `GitHub’s runners score lower than a local build: in ${round}, they scored it ${percent(low)} to ${percent(high)} while my local build scored ${localThen}.`,
     );
-    // Today's home score is a different run: if it differs, it must not appear beside the range.
-    if (homeMeasurement.performance !== localThen) {
-      expect(caveat).not.toHaveTextContent(fraction(homeMeasurement.performance));
-    }
+    // Today's home score is a different run, so it has a sentence of its own.
+    expect(sentences[0]).toMatch(
+      new RegExp(
+        `^This run scored the home page ${homeMeasurement.performance}, (on|.+ (under|above)) my target of ${measured.performanceTarget}\\.$`,
+      ),
+    );
+    // One scale throughout: no 0–1 fractions beside the 0–100 scores.
+    expect(caveat.textContent).not.toMatch(/0\.\d\d/);
   });
 });

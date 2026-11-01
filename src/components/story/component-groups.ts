@@ -57,7 +57,7 @@ export const componentGroups: readonly ComponentGroup[] = [
   },
   {
     id: 'intent',
-    title: 'Loaded on intent',
+    title: 'No box of their own',
     where: 'src/app/layout.tsx',
     lede: 'No box of their own: listeners that load with every page, what they fetch only when asked, and the error page.',
     tree: [

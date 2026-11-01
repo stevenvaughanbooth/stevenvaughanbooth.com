@@ -46,7 +46,7 @@ const themeNames: Record<Theme['id'], { diagram: string; short: string }> = {
 const sectionLabels: Partial<Record<string, string>> = {
   'open-source': 'the Adage demo',
   work: 'the Work section',
-  experience: 'the career timeline',
+  experience: 'the Experience section',
   contact: 'the contact details',
 };
 

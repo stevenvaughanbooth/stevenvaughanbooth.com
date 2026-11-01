@@ -62,7 +62,7 @@ src/
     page-targets.ts       The allowlist of places an answer may show (pure; server and browser)
     page-actions.ts       Scrolls to, focuses and marks a place (browser; loaded with the palette)
     tokens.ts             Colour tokens for next/og images, the theme colour and the manifest
-    structured-data.ts    JSON-LD for the home page and /profile.json
+    structured-data.ts    JSON-LD for the home page and the case studies, and /profile.json
   test/                   Shared test helpers (browser API fakes)
 instrumentation-client.ts Vercel BotID's client setup for POST /api/ask
 tests/e2e/                Playwright specs
@@ -217,7 +217,8 @@ An answer can show its place on the site: a curated answer offers "Show me…" b
 request like "take me to his awards" moves at once. Places come only from the allowlist in
 `lib/page-targets.ts` (sections, Work themes, career roles, `#recognition`, the case studies);
 the page scrolls under the header, focus moves to the place's heading (a role's summary, opened),
-and an accent ring marks it once.
+and an accent ring marks it once. A home page place asked for on another page is shown the same
+way once the client navigation home arrives.
 
 **Keyboard.** `/` types a question (it focuses the ask bar while the bar is in view, and opens
 Ask Steven elsewhere), `T` switches the theme and `?` opens a sheet that lists every shortcut.
@@ -390,7 +391,7 @@ emulation does not see the wider frame, which plays its 451 KB 4:5 cut after the
 idle period (see [Rendering and loading](#rendering-and-loading)). That behaviour is guarded by the
 end-to-end suite instead: the film starts after the load event, the portrait is the LCP element,
 and nothing plays under reduced motion, with Save-Data or below `md`. With Lighthouse's desktop
-preset (2026-10-30, 3 runs) the home page scores 100 in all four categories, with the portrait as
+preset (2026-10-31, 3 runs) the home page scores 100 in all four categories, with the portrait as
 LCP at 0.67 s and the cut counted in its total transfer.
 
 The performance floor sits below the local result on purpose. GitHub's runners measured the home

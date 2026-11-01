@@ -18,8 +18,8 @@ export const kindLabel: Record<ComponentKind, string> = {
 const kindMeaning: Record<ComponentKind, string> = {
   server: 'Rendered at build time, into the HTML. No code of its own reaches the browser.',
   client:
-    'Runs in the browser: a ‘use client’ island hydrated with the page, or code loaded later, when it is needed.',
-  css: 'Its behaviour is a stylesheet. No JavaScript at all.',
+    "Runs in the browser: a 'use client' island hydrated with the page, or code loaded later, when it is needed.",
+  css: 'Its behavior is a stylesheet. No JavaScript at all.',
 };
 
 const kinds = Object.keys(kindLabel) as ComponentKind[];

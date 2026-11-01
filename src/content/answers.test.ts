@@ -16,6 +16,7 @@ import {
   topicById,
   topics,
 } from './answers';
+import { homeMeasurement, measured } from '@/components/story/measured';
 import { isPageTargetId, pageTarget } from '@/lib/page-targets';
 import { adage, awards, experience, person, site, themes } from './profile';
 
@@ -116,9 +117,9 @@ describe('curated topics', () => {
   });
 
   it('quotes Adage’s results with every caveat profile.ts attaches to them', () => {
-    const { results, headline, context, candor } = adage.evidence;
+    const { results, summary, candor } = adage.evidence;
     const answer = topicById('adage').paragraphs.join(' ');
-    expect(answer).toContain(`Evidence so far: ${headline}. ${context} ${candor}`);
+    expect(answer).toContain(`Evidence so far: ${summary} ${candor}`);
     for (const result of results) {
       expect(adageEvidence).toContain(result.value);
       expect(adageEvidence).toContain(result.caveat);
@@ -292,6 +293,22 @@ describe('matchQuestion', () => {
     ['How is this site built?', 'site'],
     ['Who is Steven?', 'about'],
     ['about', 'about'],
+    // What hiring managers ask first.
+    ['What does Steven do at Salesforce?', 'role'],
+    ['What is his current role?', 'role'],
+    ['What does he work on?', 'role'],
+    ['Is Steven a manager?', 'role'],
+    ['Does he manage a team?', 'role'],
+    ['Is he open to new roles?', 'contact'],
+    ['Is Steven open to new opportunities?', 'contact'],
+    ['What is X-ray mode?', 'site'],
+    ['What is under the hood?', 'site'],
+    ['How fast is this site?', 'site'],
+    ['What does the site score in Lighthouse?', 'site'],
+    ['Does he know Rust?', 'stack'],
+    ['Is Adage written in Rust?', 'adage'],
+    ['How fast are the metadata APIs?', 'performance'],
+    ['Data Manager', 'c360'],
   ])('%s → %s', (question, expected) => {
     expect(topicOf(question)).toBe(expected);
   });
@@ -307,6 +324,32 @@ describe('matchQuestion', () => {
     const match = matchQuestion(question);
     expect(match.kind).toBe('none');
     expect(match.answer).toBe(fallbackAnswer);
+  });
+
+  it('answers the current role from the profile, without claiming to manage anyone', () => {
+    const [current] = experience;
+    const text = topicById('role').paragraphs.join(' ');
+    expect(text).toContain(`${person.role} at ${person.company}`);
+    expect(text).toContain(`${current?.title} since ${current?.start}`);
+    expect(text).toContain(current?.focus);
+    expect(text).toMatch(/engineering role/);
+    expect(text).not.toMatch(/\bmanag(e|es|er|ing)\b/);
+    expect(topicById('role').actions).toEqual(['role-principal-engineer']);
+  });
+
+  it('sends role and opportunity questions to email without promising anything', () => {
+    const text = topicById('contact').paragraphs.join(' ');
+    expect(text).toMatch(/^For roles, interviews, or collaboration, email Steven directly/);
+    expect(text).not.toMatch(/\b(looking|open to|available|job search)\b/);
+    expect(matchQuestion('Is Steven open to relocating?').kind).toBe('none');
+    expect(matchQuestion('Who is his manager?').kind).toBe('private');
+  });
+
+  it('says how fast the site measured, from measured.ts, and how to peel it back', () => {
+    const text = answerFor(topicById('site'), 'curated').paragraphs.join(' ');
+    expect(text).toContain(`the home page scored ${homeMeasurement.performance} for performance`);
+    expect(text).toContain(`every audited page scored ${measured.desktopScore}`);
+    expect(text).toMatch(/Press X/);
   });
 
   it('offers weak matches as suggestions rather than answers', () => {

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ComponentMap, KindLegend } from '@/components/story/component-map';
 import {
   kilobytes as kb,
@@ -15,8 +15,10 @@ import { Tile } from '@/components/story/tile';
 import { ArrowUpRight, GitHub } from '@/components/ui/icons';
 import { siteComponents } from '@/content/components';
 import { person, site } from '@/content/profile';
+import { VISITOR_LIMIT } from '@/lib/ask-contract';
 import lighthouse from '../../../lighthouserc.json';
 import pkg from '../../../package.json';
+import styles from './colophon.module.css';
 
 const title = 'Under the hood';
 const description =
@@ -80,6 +82,12 @@ const sections = [
 
 type SectionId = (typeof sections)[number]['id'];
 
+/** The view timeline a section publishes, which its link in the nav plays against. */
+const timeline = (id: SectionId) => ({ '--timeline': `--colophon-${id}` }) as CSSProperties;
+const timelines = {
+  '--timelines': sections.map((section) => `--colophon-${section.id}`).join(', '),
+} as CSSProperties;
+
 interface StackRow {
   concern: string;
   choice: string;
@@ -109,7 +117,13 @@ const stack: StackRow[] = [
     concern: 'Styling',
     choice: 'Tailwind CSS with design tokens',
     version: version('tailwindcss'),
-    why: 'Each colour token is defined once, with light-dark(), for both themes.',
+    why: 'Each color token is defined once, with light-dark(), for both themes.',
+  },
+  {
+    concern: '3D',
+    choice: 'Three.js, named imports',
+    version: `three ${version('three')}`,
+    why: 'The diagrams draw in 3D once the page has loaded, where the device can. With Save-Data, low memory or no GPU, Three.js is never fetched and the 2D card stays.',
   },
   {
     concern: 'Fonts',
@@ -125,7 +139,7 @@ const stack: StackRow[] = [
     concern: 'Live answers',
     choice: 'Route Handler → Anthropic Messages API',
     version: 'claude-haiku-5-5',
-    why: 'Claude Haiku 5.5, streamed as it is written. The key stays on the server.',
+    why: 'Claude Haiku 5.5, streamed as it is written, when live answers are on. The key stays on the server.',
   },
   {
     concern: 'Tests',
@@ -209,7 +223,7 @@ const accessibility = [
   },
   {
     title: 'Meaning',
-    body: 'Colour is never the only signal, and every diagram has a text alternative.',
+    body: 'Color is never the only signal, and every diagram has a text alternative.',
   },
   {
     title: 'Checked in CI',
@@ -235,8 +249,8 @@ const security = [
   {
     title: 'A few questions, then email',
     points: [
-      'Three per visitor per 24 hours, by a signed cookie, with a looser per-network cap. Then the palette points to email.',
-      '10 a minute and 150 a day across the site. Without Redis, limits fail closed.',
+      `${VISITOR_LIMIT} per visitor per 24 hours, by a signed cookie, with a looser per-network cap. Then the palette points to email.`,
+      'Across the site, 10 a minute and 150 a day. Without Redis, limits fail closed.',
     ],
   },
   {
@@ -252,7 +266,7 @@ export default function ColophonPage() {
   return (
     <div data-component="colophon" className="relative isolate">
       <div aria-hidden className="bg-grid absolute inset-x-0 top-0 -z-10 h-[32rem]" />
-      <article className="page pt-32 pb-24 md:pt-40 md:pb-32">
+      <article className={`${styles.reading} page pt-32 pb-24 md:pt-40 md:pb-32`} style={timelines}>
         <header className="max-w-3xl">
           <p className="label">Colophon</p>
           <h1 className="mt-4 text-title font-semibold text-balance">{title}</h1>
@@ -281,17 +295,26 @@ export default function ColophonPage() {
           </div>
         </header>
 
-        <nav aria-label="On this page" className="mt-12 border-y border-line py-4 md:mt-16">
-          <ol className="flex flex-wrap gap-x-1 gap-y-1">
+        {/*
+         * Stays under the fixed header for the whole page. One row at every width: below lg it
+         * scrolls sideways, and its edge fades while there is more to scroll to. The section being
+         * read is marked in CSS alone (colophon.module.css).
+         */}
+        <nav
+          aria-label="On this page"
+          className="sticky top-16 z-30 mt-12 border-y border-line bg-bg py-0.5 md:mt-16"
+        >
+          <ol className={`${styles.strip} -mx-1.5 flex gap-x-1 overflow-x-auto p-1.5`}>
             {sections.map((section, i) => (
-              <li key={section.id}>
+              <li key={section.id} className="shrink-0">
                 <a
                   href={`#${section.id}`}
-                  className="group flex items-baseline gap-2 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:bg-elevated hover:text-fg"
+                  style={timeline(section.id)}
+                  className={`${styles.link} group flex items-baseline gap-2 rounded-full px-3 py-1.5 text-sm whitespace-nowrap text-muted transition-colors hover:bg-elevated hover:text-fg`}
                 >
                   <span
                     aria-hidden
-                    className="font-mono text-xs text-subtle group-hover:text-green"
+                    className={`${styles.number} font-mono text-xs text-subtle group-hover:text-green`}
                   >
                     {String(i + 1).padStart(2, '0')}
                   </span>
@@ -337,7 +360,11 @@ export default function ColophonPage() {
           >
             <dl className="grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-2 lg:grid-cols-3">
               {stack.map((row) => (
-                <div key={row.concern} className="bg-surface p-5 md:max-lg:last:odd:col-span-2">
+                // A lone last cell spans its row, so no empty cell shows the hairline color.
+                <div
+                  key={row.concern}
+                  className="bg-surface p-5 md:max-lg:last:odd:col-span-2 lg:last:nth-[3n+1]:col-span-3"
+                >
                   <dt className="label">{row.concern}</dt>
                   <dd className="mt-2">
                     <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -355,7 +382,7 @@ export default function ColophonPage() {
 
           <Section
             id="budgets"
-            title="Budgets that fail the build."
+            title="Budgets that fail CI."
             lede={
               <>
                 Lighthouse CI audits the home page, this one and a case study on emulated mobile,
@@ -444,12 +471,13 @@ export default function ColophonPage() {
 
           <Section
             id="ask-steven"
-            title="A live model, with the key locked away."
+            title="Live answers, with the key locked away."
             lede={
               <>
-                Press <Kbd>⌘K</Kbd> or <Kbd>Ctrl K</Kbd> to ask about my work. Preset topics answer
-                from curated notes; other questions go to Claude, under two rules: the key is never
-                exposed, and abuse stays cheap even if every in-app control fails.
+                Press <Kbd>⌘K</Kbd> or <Kbd>Ctrl+K</Kbd> to ask about my work. Preset topics answer
+                from curated notes. When live answers are on, other questions go to Claude under two
+                rules: the key is never exposed, and abuse stays cheap even if every in-app control
+                fails. The palette says whether they are on.
               </>
             }
           >
@@ -534,7 +562,9 @@ function Section({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="border-t border-line py-12 first:border-t-0 first:pt-0 md:py-16"
+      style={timeline(id)}
+      // Clear of the sticky section nav when a link or the address lands here.
+      className={`${styles.section} scroll-mt-8 border-t border-line py-12 first:border-t-0 first:pt-0 md:py-16`}
     >
       <p className="label">
         <span className="text-green">{String(index + 1).padStart(2, '0')}</span>

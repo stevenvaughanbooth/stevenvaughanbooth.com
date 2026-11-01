@@ -1,8 +1,10 @@
 /**
  * Performs a page action from Ask Steven: shows the visitor one target from the allowlist in
  * page-targets.ts. An in-page target scrolls into view, takes keyboard focus, and its heading (or
- * card) pulses once in the accent colour; a career role also opens its disclosure. A case study is
- * a page of its own, so it navigates there. Anything outside the allowlist does nothing.
+ * card) pulses once in the accent color; a career role also opens its disclosure. A home page
+ * target seen from another page navigates home and is shown the same way once it arrives. A case
+ * study is a page of its own, so it navigates there, and the page focuses its own heading.
+ * Anything outside the allowlist does nothing.
  *
  * Browser-only, and loaded with the palette. It never runs on its own: the palette calls it when
  * the visitor presses "Show me", or asks outright to be shown something.
@@ -18,10 +20,15 @@ export interface PageActionOptions {
 const PULSE_MS = 1800;
 /** A scroll counts as finished once no scroll event has arrived for this long. */
 const SETTLE_MS = 120;
+/** How often to look for a target on the page being navigated to, and for how long. */
+const ARRIVAL_POLL_MS = 50;
+const ARRIVAL_WAIT_MS = 10_000;
 
 let running: Animation | undefined;
 /** Cancels the wait of an action still scrolling, so only the latest one pulses. */
 let waiting: (() => void) | undefined;
+/** Cancels the wait for a target on another page, so only the latest action is shown. */
+let arriving: (() => void) | undefined;
 
 /** Runs `then` once any scrolling has stopped, without relying on `scrollend` support. */
 function afterScroll(then: () => void) {
@@ -129,18 +136,48 @@ function reveal(element: HTMLElement, target: PageTarget) {
 }
 
 /**
+ * Waits for a home page target to arrive after a client navigation, then shows it as if it had
+ * been asked for there: the router only scrolls to the fragment, leaving focus on the body and a
+ * role's disclosure closed. Gives up after a while, or when another action starts.
+ */
+function revealOnArrival(target: PageTarget) {
+  arriving?.();
+  const started = Date.now();
+  let timer = window.setTimeout(look, ARRIVAL_POLL_MS);
+  function stop() {
+    window.clearTimeout(timer);
+    arriving = undefined;
+  }
+  function look() {
+    const place = placeOn(target, window.location.pathname);
+    const element = place ? document.getElementById(place.anchor) : null;
+    if (element) {
+      stop();
+      reveal(element, target);
+    } else if (Date.now() - started < ARRIVAL_WAIT_MS) {
+      timer = window.setTimeout(look, ARRIVAL_POLL_MS);
+    } else {
+      stop();
+    }
+  }
+  arriving = stop;
+}
+
+/**
  * Shows a target. Returns false, and does nothing, for an id outside the allowlist. Scrolling
  * follows the page's own `scroll-behavior`, which is smooth unless reduced motion is preferred.
  */
 export function showOnPage(id: unknown, { navigate }: PageActionOptions): boolean {
   const target = pageTarget(id);
   if (!target) return false;
+  arriving?.();
   const place = placeOn(target, window.location.pathname);
   const element = place ? document.getElementById(place.anchor) : null;
   if (!place || !element) {
     // A case study, or a home page target seen from another page. The route type cannot know
     // pages that are generated from content, so the allowlist vouches for the href instead.
     navigate(target.href as Route);
+    if (target.anchor) revealOnArrival(target);
     return true;
   }
   window.history.pushState(null, '', place.href);

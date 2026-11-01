@@ -117,6 +117,57 @@ describe('showOnPage', () => {
     expect(navigate).toHaveBeenCalledWith('/#role-principal-engineer');
   });
 
+  it('shows a home page target once the navigation there arrives: opened, focused, pulsed', () => {
+    window.history.replaceState(null, '', '/work/mcp');
+    document.body.innerHTML = '<h1 id="case-study-title">Give an agent a map.</h1>';
+    showOnPage('role-lead-engineer', { navigate });
+    expect(navigate).toHaveBeenCalledWith('/#role-lead-engineer');
+
+    // Still on the case study while the router fetches the home page: nothing happens.
+    vi.advanceTimersByTime(500);
+    expect(scrolled).toEqual([]);
+
+    // The router commits the home page and scrolls to the fragment, leaving focus on the body.
+    window.history.replaceState(null, '', '/#role-lead-engineer');
+    document.body.innerHTML = page;
+    vi.advanceTimersByTime(50);
+    const lead = document.querySelector<HTMLDetailsElement>('#role-lead-engineer details');
+    expect(lead?.open).toBe(true);
+    expect(document.activeElement).toBe(lead?.querySelector('summary'));
+    expect(scrolled).toHaveLength(1);
+    vi.advanceTimersByTime(200);
+    expect(animated.at(-1)?.element).toBe(lead?.querySelector('summary'));
+  });
+
+  it('stops waiting for a target on another page after a while, or for a newer action', () => {
+    window.history.replaceState(null, '', '/colophon');
+    document.body.innerHTML = '';
+    showOnPage('recognition', { navigate });
+    vi.advanceTimersByTime(10_050);
+    window.history.replaceState(null, '', '/#recognition');
+    document.body.innerHTML = page;
+    vi.advanceTimersByTime(1000);
+    expect(scrolled).toEqual([]);
+
+    window.history.replaceState(null, '', '/colophon');
+    document.body.innerHTML = '';
+    showOnPage('recognition', { navigate });
+    showOnPage('case-study-platform', { navigate });
+    window.history.replaceState(null, '', '/#recognition');
+    document.body.innerHTML = page;
+    vi.advanceTimersByTime(1000);
+    expect(scrolled).toEqual([]);
+  });
+
+  it('leaves a case study, a page of its own, to focus its heading itself', () => {
+    showOnPage('case-study-mcp', { navigate });
+    window.history.replaceState(null, '', '/work/mcp');
+    document.body.innerHTML = '<h1 id="case-study-title" tabindex="-1">Give an agent a map.</h1>';
+    vi.advanceTimersByTime(1000);
+    expect(scrolled).toEqual([]);
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('on a case study, shows its theme’s diagram there, and the page itself at its title', () => {
     window.history.replaceState(null, '', '/work/mcp');
     document.body.innerHTML = `

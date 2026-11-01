@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
-import { fraction, homeMeasurement, measured } from '@/components/story/measured';
+import { expect, type Locator, test } from '@playwright/test';
+import { homeMeasurement, measured, percent } from '@/components/story/measured';
 import { siteComponents } from '@/content/components';
 import { person } from '@/content/profile';
 import { hydrated } from './helpers';
@@ -136,10 +136,10 @@ test('the results show the measured numbers and the floor from lighthouserc.json
   expect(values).toContain(String(measured.tests.unit));
   expect(values).toContain(String(measured.tests.e2e.passed));
   const caveat = results.getByRole('region', { name: 'The caveat' });
-  await expect(caveat).toContainText(`So CI enforces a floor of ${floor.toFixed(2)}`);
+  await expect(caveat).toContainText(`So CI’s floor is ${percent(floor)}`);
   // The CI range sits beside the local score from its own round, not today's.
   await expect(caveat).toContainText(
-    `where my local build scored ${fraction(measured.ciRunners.localThen)}`,
+    `while my local build scored ${measured.ciRunners.localThen}.`,
   );
 });
 
@@ -150,4 +150,59 @@ test('the page fits the viewport with no sideways scrolling', async ({ page }) =
   );
   // Negative where a classic scrollbar's stable gutter is reserved (Linux CI); never positive.
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('has a share image of its own, for Open Graph and X', async ({ page, request }) => {
+  await page.goto('/colophon');
+  for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {
+    const url = await page.locator(selector).getAttribute('content');
+    expect(url, selector).toMatch(/\/colophon\/(opengraph|twitter)-image/);
+    const image = await request.get(new URL(url!).pathname);
+    expect(image.status()).toBe(200);
+    expect(image.headers()['content-type']).toBe('image/png');
+  }
+});
+
+test('the section nav stays under the header while the page scrolls, without moving it', async ({
+  page,
+}) => {
+  await page.goto('/colophon');
+  const nav = page.getByRole('navigation', { name: 'On this page' });
+  const before = await page.locator('#components').boundingBox();
+  await page.locator('#stack').scrollIntoViewIfNeeded();
+  await page.evaluate(() => scrollBy(0, 400));
+  const header = await page.getByRole('banner').boundingBox();
+  const stuck = await nav.boundingBox();
+  // Right under the fixed header, on one row.
+  expect(Math.abs(stuck!.y - (header!.y + header!.height))).toBeLessThanOrEqual(2);
+  expect(stuck!.height).toBeLessThan(64);
+
+  // A link lands its section's label below the nav, not under it, and the nav marks it as read.
+  const budgets = nav.getByRole('link', { name: /Budgets/ });
+  await budgets.click();
+  await expect(page).toHaveURL(/#budgets$/);
+  await expect
+    .poll(async () => (await page.locator('#budgets p.label').first().boundingBox())!.y)
+    .toBeGreaterThanOrEqual(stuck!.y + stuck!.height);
+  const reading = (link: Locator) =>
+    link.evaluate((element) => getComputedStyle(element).getPropertyValue('--colophon-on').trim());
+  await expect.poll(() => reading(budgets)).toBe('1');
+  expect(await reading(nav.getByRole('link', { name: /Stack/ }))).toBe('0');
+
+  // Being sticky moved nothing: the first section starts where it did.
+  await page.evaluate(() => scrollTo(0, 0));
+  expect((await page.locator('#components').boundingBox())!.y).toBeCloseTo(before!.y, 0);
+});
+
+test('describes live answers as they are: on only when switched on', async ({ page }) => {
+  await page.goto('/colophon');
+  const ask = page.locator('#ask-steven');
+  await expect(ask.getByRole('heading', { level: 2 })).toHaveText(
+    'Live answers, with the key locked away.',
+  );
+  await expect(ask).toContainText('When live answers are on, other questions go to Claude');
+  await expect(ask).toContainText('Ctrl+K');
+  await expect(page.locator('#stack')).toContainText('when live answers are on');
+  await expect(page.locator('#stack')).toContainText('Three.js');
+  await expect(page.locator('article').first()).not.toContainText(/colour|behaviour/);
 });

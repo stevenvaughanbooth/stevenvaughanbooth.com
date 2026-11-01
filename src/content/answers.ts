@@ -5,6 +5,7 @@
  * question always resolves to the same answer.
  */
 import type { Route } from 'next';
+import { homeMeasurement, measured, otherCategories } from '@/components/story/measured';
 import { VISITOR_LIMIT } from '@/lib/ask-contract';
 import {
   isPageTargetId,
@@ -66,6 +67,7 @@ export type TopicId =
   | 'mcp'
   | 'platform'
   | 'adage'
+  | 'role'
   | 'migration'
   | 'schema'
   | 'performance'
@@ -122,12 +124,13 @@ const themeActions = (id: Theme['id']) =>
  * too. The record's `results` are the page's cards, which restate the same figures field by field,
  * so they stay out of it: with them, every number and caveat would read twice.
  */
-export const adageEvidence = `${adage.evidence.headline}. ${adage.evidence.context} ${adage.evidence.candor}`;
+export const adageEvidence = `${adage.evidence.summary} ${adage.evidence.candor}`;
 
 const presidentsAward = awards.find((award) => /president/i.test(award.name));
 const c360Award = awards.find((award) => /customer 360/i.test(award.reason));
 const c360Role = experience.find((role) => role.focus?.includes('Customer 360'));
 const firstRole = experience.at(-1);
+const currentRole = experience.find((role) => role.end === 'Present');
 
 const emailLink: AnswerLink = { label: 'Email Steven', href: person.links.email };
 const linkedInLink: AnswerLink = { label: 'LinkedIn', href: person.links.linkedin };
@@ -191,9 +194,10 @@ export const topics: Topic[] = [
     accent: mcp.accent,
     heading: 'Context, one useful step at a time.',
     paragraphs: [
-      'Steven designed and piloted MCP tools around how agents explore: start with a compact map, search for the relevant metadata, then retrieve the detail.',
-      // The same words on the home page and on the case study, which the diagram heads.
-      'The MCP diagram steps through how the context narrows.',
+      'Steven designs MCP tools around progressive disclosure: each call answers one question and points to the next.',
+      // The MCP diagram's three steps, on the home page and at the head of the case study.
+      'In the MCP diagram, a describe call gives an agent a compact map of the metadata, a search narrows it to relevant matches, and a query opens only the record it needs. The calls are conceptual, not a real API.',
+      'He designed and piloted MCP tools like these to help agents and builders discover and use Salesforce metadata.',
     ],
     actions: themeActions('mcp'),
     names: ['mcp', 'model context protocol', 'progressive disclosure'],
@@ -275,13 +279,49 @@ export const topics: Topic[] = [
       'opensource',
       'oss',
       'side project',
-      'rust',
       'harness',
       'harnesses',
       'session history',
       'instinct*',
       'experiment',
     ],
+  },
+  {
+    id: 'role',
+    title: 'Current role',
+    hint: person.role,
+    prompt: `What does Steven do at ${person.company}?`,
+    glyph: '◆',
+    heading: `${person.role} at ${person.company}`,
+    paragraphs: [
+      `Steven is a ${person.role} at ${person.company}${currentRole ? ` (${currentRole.title} since ${currentRole.start})` : ''}.${currentRole?.focus ? ` His focus is the ${currentRole.focus}` : ''}`,
+      'It is an engineering role, and the leadership this site describes is technical: he led a major metadata migration, and as a Productivity Champion he helps other engineers adopt better ways of working.',
+    ],
+    actions: currentRole ? [targetId(roleAnchor(currentRole))] : [targetId('experience')],
+    followUps: ['platform', 'mcp', 'devtools'],
+    names: [
+      'current role',
+      'current job',
+      'current position',
+      'day job',
+      'job title',
+      'do at salesforce',
+      'work on at salesforce',
+      'what does he do',
+      'what does steven do',
+      'what do you do',
+      'a manager',
+      'people manager',
+      'engineering manager',
+      'people management',
+      'manage people',
+      'manage a team',
+      'manages a team',
+      'lead a team',
+      'leads a team',
+      'individual contributor',
+    ],
+    keywords: ['title', 'position', 'currently', 'these days', 'nowadays', 'work on', 'working on'],
   },
   {
     id: 'migration',
@@ -330,7 +370,7 @@ export const topics: Topic[] = [
       'Steven improved the performance and efficiency of Salesforce metadata APIs, helping builders work with complex applications at enterprise scale.',
     ],
     actions: themeActions('platform'),
-    names: ['api performance'],
+    names: ['api performance', 'metadata api', 'metadata apis'],
     keywords: [
       'performance',
       'improve performance',
@@ -350,7 +390,7 @@ export const topics: Topic[] = [
     glyph: '⌬',
     heading: 'Customer 360 Data Manager',
     paragraphs: [
-      'Steven built backend services supporting Customer 360 Data Manager, helping enable connected experiences across Salesforce.',
+      'Steven built backend services supporting Customer 360 Data Manager.',
       ...(c360Award ? [`${c360Award.year} ${c360Award.name}. ${c360Award.reason}`] : []),
     ],
     facts: c360Role
@@ -430,12 +470,13 @@ export const topics: Topic[] = [
     hint: person.skills.slice(0, 3).join(' · '),
     prompt: 'What languages and technologies does Steven work with?',
     glyph: 'λ',
-    heading: 'Backend foundations. Agent-first thinking.',
+    heading: 'Rooted in backend engineering.',
     paragraphs: [
       person.skills.join(' · '),
       'His foundation is backend engineering, distributed systems, and APIs. Recent work brings that experience to agent-facing tools.',
+      `${adage.name}, his open-source experiment, is written in ${adage.language}.`,
     ],
-    names: ['tech stack', 'languages', 'technologies', 'programming languages'],
+    names: ['tech stack', 'languages', 'technologies', 'programming languages', 'rust'],
     keywords: [
       'skills',
       'his skills',
@@ -494,7 +535,7 @@ export const topics: Topic[] = [
     prompt: 'How can I reach Steven?',
     glyph: '@',
     paragraphs: [
-      'You can reach Steven by email or connect on LinkedIn. His work is focused on backend platforms, distributed systems, and agent tooling.',
+      'For roles, interviews, or collaboration, email Steven directly, or connect on LinkedIn. His work is focused on backend platforms, distributed systems, and agent tooling.',
     ],
     links: [emailLink, linkedInLink],
     actions: [targetId('contact')],
@@ -507,6 +548,14 @@ export const topics: Topic[] = [
       'recruiting',
       'interview',
       'get in touch',
+      'opportunit*',
+      'new role*',
+      'new job',
+      'open to work',
+      'open to new',
+      'is he available',
+      'is steven available',
+      'are you available',
     ],
     keywords: [
       'recruit*',
@@ -525,7 +574,7 @@ export const topics: Topic[] = [
     prompt: 'Where is Steven’s code?',
     glyph: '</>',
     paragraphs: [
-      `Explore Steven’s public GitHub profile. ${adage.name} is his open-source experiment there; this guide does not make claims about other repositories.`,
+      `Explore Steven’s public GitHub profile. ${adage.name}, his open-source experiment, is the project this site features.`,
     ],
     links: [githubLink, adageRepoLink],
     names: ['github'],
@@ -558,6 +607,8 @@ export const topics: Topic[] = [
     glyph: '{}',
     paragraphs: [
       'This site is a statically prerendered Next.js app with typed content, Tailwind CSS design tokens, and small client islands for the interactive pieces.',
+      `In the last Lighthouse run on emulated mobile, the home page scored ${homeMeasurement.performance} for performance and ${otherCategories(homeMeasurement)} for accessibility, best practices, and SEO; on the desktop preset, every audited page scored ${measured.desktopScore} in every category.`,
+      'Press X, or the X-ray button in the header, to peel any page back into a labeled blueprint of its components.',
     ],
     modeNote: {
       live: 'Ask Steven answers preset topics instantly from curated notes. Other questions go to Claude through a rate-limited server route, and the API key never reaches the browser.',
@@ -571,20 +622,45 @@ export const topics: Topic[] = [
       { label: 'Under the hood', href: '/colophon' },
       { label: 'Source on GitHub', href: site.repo },
     ],
-    names: ['colophon', 'this site', 'this website', 'ask steven'],
-    keywords: ['website', 'next js', 'nextjs', 'tailwind', 'built with', 'palette'],
+    names: [
+      'colophon',
+      'this site',
+      'this website',
+      'ask steven',
+      'x ray',
+      'xray',
+      'under the hood',
+      'peel back',
+      'lighthouse',
+    ],
+    keywords: [
+      'website',
+      'next js',
+      'nextjs',
+      'tailwind',
+      'built with',
+      'palette',
+      'how fast is the site',
+      'how fast is the page',
+      'how fast is this',
+      'page speed',
+      'site speed',
+      'load time',
+      'performance score',
+      'blueprint',
+    ],
   },
   {
     id: 'about',
     title: `About ${person.givenName}`,
-    hint: `${person.shortRole}, ${person.location}`,
+    hint: `${person.role}, ${person.location}`,
     prompt: `Who is ${person.name}?`,
     glyph: '●',
     accent: 'green',
     heading: person.tagline,
     paragraphs: [
       `${person.name} is a ${person.role} at ${person.company}, based in ${person.location}.`,
-      'He likes hard problems and ideas that make him want to open his editor. He is a Productivity Champion and developer tooling advocate, very tapped into new models and features, and he helps useful tools and workflows take hold across his organization.',
+      'He likes hard problems and ideas that make him want to open his editor. He is a Productivity Champion and developer tooling advocate, quick to try new models and features, and he helps useful tools and workflows take hold across his organization.',
       `In his words: “${person.builderNote.title}”`,
     ],
     followUps: ['devtools', 'mcp', 'platform'],
@@ -624,7 +700,7 @@ const showMe = (id: string) => `Show me ${pageTarget(targetId(id))?.label ?? id}
  */
 export const heroSuggestions: string[] = [
   `What is ${adage.name}?`,
-  themes.find((theme) => theme.id === 'mcp')?.prompt ?? 'How do you design APIs for agents?',
+  themes.find((theme) => theme.id === 'mcp')?.prompt ?? 'How does Steven design APIs for agents?',
   showMe('work-platform'),
 ];
 
@@ -644,7 +720,7 @@ export const helpAnswer: CuratedAnswer = {
 
 export const privateAnswer: CuratedAnswer = {
   paragraphs: [
-    'This guide covers only the career and project details Steven has chosen to share publicly. Ask about his platform work, agent tooling, experience or public links.',
+    'This guide covers only the career and project details Steven has chosen to share publicly. Ask about his platform work, agent tooling, experience, or public links.',
     'For anything else, email Steven directly.',
   ],
   links: [emailLink],
@@ -662,7 +738,7 @@ export const promptAnswer: CuratedAnswer = {
 
 export const fallbackAnswer: CuratedAnswer = {
   paragraphs: [
-    'That isn’t covered in Steven’s curated notes. They cover Adage, his MCP work, the Core Metadata Platform, the metadata migration, API performance, his career and his awards. For anything else, email Steven.',
+    'That isn’t covered in Steven’s curated notes. They cover his current role, Adage, his MCP work, the Core Metadata Platform, the metadata migration, API performance, his career, and his awards. For anything else, email Steven.',
   ],
   links: [emailLink],
   followUps: ['projects', 'adage', 'career'],

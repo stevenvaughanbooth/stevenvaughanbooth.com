@@ -1,0 +1,84 @@
+/*
+ * The section nav's row of links. Where it is wider than the page it scrolls sideways, and its
+ * right edge fades out while there is more to scroll to: a scroll timeline on the row itself moves
+ * the fade away as the end comes into view. A row that fits has an inactive timeline, so it never
+ * fades; without scroll-driven animations nothing fades at all.
+ */
+@property --strip-fade {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.strip {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--strip-fade)), transparent);
+  scrollbar-width: none;
+}
+
+@media (pointer: fine) {
+  .strip {
+    scrollbar-width: thin;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .strip {
+    animation: strip-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+
+@keyframes strip-fade {
+  from,
+  90% {
+    --strip-fade: 2.5rem;
+  }
+  to {
+    --strip-fade: 0px;
+  }
+}
+
+/*
+ * The section being read. Each section publishes a view timeline (its --timeline) seen through a
+ * one-pixel reading line just under the sticky nav; the article shares the timelines with the nav,
+ * and each link plays against its own section's while that section crosses the line. Only colors
+ * change, so nothing moves. Without scroll-driven animations nothing is marked.
+ */
+@property --colophon-on {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@supports (timeline-scope: --a) {
+  .reading {
+    timeline-scope: var(--timelines);
+  }
+
+  .section {
+    view-timeline-name: var(--timeline);
+    view-timeline-inset: 8rem calc(100% - 8rem - 1px);
+  }
+
+  .link {
+    animation: colophon-reading linear none;
+    animation-timeline: var(--timeline);
+    animation-range: cover;
+  }
+
+  .link:not(:hover) {
+    color: color-mix(in oklab, var(--fg) calc(var(--colophon-on) * 100%), var(--muted));
+    background: color-mix(in oklab, var(--elevated) calc(var(--colophon-on) * 100%), transparent);
+  }
+
+  .link:not(:hover) .number {
+    color: color-mix(in oklab, var(--green) calc(var(--colophon-on) * 100%), var(--subtle));
+  }
+}
+
+@keyframes colophon-reading {
+  from,
+  to {
+    --colophon-on: 1;
+  }
+}

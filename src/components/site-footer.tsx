@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { disclaimer, person, site } from '@/content/profile';
+import { person, site, sourceNote } from '@/content/profile';
 import { ShortcutsButton } from './shortcuts/shortcuts';
 
 export function SiteFooter() {
@@ -10,7 +10,7 @@ export function SiteFooter() {
           <p className="font-mono text-fg">
             sb<span className="text-green">.</span>
           </p>
-          <p className="text-xs leading-relaxed text-subtle">{disclaimer}</p>
+          <p className="text-xs leading-relaxed text-subtle">{sourceNote}</p>
         </div>
         <nav aria-label="Footer">
           <ul className="grid grid-cols-2 gap-x-10 gap-y-2.5">

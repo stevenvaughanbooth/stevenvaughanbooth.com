@@ -1,5 +1,5 @@
 import { ArrowDown } from '@/components/ui/icons';
-import { fraction, homeMeasurement, measured, otherCategories } from './measured';
+import { homeMeasurement, measured, otherCategories, percent } from './measured';
 import { Tile } from './tile';
 
 interface ResultsProps {
@@ -7,6 +7,14 @@ interface ResultsProps {
   floor: number;
   /** Where the full per-page numbers are, on this page. */
   detailsHref: `#${string}`;
+}
+
+/** "a point under", "on" or "2 points above": how far a score sits from the target. */
+function against(score: number, target: number): string {
+  const gap = Math.abs(target - score);
+  if (gap === 0) return 'on';
+  const points = gap === 1 ? 'a point' : `${gap} points`;
+  return `${points} ${score < target ? 'under' : 'above'}`;
 }
 
 /** The headline numbers from `measured`, then the one caveat that matters. */
@@ -24,8 +32,10 @@ export function Results({ floor, detailsHref }: ResultsProps) {
       value: String(measured.tests.e2e.passed),
     },
   ];
-  // The CI range comes from an earlier run than `home`, so it is shown with that run's own score.
+  // The CI range comes from an earlier run than `home`, so it is shown with that run's own score,
+  // in a sentence of its own. Every score is on Lighthouse's 0–100 scale, as the tiles show it.
   const ci = measured.ciRunners;
+  const target = measured.performanceTarget;
 
   return (
     <>
@@ -48,9 +58,10 @@ export function Results({ floor, detailsHref }: ResultsProps) {
           The caveat
         </h3>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-pretty">
-          On GitHub’s runners in {ci.round}, Lighthouse scored the home page {ci.low.toFixed(2)} to{' '}
-          {ci.high.toFixed(2)}, where my local build scored {fraction(ci.localThen)}. So CI enforces
-          a floor of {floor.toFixed(2)}, and {measured.performanceTarget} stays the target.
+          This run scored the home page {home.performance}, {against(home.performance, target)} my
+          target of {target}. GitHub’s runners score lower than a local build: in {ci.round}, they
+          scored it {percent(ci.low)} to {percent(ci.high)} while my local build scored{' '}
+          {ci.localThen}. So CI’s floor is {percent(floor)}, and {target} stays the target.
         </p>
 
         <a

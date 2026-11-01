@@ -76,7 +76,7 @@ ${list(projects.map((project) => `${project.title} (${project.status}): ${projec
 
 ${list(awards.map((award) => `${award.year} ${award.name}: ${describeAward(award)}`))}
 
-**Open source: ${adage.name}.** ${adage.tagline} ${adage.summary} Status: ${adage.status}, written in ${adage.language}, ${adage.license}. Works with ${and.format(adage.harnesses)}. Install with \`${adage.install}\`. Evidence so far: ${adage.evidence.headline}. ${adage.evidence.context} ${adage.evidence.candor}
+**Open source: ${adage.name}.** ${adage.tagline} ${adage.summary} Status: ${adage.status}, written in ${adage.language}, ${adage.license}. Works with ${and.format(adage.harnesses)}. Install with \`${adage.install}\`. Evidence so far: ${adage.evidence.summary} ${adage.evidence.candor}
 
 **Ask Steven.** Every page has a command palette, opened with ⌘K, Ctrl+K, or any “Ask” button. It searches the site’s sections and links and answers preset topics instantly from curated content. When live answers are on, Claude answers other questions from the same public profile, with a small allowance per visitor; when they are off, or the allowance is used, the palette points to email instead. For anything important, confirm with Steven directly.
 

@@ -37,7 +37,7 @@ export interface Theme {
 }
 
 export interface Award {
-  id: 'presidents-award' | 'tmp-all-star';
+  id: 'presidents-award' | 'all-star';
   name: string;
   year: string;
   /** What the award recognizes. Empty when only the reason is public. */
@@ -55,7 +55,7 @@ export const site = {
   domain: 'stevenvaughanbooth.com',
   title: 'Steven Booth — Principal Software Engineer',
   description:
-    'Steven Booth is a principal engineer at Salesforce building platform foundations, agent-facing APIs and MCP tools, and the workflows that help engineers build with AI.',
+    'Steven Booth is a Principal Software Engineer at Salesforce building platform foundations, agent-facing APIs and MCP tools, and the workflows that help engineers build with AI.',
   repo: 'https://github.com/stevenvaughanbooth/stevenvaughanbooth.com',
 } as const;
 
@@ -64,7 +64,6 @@ export const person = {
   givenName: 'Steven',
   familyName: 'Booth',
   role: 'Principal Software Engineer',
-  shortRole: 'Principal Engineer',
   company: 'Salesforce',
   location: 'San Francisco, CA',
   email: 'stevenvaughanbooth@gmail.com',
@@ -81,7 +80,7 @@ export const person = {
       'Steven is a builder, a Productivity Champion, and a developer tooling advocate. He builds platform foundations and helps better tools and workflows take hold across his organization.',
   },
   builderNote: {
-    title: 'I am a builder. Always have been.',
+    title: 'I’ve always been a builder.',
     body: 'I like hard problems, especially when there’s room for an approach that isn’t obvious. I’m first in line to try new models and features in my own workflows. A lot has changed. It’s only made me more eager to build.',
   },
   education: {
@@ -162,7 +161,7 @@ export const recognitionAnchor = 'recognition';
 export const careerStartYear = 2018;
 
 export const careerSummary = {
-  title: 'Same curiosity. Increasing scope.',
+  title: 'From associate to principal, with the same curiosity.',
   body: 'Growing with Salesforce since 2018. The through line: building foundations that let other people do more.',
 } as const;
 
@@ -184,12 +183,12 @@ export const themes: Theme[] = [
     accent: 'amber',
     title: 'Better workflows. Stronger teams.',
     lede: 'I’m a Productivity Champion and developer tooling advocate.',
-    body: 'I’m very tapped into how AI can improve the way we work, and I help that translate into everyday practice across my organization. I share what works, promote useful tools and workflows, and help other engineers make them their own.',
+    body: 'I keep close track of how AI can improve the way we work, and I help that translate into everyday practice across my organization. I share what works, promote useful tools and workflows, and help other engineers make them their own.',
     about:
       'Steven is a Productivity Champion and developer tooling advocate. He helps AI-assisted ways of working translate into everyday practice across his organization: he shares what works, promotes useful tools and workflows, and helps other engineers make them their own.',
     proof:
       'The multiplier is in the adoption: a useful idea spreads, teams build on it, and more people benefit.',
-    prompt: 'How do you help teams adopt better workflows?',
+    prompt: 'How does Steven help teams adopt better workflows?',
   },
   {
     id: 'mcp',
@@ -204,7 +203,7 @@ export const themes: Theme[] = [
       'A useful interface helps an agent decide what to ask next. Steven designs MCP tools around progressive disclosure: discover the landscape, find what matters, then retrieve the detail, giving an agent enough context to move forward with a clear path to more.',
     proof:
       'I designed and piloted MCP tools that help agents and builders discover and use Salesforce metadata.',
-    prompt: 'How do you design APIs for agents?',
+    prompt: 'How does Steven design APIs for agents?',
   },
   {
     id: 'platform',
@@ -230,7 +229,7 @@ export const projects = [
     title: 'Metadata tools for agents',
     status: 'Piloted',
     summary:
-      'Designed and piloted MCP tools that help agents and builders discover and use Salesforce metadata. My API design emphasizes progressive disclosure: start with the big picture, find relevant information, then explore the detail.',
+      'I designed and piloted MCP tools that help agents and builders discover and use Salesforce metadata. My API design emphasizes progressive disclosure: start with the big picture, find relevant information, then explore the detail.',
     about:
       'Designed and piloted MCP tools that help agents and builders discover and use Salesforce metadata. His API design emphasizes progressive disclosure: start with the big picture, find relevant information, then explore the detail.',
   },
@@ -248,7 +247,7 @@ export const projects = [
     title: 'Faster experiences for builders',
     status: 'API performance',
     summary:
-      'Improved the performance and efficiency of Salesforce metadata APIs, helping builders work with complex applications at enterprise scale.',
+      'I improved the performance and efficiency of Salesforce metadata APIs, helping builders work with complex applications at enterprise scale.',
     about:
       'Improved the performance and efficiency of Salesforce metadata APIs, helping builders work with complex applications at enterprise scale.',
   },
@@ -257,7 +256,7 @@ export const projects = [
     title: 'Core Metadata Platform',
     status: 'Platform engineering',
     summary:
-      'Build extensible metadata foundations that help builders create and customize applications across Salesforce Core, Data 360, and Marketing Cloud Next.',
+      'I build extensible metadata foundations that help builders create and customize applications across Salesforce Core, Data 360, and Marketing Cloud Next.',
     about:
       'Builds extensible metadata foundations that help builders create and customize applications across Salesforce Core, Data 360, and Marketing Cloud Next.',
   },
@@ -290,8 +289,8 @@ export const awards: Award[] = [
     reason: 'Awarded for leading a major metadata migration.',
   },
   {
-    id: 'tmp-all-star',
-    name: 'TMP All-Star Award',
+    id: 'all-star',
+    name: 'All-Star Award',
     year: 'FY21',
     detail: '',
     reason: 'Recognized for contributions to Customer 360 Data Manager’s launch.',
@@ -322,14 +321,15 @@ const adageResults = [
     detail:
       'Versus the agent alone, with 22% lower reported API cost and all 12 runs passing hidden checks in both arms.',
     caveat:
-      'Development evidence, not a held-out result: run 4 reused six sandbox tasks after fixes informed by runs 1–3 (12 runs per arm, Claude Sonnet 5.5). The deeper mod prototype supplied approved steps; Adage’s default command hooks cut requests by about 14% in the same study.',
+      'This is development evidence, not a held-out result: run 4 reused six sandbox tasks after fixes informed by runs 1–3 (12 runs per arm, Claude Sonnet 5.5). The deeper mod prototype supplied approved steps; Adage’s default command hooks cut requests by about 14% in the same study.',
   },
   {
     value: '22%',
     label: 'fewer model requests',
     study: 'Held-out advisory comparison',
     detail: 'Versus the agent alone, with 19 of 20 runs passing hidden checks in each arm.',
-    caveat: 'Claude Haiku 4.5 on four tasks repeated five times, not twenty independent tasks.',
+    caveat:
+      'The comparison used Claude Haiku 4.5 on four tasks repeated five times, not twenty independent tasks.',
   },
 ] as const;
 
@@ -376,9 +376,11 @@ export const adage = {
   evidence: {
     /** For the page: one figure per study, each with its caveat directly beneath. */
     results: adageResults,
-    /** For prose surfaces (palette, prompt, /llms.txt): always followed by `context`. */
-    headline: `${modPrototype.value} ${modPrototype.label} and 22% lower reported API cost`,
-    context: `${modPrototype.study} versus the agent alone, with all 12 runs passing hidden checks in both arms. ${modPrototype.caveat} In a held-out advisory comparison, Adage used about ${heldOutAdvisory.value} ${heldOutAdvisory.label}, with 19 of 20 runs passing hidden checks in each arm: ${heldOutAdvisory.caveat}`,
+    /**
+     * For prose surfaces (palette, prompt, /llms.txt): both studies in sentences, the held-out one
+     * first, each followed by its caveat word for word.
+     */
+    summary: `In a ${heldOutAdvisory.study.toLowerCase()}, Adage used about ${heldOutAdvisory.value} ${heldOutAdvisory.label} than the agent alone, with 19 of 20 runs passing hidden checks in each arm. ${heldOutAdvisory.caveat} A ${modPrototype.study} used ${modPrototype.value} ${modPrototype.label} than the agent alone, with 22% lower reported API cost and all 12 runs passing hidden checks in both arms. ${modPrototype.caveat}`,
     candor:
       'The evidence page also publishes negative results, including an execution mode that failed its own quality rule.',
   },
@@ -419,8 +421,13 @@ export const publicReferences: Link[] = [
   },
 ];
 
+/** Where the site's statements come from, in the third person for /llms.txt, /profile.json and the prompt. */
 export const disclaimer =
   'High-level career statements supplied by Steven Booth. Product terminology is aligned with public Salesforce documentation. Diagrams illustrate concepts, not an internal system design.';
+
+/** `disclaimer` for the page footer, as Steven. */
+export const sourceNote =
+  'The career statements here are my own, kept high level. Product terminology follows public Salesforce documentation, and the diagrams illustrate concepts, not an internal system design.';
 
 const filmSeconds = 16;
 
@@ -432,6 +439,6 @@ export const film = {
   title: 'Arrival',
   seconds: filmSeconds,
   body: 'From the city. Into the workspace.',
-  duration: `${filmSeconds} seconds · soundless`,
+  duration: `${filmSeconds} seconds · silent`,
   note: 'An illustrative, AI-generated San Francisco journey. The tower and skyline are not faithful architectural footage.',
 } as const;

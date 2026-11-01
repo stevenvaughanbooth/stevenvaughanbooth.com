@@ -335,11 +335,26 @@ test.describe('answers that act', () => {
     await expect(page.locator('details[name="career-role"][open]')).toHaveCount(1);
   });
 
+  test('from another page, a role on the timeline opens there once the home page arrives', async ({
+    page,
+  }) => {
+    await page.goto('/work/mcp');
+    await hydrated(page);
+    await openPalette(page);
+    await ask(page, 'Show me the Senior Engineer role');
+    await page.waitForURL('**/#role-senior-engineer');
+    const role = page.locator('#role-senior-engineer');
+    await expect(role.locator('details')).toHaveAttribute('open', '');
+    await expect(role.locator('summary')).toBeFocused();
+    await expect(role.locator('summary')).toBeInViewport();
+  });
+
   test('a case study opens as a page of its own', async ({ page }) => {
     await page.goto('/');
     await openPalette(page);
-    await ask(page, 'How do you design APIs for agents?');
-    const link = turn(page, 'How do you design APIs for agents?').getByRole('link', {
+    const prompt = themes.find((theme) => theme.id === 'mcp')!.prompt;
+    await ask(page, prompt);
+    const link = turn(page, prompt).getByRole('link', {
       name: /Read the MCP case study/,
     });
     await expect(link).toHaveAttribute('href', '/work/mcp');
@@ -355,7 +370,7 @@ test.describe('answers that act', () => {
     await hydrated(page);
     await page.getByRole('button', { name: 'Ask about this' }).click();
     const reply = turn(page, prompt);
-    await expect(reply).toContainText('The MCP diagram steps through how the context narrows.');
+    await expect(reply).toContainText('In the MCP diagram, a describe call');
     await expect(reply).not.toContainText('Work section');
     // One place, on this page: no link to the page the visitor is already on.
     const places = reply.getByRole('list', { name: 'On this site' });

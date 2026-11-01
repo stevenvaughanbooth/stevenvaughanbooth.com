@@ -486,8 +486,8 @@ export const siteComponents: readonly SiteComponent[] = [
     file: 'src/app/colophon/page.tsx',
     kind: 'server',
     loads: 'No JavaScript',
-    features: ['Server Component', 'Static prerendering'],
-    why: 'This list, the budgets and the versions are imported at build time from the files X-ray mode, Lighthouse CI and the build read, so those stay in step with the code. The measured scores and test counts are typed in from a dated run.',
+    features: ['Server Component', 'Static prerendering', 'scroll-driven animation'],
+    why: 'This list, the budgets and the versions are imported at build time from the files X-ray mode, Lighthouse CI and the build read; the measured scores and test counts are typed in from a dated run. Its section nav stays under the header and marks the section being read, in CSS alone.',
     onPage: true,
   },
 ];

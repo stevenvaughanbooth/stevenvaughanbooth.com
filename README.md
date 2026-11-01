@@ -41,9 +41,9 @@ model and the full `/api/ask` contract. In short:
   the Claude system prompt, JSON-LD, `/profile.json` and `/llms.txt` all read from it.
 - **HTML first.** Sections are Server Components. The diagrams render on the server too; a small
   `'use client'` shell shows each one and loads its controller only as it nears the viewport.
-  Every diagram plays the same tour, with a Pause / Play / Replay control, and the MCP diagram
-  lays its steps out as a lit Three.js scene once the page has loaded and gone idle, where the
-  device can draw it. The 2D card stays the content and the fallback. The
+  Every diagram plays the same tour, with a Pause / Play / Replay control, and all four lay their
+  steps out as lit Three.js scenes once the page has loaded and gone idle, where the device can
+  draw them. The 2D card stays the content and the fallback. The
   career timeline and the signal line ship no JavaScript at all. The other client modules are the
   theme toggle, the mobile Sections menu, the keyboard shortcuts, a copy button, the hero's ask
   bar, the Ask buttons and the palette loader, the hero's film frame, the "Scene by scene" dialog,
@@ -62,7 +62,8 @@ model and the full `/api/ask` contract. In short:
   career role, the awards or a case study) is on one allowlist,
   [`page-targets.ts`](src/lib/page-targets.ts), built from `profile.ts`. A curated answer offers
   "Show me…" buttons; "show me…" and "take me to…" questions move at once. The page scrolls
-  under the header, focus lands on the place's heading, and an accent ring marks it.
+  under the header, focus lands on the place's heading, and an accent ring marks it, from any
+  page of the site.
 - **Case studies.** `/work/devtools`, `/work/mcp` and `/work/platform` are prerendered from
   [`case-studies.ts`](src/content/case-studies.ts). Each theme's kicker, title, lede and diagram
   morph between the Work section and its case study with React's `<ViewTransition>`.
@@ -112,9 +113,9 @@ src/
     ask-client/           Browser client for /api/ask
     ask-contract.ts       Limits, types and error codes shared by both sides
     page-targets.ts       The allowlist of places an answer may show
-    page-actions.ts       Scrolls to, focuses and marks a place (loaded with the palette)
+    page-actions.ts       Scrolls to, focuses and marks a place, on arrival from another page too
     tokens.ts             Colour tokens for next/og images, the theme colour and the manifest
-    structured-data.ts    JSON-LD for the home page and /profile.json
+    structured-data.ts    JSON-LD for the home page and the case studies, and /profile.json
   test/                   Shared test helpers (browser API fakes)
 instrumentation-client.ts Vercel BotID's client setup
 tests/e2e/                Playwright specs
