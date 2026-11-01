@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StepPanel, StepStack } from '../shared/step-panel';
 import type { TourRegion } from '../shared/tour/use-tour';
 import { VisualFrame } from '../shared/visual-frame';
+import type { PlatformSceneData } from './scene-data';
 
 /** Every story moves through three phases; the tour steps through them all, story by story. */
 export const phasesPerStory = 3;
@@ -24,6 +25,8 @@ export interface MetadataPlatformContent {
   narration: readonly ReactNode[];
   /** Per story. */
   contributions: readonly ReactNode[];
+  /** What the controller's 3D scene draws. */
+  sceneData: PlatformSceneData;
 }
 
 interface MetadataPlatformViewProps extends MetadataPlatformContent {
@@ -37,6 +40,11 @@ interface MetadataPlatformViewProps extends MetadataPlatformContent {
   /** PhaseSteps, likewise. */
   phaseSteps: ReactNode;
   region?: TourRegion;
+  /**
+   * The controller's 3D scene over the diagrams. It follows every step (story × phase) and sits
+   * outside the per-story diagram, so changing stories moves its camera instead of remounting it.
+   */
+  scene?: ReactNode;
 }
 
 /**
@@ -56,6 +64,7 @@ export function MetadataPlatformView({
   tabs,
   phaseSteps,
   region,
+  scene,
 }: MetadataPlatformViewProps) {
   const story = Math.floor(step / phasesPerStory);
   const phase = step % phasesPerStory;
@@ -78,6 +87,7 @@ export function MetadataPlatformView({
               {scenes[story]}
             </div>
           }
+          scene={scene}
         >
           {phaseSteps}
           <StepStack step={story} items={titles} className="mt-3" />

@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { projects, themes } from '@/content/profile';
 import { mockIntersectionObserver, mockReducedMotion } from '@/test/browser-mocks';
 import { MetadataPlatform } from '../metadata-platform';
+import { platformSceneData } from './scene-data';
+import { Scene } from './scenes';
 import { type StoryId, stories } from './stories';
 
 // The controller's first dynamic import is transformed on demand, which can take over a second
@@ -229,5 +231,58 @@ describe('MetadataPlatform', () => {
 
     expect(selectedTab()).toHaveAccessibleName(story('migration').short);
     expect(selectedTab()).toHaveFocus();
+  });
+  it('keeps the 2D diagram where WebGL is unavailable, loading no 3D scene', async () => {
+    mockReducedMotion(false);
+    render(<MetadataPlatform />);
+    await loadController();
+    // jsdom has no WebGL: the scene's box stays empty and the stage keeps its SVG.
+    const stage = within(card()).getByRole('img');
+    // The scene's box comes first in the stage, outside the per-story diagram it covers.
+    const scene = stage.firstElementChild;
+    expect(scene).toHaveAttribute('aria-hidden', 'true');
+    expect(scene).not.toHaveAttribute('data-phase');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stage.querySelector('canvas')).toBeNull();
+    expect(stage.querySelector('[data-scene="live"]')).toBeNull();
+    expect(scene).toBeEmptyDOMElement();
+    expect(stage.querySelectorAll('svg')).toHaveLength(1);
+  });
+
+  it('labels the 3D scene with the words its 2D diagrams draw', () => {
+    const data = platformSceneData();
+    const words: Record<StoryId, readonly string[]> = {
+      agents: [
+        data.platform,
+        data.agents.source,
+        data.agents.tools,
+        ...data.agents.steps,
+        data.agents.target,
+        data.agents.outcome,
+        ...data.agents.metadata.flatMap((item) => [item.letter, item.value]),
+      ],
+      schema: [
+        data.platform,
+        ...data.schema.rows.flatMap((row) => [row.label, row.value]),
+        data.schema.added.label,
+        data.schema.hub,
+        data.schema.hubBody,
+        data.schema.target,
+        data.schema.outcome,
+      ],
+      migration: [
+        data.platform,
+        data.migration.source,
+        ...data.migration.definitions.flatMap((item) => [item.letter, item.label]),
+        data.migration.hub,
+        data.migration.foundation,
+      ],
+    };
+    expect(data.results).toEqual(stories.map((item) => item.result));
+    for (const item of stories) {
+      const { container, unmount } = render(<Scene id={item.id} result={item.result} />);
+      for (const word of words[item.id]) expect(container).toHaveTextContent(word);
+      unmount();
+    }
   });
 });

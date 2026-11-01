@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { SegmentedTabs } from '../shared/segmented-tabs';
+import { SceneCanvas } from '../shared/three/scene-canvas';
 import { TourControls } from '../shared/tour/tour-controls';
 import { useTour } from '../shared/tour/use-tour';
 import { tablistLabel, wording } from './controls';
 import { PhaseSteps } from './phase-steps';
 import { type MetadataPlatformContent, MetadataPlatformView, phasesPerStory } from './view';
 
+/** The 3D scene's chunk, with three.js. SceneCanvas imports it once the page has settled. */
+const loadScene = () => import('./scene');
+
 /**
- * Loaded lazily by the shell: live tabs and phases, and the shared one-pass tour through every
- * phase of every story.
+ * Loaded lazily by the shell: live tabs and phases, the shared one-pass tour through every phase
+ * of every story, and the 3D platform scene over the diagrams where the device can draw it.
  */
 export function MetadataPlatformController(content: MetadataPlatformContent) {
   const tour = useTour({ steps: content.stories.length * phasesPerStory });
@@ -67,6 +71,7 @@ export function MetadataPlatformController(content: MetadataPlatformContent) {
           progress={tour.progress}
         />
       }
+      scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}
     />
   );
 }
