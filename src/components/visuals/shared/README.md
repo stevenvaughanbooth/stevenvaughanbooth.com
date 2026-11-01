@@ -147,8 +147,9 @@ sets `data-scene="live"`: the box fades in and the SVG after it, its `peer`, fad
 its place, so nothing moves). A failed import, a WebGL error or a lost context leaves or puts the
 2D card back; a restored context brings the scene back. While the scene is live the diagram also
 stops taking the pointer (`peer-data-[scene=live]:pointer-events-none`): its opacity puts it above
-the canvas in paint order. On a software renderer (SwiftShader, llvmpipe) the engine draws at 1x
-and cuts between steps, as under reduced motion.
+the canvas in paint order. A software renderer (SwiftShader, llvmpipe) keeps the 2D card unless
+`localStorage.scene` is `'force'`, as in the end-to-end tests; forced, the engine draws at 1x and
+cuts between steps, as under reduced motion.
 
 **A scene** is `defineScene<Data>({ poses, fov?, framedAspect?, build })`:
 

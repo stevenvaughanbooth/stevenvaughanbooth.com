@@ -145,7 +145,8 @@ in, with a Pause / Play / Replay control in the footer.
 
 A controller may also lay a **3D scene** over its SVG (today all three Work diagrams and the Adage replay do). Its
 `SceneCanvas` checks first that the device may draw in 3D (no Save-Data, no
-`prefers-reduced-data`, at least 4 GB of device memory where the browser reports it, and WebGL 2),
+`prefers-reduced-data`, at least 4 GB of device memory where the browser reports it, and WebGL 2
+drawn on a GPU: a software renderer such as SwiftShader keeps the 2D card),
 then waits for the load event, an idle period and a pause in scrolling before it imports the
 scene's chunk: three.js 0.186 (named imports, about 146 KB compressed), the shared engine in
 `visuals/shared/three/` and the scene. The home page therefore never fetches three.js until a diagram's controller has loaded near
@@ -409,7 +410,9 @@ the X-ray HUD; they are typed in by hand after each run.
 | `/colophon` | 97          | 100           | 100            | 100 | 1.05 s | 2.63 s | 20 ms | 0   | 158,306 B  | 270,493 B |
 | `/work/mcp` | 96          | 100           | 100            | 100 | 1.05 s | 2.78 s | 52 ms | 0   | 336,213 B  | 471,548 B |
 
-**3D diagrams.** The run above includes all four Three.js scenes. On `/` the diagrams are below the
+**3D diagrams.** The run above, on a machine with a GPU, includes all four Three.js scenes. GitHub's
+runners draw WebGL in software, where the diagrams stay 2D, so Lighthouse CI there measures the 2D
+path; the end-to-end tests force the scenes on (`localStorage.scene = 'force'`) to check them. On `/` the diagrams are below the
 fold, so three.js is not fetched during the audit. On `/work/mcp` the diagram is in view: its scene
 loads and compiles after the load event, which adds about 157 KB of JavaScript and about 30 ms of
 total blocking time against the 2D build, with the score and LCP unchanged.

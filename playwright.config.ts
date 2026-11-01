@@ -19,6 +19,14 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // Headless Chromium draws WebGL in software, where the site keeps diagrams 2D; the tests
+    // force the 3D scenes on to check them (src/components/visuals/shared/three/support.ts).
+    storageState: {
+      cookies: [],
+      origins: [
+        { origin: new URL(baseURL).origin, localStorage: [{ name: 'scene', value: 'force' }] },
+      ],
+    },
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
