@@ -200,9 +200,9 @@ Work theme at `/work/<theme>`, and Under the hood at `/colophon`:
    across both columns: Top 1% (FY24 President's Award), Principal, MCP tools, Adage. The portrait
    frame opens with _Arrival_, a 16-second film that lands on the portrait, and its chip replays
    the film in a theater with a "Scene by scene" text alternative.
-2. **Open source: Adage.** The flagship side project, with a replay of a reflex in a terminal (its
-   pipeline staged in 3D above it, where the device can draw it) and its evidence quoted with the
-   caveats.
+2. **Open source: Adage.** Adage's intro, install command and links; the session replay in its own
+   band, the 3D stage and a scrolling terminal side by side on wide screens; then the question behind
+   it and the evidence, quoted with the caveats.
 3. **Work:** three themes (team multiplier, agent interfaces, Core Metadata Platform), each with an
    interactive diagram that tours its steps (in 3D, where the device can draw it), a "Read the case study" link and an "Ask about this" button.
 4. **Experience:** career timeline, recognition (anchored at `#recognition`), builder note and

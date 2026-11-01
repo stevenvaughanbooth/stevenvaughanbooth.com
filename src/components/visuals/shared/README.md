@@ -94,7 +94,7 @@ footer={<TourControls accent="green" playback={tour.playback} running={tour.runn
   under focus;
 - never starts under reduced motion (the views hide the footer with `motion-reduce:hidden`).
 
-`start: 'unseen'` is for a replay whose text must not vanish under the reader (ReflexDemo): it
+`start: 'unseen'` is for a replay whose text must not vanish under the reader (ReflexDemo, whose region is its stage and terminal together): it
 resets to the first step only while out of sight, and rests if it is already on screen. A replay
 passes `dwellMs` as a function, one delay per frame.
 
