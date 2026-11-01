@@ -1,22 +1,17 @@
 import {
-  AdditiveBlending,
-  type Blending,
   type BufferGeometry,
   CatmullRomCurve3,
   Color,
   ConeGeometry,
   CubicBezierCurve3,
   type Curve,
-  DirectionalLight,
   ExtrudeGeometry,
   Fog,
   Group,
-  HemisphereLight,
   LatheGeometry,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  NormalBlending,
   PlaneGeometry,
   Quaternion,
   RingGeometry,
@@ -30,8 +25,9 @@ import {
   Vector3,
 } from 'three';
 import { defineScene, type Theme } from '../shared/three/engine';
-import { damp } from '../shared/three/pose';
-import { radialTexture, rimGeometry, slabGeometry } from '../shared/three/shapes';
+import { drawTubes, Eased, glowBlending, glowTextures, lightRig, mix } from '../shared/three/kit';
+import { boxCorners, type Vec3 } from '../shared/three/pose';
+import { rimGeometry, slabGeometry } from '../shared/three/shapes';
 import type { MultiplierSceneData } from './scene-data';
 
 /*
@@ -84,32 +80,11 @@ const POP_MS = 520;
 
 type Phase = 'pending' | 'current' | 'reached';
 
-/** A number that eases towards its target, optionally after a delay. */
-class Eased {
-  value: number;
-  target: number;
-  private from = 0;
-  constructor(value: number) {
-    this.value = value;
-    this.target = value;
-  }
-  set(target: number, instant: boolean, at = 0) {
-    this.target = target;
-    this.from = at;
-    if (instant) this.value = target;
-  }
-  /** True while it still moves. */
-  update(dt: number, now: number, tau = 0.24): boolean {
-    if (now < this.from) return true;
-    this.value = damp(this.value, this.target, dt, tau);
-    if (Math.abs(this.value - this.target) < 0.002) this.value = this.target;
-    return this.value !== this.target;
-  }
-}
-
 /** A part of the network that lights when the pulse reaches it. */
 interface Node {
   stage: number;
+  /** Everyone else the practice reaches: unseen until the pulse reaches them. */
+  satellite: boolean;
   /** Seconds after a run starts that the pulse reaches it. */
   arrive: number;
   group: Group;
@@ -157,8 +132,6 @@ interface Pulse {
   core: Mesh<SphereGeometry, MeshBasicMaterial>;
   trail: Sprite[];
 }
-
-const mix = (a: Color, b: Color, t: number, out: Color) => out.copy(a).lerp(b, t);
 
 /** A flat-topped puck with softened edges, its base at y = 0. */
 function discGeometry(radius: number, height: number) {
@@ -228,30 +201,75 @@ function arc(a: Vector3, b: Vector3, lift: number) {
   );
 }
 
+/*
+ * What each stage keeps in view. Only what the camera frames is drawn: a stage not reached yet
+ * waits as a ghost only when it is next, and the glass floor arrives with the loop that runs on
+ * it, so no edge or half-drawn ghost is ever cut by the stage.
+ */
+const championView: Vec3[] = [
+  // The pad, its halos and the champion.
+  ...boxCorners(
+    [CHAMPION.x - CHAMPION.radius - 0.5, 0, CHAMPION.z - CHAMPION.radius - 0.5],
+    [CHAMPION.x + CHAMPION.radius + 0.5, 0.9, CHAMPION.z + CHAMPION.radius + 0.5],
+  ),
+  // The ideas overhead, with their name, and the champion's name in front.
+  [CHAMPION.x - 0.7, 2.25, CHAMPION.z],
+  [CHAMPION.x + 0.7, 2.25, CHAMPION.z],
+  [CHAMPION.x - 0.6, 0, CHAMPION.z + CHAMPION.radius + 1.1],
+  [CHAMPION.x + 0.6, 0, CHAMPION.z + CHAMPION.radius + 1.1],
+];
+const workflowView = boxCorners(
+  [WORKFLOW.x - WORKFLOW.width / 2, 0, WORKFLOW.z - WORKFLOW.depth / 2],
+  [WORKFLOW.x + WORKFLOW.width / 2, WORKFLOW.height + 0.1, WORKFLOW.z + WORKFLOW.depth / 2],
+);
+const peopleView: Vec3[] = [
+  ...boxCorners(
+    [ENGINEERS.x - 1.05, 0, ENGINEERS.z - 0.62],
+    [ENGINEERS.x + 1.05, 0.6, ENGINEERS.z + 1.15],
+  ),
+  ...boxCorners(
+    [TEAMS.x - TEAMS.width / 2, 0, TEAMS.z - TEAMS.depth / 2],
+    [TEAMS.x + TEAMS.width / 2, 0.6, TEAMS.z + TEAMS.depth / 2 + 0.55],
+  ),
+];
+const reachView = satellites.flatMap(({ x, z }) =>
+  boxCorners([x - 0.25, 0, z - 0.25], [x + 0.25, SATELLITE.y + 0.25, z + 0.25]),
+);
+const floorView = boxCorners(
+  [FLOOR.x - FLOOR.width / 2, -FLOOR.height, FLOOR.z - FLOOR.depth / 2],
+  [FLOOR.x + FLOOR.width / 2, 0, FLOOR.z + FLOOR.depth / 2],
+);
+
 export const scene = defineScene<MultiplierSceneData>({
   fov: 30,
-  framedAspect: 1.6,
-  poses: [
-    // Discover: close on the champion and the ideas overhead.
-    { target: [CHAMPION.x + 0.35, 0.62, 0.1], distance: 7.4, azimuth: -0.46, elevation: 0.34 },
-    // Share: the champion and the workflows.
-    { target: [-2.25, 0.7, 0.05], distance: 8.8, azimuth: -0.3, elevation: 0.44 },
+  views: [
+    // Discover: close on the champion and the ideas overhead, the workflows waiting beside them.
+    { azimuth: -0.46, elevation: 0.36, fit: [...championView, ...workflowView] },
+    // Share: the champion and the workflows, the people they reach waiting beyond.
+    { azimuth: -0.3, elevation: 0.46, fit: [...championView, ...workflowView, ...peopleView] },
     // Enable: back, to the engineers, the teams and everyone beyond.
-    { target: [0.3, 0.35, 0.2], distance: 14.2, azimuth: -0.16, elevation: 0.6 },
-    // Learn: back and up, to the whole loop.
-    { target: [0.2, 0, 1.05], distance: 15.8, azimuth: -0.06, elevation: 0.84 },
+    {
+      azimuth: -0.16,
+      elevation: 0.6,
+      fit: [...championView, ...workflowView, ...peopleView, ...reachView],
+    },
+    // Learn: back and up, to the whole loop on its floor.
+    {
+      azimuth: -0.06,
+      elevation: 0.84,
+      fit: [...championView, ...peopleView, ...reachView, ...floorView],
+    },
   ],
   build({ scene: root, camera, label, own }, data) {
-    const glowTexture = own(radialTexture(2.4));
-    const shadowTexture = own(radialTexture(1.6));
+    const { glow: glowTexture, shadow: shadowTexture } = glowTextures(own);
     const person = personGeometries();
     let theme: Theme | undefined;
 
     // Light from above and in front, with the floor's colour from below.
-    const sky = new HemisphereLight(0xffffff, 0x000000, 2.1);
-    const sun = new DirectionalLight(0xffffff, 1.7);
-    sun.position.set(4, 10, 8);
-    root.add(sky, sun);
+    const light = lightRig(root, [4, 10, 8], {
+      light: { sky: 2.1, sun: 1.6 },
+      dark: { sky: 1.3, sun: 1.2 },
+    });
     const fog = new Fog(0x000000, 14, 40);
     root.fog = fog;
 
@@ -274,6 +292,8 @@ export const scene = defineScene<MultiplierSceneData>({
     floor.renderOrder = 0;
     floorRim.renderOrder = 1;
     root.add(floor, floorRim);
+    /** The floor shows with the loop that runs on it, when the camera takes in all of it. */
+    const floorShown = new Eased(1);
 
     const nodes: Node[] = [];
     function addNode(
@@ -297,6 +317,7 @@ export const scene = defineScene<MultiplierSceneData>({
       group.add(glow);
       const node: Node = {
         stage,
+        satellite: false,
         arrive,
         group,
         pads: [],
@@ -462,6 +483,7 @@ export const scene = defineScene<MultiplierSceneData>({
     const dot = new SphereGeometry(SATELLITE.radius, 32, 20);
     satellites.forEach(({ x, z }, index) => {
       const node = addNode(2, reached + LEG.reach + index * LEG.stagger, x, z, 1.5, 0.3);
+      node.satellite = true;
       const sphere = new Mesh(dot, figureMaterial());
       sphere.position.y = SATELLITE.y;
       sphere.renderOrder = 5;
@@ -472,6 +494,8 @@ export const scene = defineScene<MultiplierSceneData>({
 
     // The connections.
     const beams: Beam[] = [];
+    /** Connections out to everyone else, which wait unseen with them. */
+    const reachBeams = new Set<Beam>();
     function addBeam(stage: number, curve: Curve<Vector3>, segments = 64) {
       const tube = (radius: number) => new TubeGeometry(curve, segments, radius, 8, false);
       const track = new Mesh(tube(0.011), new MeshBasicMaterial({ transparent: true }));
@@ -516,11 +540,13 @@ export const scene = defineScene<MultiplierSceneData>({
               ENGINEERS.z + lastEngineer.z,
             )
           : new Vector3(TEAMS.x + TEAMS.width / 2, 0.08, TEAMS.z);
-      return addBeam(
+      const beam = addBeam(
         2,
         arc(start, new Vector3(x - SATELLITE.radius - 0.02, SATELLITE.y, z), 0.22),
         40,
       );
+      reachBeams.add(beam);
+      return beam;
     });
     // Shared learning: from the farthest reach, round the front of the network, back to the
     // champion.
@@ -640,7 +666,10 @@ export const scene = defineScene<MultiplierSceneData>({
         // A node lights as the pulse reaches it; dimming and resetting happen at once.
         const arrive = phase === 'pending' ? 0 : at(node.arrive);
         const wasLit = node.lit.target === 1;
-        node.presence.set(phase === 'pending' ? 0.26 : 1, instant);
+        // A stage not reached yet waits as a ghost only when it is next, and only where the
+        // camera frames it; everyone else appears as the pulse reaches them.
+        const ghost = node.stage === step + 1 && !node.satellite ? 0.26 : 0;
+        node.presence.set(phase === 'pending' ? ghost : 1, instant);
         node.lit.set(phase === 'pending' ? 0 : 1, instant, wasLit ? 0 : arrive);
         node.now.set(phase === 'current' ? 1 : 0, instant, phase === 'current' ? arrive : 0);
         if (!instant && phase !== 'pending' && (!wasLit || phase === 'current')) {
@@ -664,6 +693,7 @@ export const scene = defineScene<MultiplierSceneData>({
         pingQueue.push({ at: workflow.pop, x: WORKFLOW.x, z: WORKFLOW.z, radius: workflow.ping });
       }
       learningLit.set(step >= 3 ? 1 : 0, instant, step >= 3 ? at(home - LEG.loop / 2) : 0);
+      floorShown.set(step >= 3 ? 1 : 0, instant);
 
       // The ideas rise from the champion as Discover begins.
       sparks.forEach((spark, index) => {
@@ -687,8 +717,8 @@ export const scene = defineScene<MultiplierSceneData>({
 
     function paint(dt: number, now: number): boolean {
       if (!theme) return false;
-      const { color, dark } = theme;
-      const additive: Blending = dark ? AdditiveBlending : NormalBlending;
+      const { color, dark, blueprint } = theme;
+      const additive = glowBlending(theme);
       // Solid amber reads as brown in the light theme's shading: lift it there.
       warm.copy(color.amber);
       if (!dark) warm.offsetHSL(0, -0.12, 0.12);
@@ -699,13 +729,14 @@ export const scene = defineScene<MultiplierSceneData>({
       fog.color.copy(color.bg);
       fog.near = away * 0.95;
       fog.far = away * 2.8;
-      sky.groundColor.copy(color.bg);
-      sky.intensity = dark ? 1.3 : 2.1;
-      sun.intensity = dark ? 1.2 : 1.6;
+      light.paint(theme);
+      moving = floorShown.update(dt, now, 0.3) || moving;
+      const ground = floorShown.value;
       floor.material.color.copy(dark ? color.elevated : color.surface);
-      floor.material.opacity = dark ? 0.42 : 0.6;
+      floor.material.opacity = (blueprint ? 0.3 : dark ? 0.42 : 0.6) * ground;
       floorRim.material.color.copy(color.lineStrong);
-      floorRim.material.opacity = dark ? 0.7 : 0.8;
+      floorRim.material.opacity = (dark ? 0.7 : 0.8) * ground;
+      floor.visible = floorRim.visible = ground > 0.003;
 
       for (const node of nodes) {
         moving = node.presence.update(dt, now) || moving;
@@ -732,8 +763,8 @@ export const scene = defineScene<MultiplierSceneData>({
           );
           material.emissive.copy(color.amber);
           material.emissiveIntensity = dark ? 0.05 * showing : 0;
-          material.opacity = (dark ? 0.86 : 0.92) * p;
-          material.depthWrite = p > 0.9;
+          material.opacity = (blueprint ? 0.55 : dark ? 0.86 : 0.92) * p;
+          material.depthWrite = p > 0.9 && !blueprint;
         }
         for (const figure of node.figures) {
           const material = figure.material;
@@ -806,13 +837,11 @@ export const scene = defineScene<MultiplierSceneData>({
           beam.drawn = Math.min(beam.target, Math.max(beam.drawn, reachedNow));
           if (beam.drawn < beam.target) moving = true;
         }
-        const segments = beam.trace.geometry.parameters.tubularSegments;
-        const radial = beam.trace.geometry.parameters.radialSegments;
-        const count = Math.round(beam.drawn * segments) * radial * 6;
-        beam.trace.geometry.setDrawRange(0, count);
-        beam.glow.geometry.setDrawRange(0, count);
-        // A connection not reached yet is a faint track; the loop's waits unseen until Enable.
-        const waiting = beam.stage > current ? (beam === loop && current < 2 ? 0 : 0.45) : 1;
+        drawTubes(beam.drawn, beam.trace, beam.glow);
+        // A connection not reached yet is a faint track while its stage is next; the loop's and
+        // those out to everyone else wait unseen, with what they lead to.
+        const next = beam.stage === current + 1 && beam !== loop && !reachBeams.has(beam);
+        const waiting = beam.stage > current ? (next ? 0.45 : 0) : 1;
         beam.track.material.color.copy(color.lineStrong);
         beam.track.material.opacity = (dark ? 0.8 : 0.9) * waiting;
         beam.track.visible = waiting > 0;

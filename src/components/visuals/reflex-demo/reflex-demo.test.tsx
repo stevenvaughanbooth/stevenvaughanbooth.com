@@ -7,6 +7,7 @@ import {
   setPageVisibility,
 } from '@/test/browser-mocks';
 import { ReflexDemo } from '../reflex-demo';
+import { TOUR_OVERVIEW_MS } from '../shared/tour/use-tour';
 import { knownCommand, steps, transcript } from './script';
 import { reflexSceneData } from './scene-data';
 import { sceneBeat, sceneBeats } from './scene-beats';
@@ -205,19 +206,20 @@ describe('<ReflexDemo />', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('keeps the finished session when it is already on screen as the controller loads', async () => {
+  it('opens on the finished session when it loads on screen, then replays it from the start', async () => {
     mockReducedMotion(false);
     render(<ReflexDemo />);
     await loadController({ onScreen: true });
-    vi.useFakeTimers();
-    page.show(1);
 
+    // The session the visitor landed on stays for a beat, offering to play…
     expect(pendingText()).toBe('');
-    expect(vi.getTimerCount()).toBe(0);
-    expect(screen.getByText('Full session')).toBeInTheDocument();
-    fireEvent.click(button('Play the session'));
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(button('Play the session')).toBeInTheDocument();
+    // …then replays from the start by itself.
+    await waitFor(() => expect(button('Pause the session')).toBeInTheDocument(), {
+      timeout: TOUR_OVERVIEW_MS + 1500,
+    });
     expect(pendingText()).not.toBe('');
-    expect(button('Pause the session')).toBeInTheDocument();
   });
 
   it('pauses and resumes from the same control every tour has', async () => {

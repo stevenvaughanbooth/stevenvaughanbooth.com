@@ -31,6 +31,8 @@ async function loadController() {
   const staticTabs = screen.getByRole('tablist');
   page.show(0, { near: true });
   await waitFor(() => expect(staticTabs).not.toBeInTheDocument(), controllerLoad);
+  // The controller's first report: still out of sight, so the tour resets to its first step.
+  page.show(0);
 }
 
 function story(id: StoryId) {
@@ -89,7 +91,7 @@ describe('MetadataPlatform', () => {
     expect(card()).not.toHaveTextContent(projects.find((project) => project.id === 'mcp')!.summary);
   });
 
-  it('opens a picked story on its outcome, by click and by keyboard', async () => {
+  it('opens a picked story at its first phase, by click and by keyboard', async () => {
     mockReducedMotion(true);
     render(<MetadataPlatform />);
     await loadController();
@@ -98,9 +100,9 @@ describe('MetadataPlatform', () => {
     fireEvent.click(screen.getByRole('tab', { name: schema.short }));
     expect(selectedTab()).toHaveAccessibleName(schema.short);
     expect(screen.getByRole('img')).toHaveAccessibleName(schema.description);
-    expect(currentPhase()).toHaveAccessibleName(schema.phases[2].label);
+    expect(currentPhase()).toHaveAccessibleName(schema.phases[0].label);
     expect(screen.getByText(schema.title)).toBeVisible();
-    expect(screen.getByText(schema.phases[2].copy)).toBeVisible();
+    expect(screen.getByText(schema.phases[0].copy)).toBeVisible();
     expect(card().querySelectorAll('[role="img"] svg')).toHaveLength(1);
 
     fireEvent.keyDown(selectedTab(), { key: 'ArrowRight' });

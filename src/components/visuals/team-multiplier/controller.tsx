@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SegmentedTabs } from '../shared/segmented-tabs';
 import { SceneCanvas } from '../shared/three/scene-canvas';
 import { TourControls } from '../shared/tour/tour-controls';
@@ -13,7 +14,9 @@ const loadScene = () => import('./scene');
  * network in 3D over the SVG where the device can draw it.
  */
 export function TeamMultiplierController(content: TeamMultiplierContent) {
-  const tour = useTour({ steps: content.stages.length });
+  // The tour waits for the 3D scene to swap in (or not), so it never swaps in mid-step.
+  const [settled, setSettled] = useState(false);
+  const tour = useTour({ steps: content.stages.length, hold: !settled });
 
   return (
     <TeamMultiplierView
@@ -36,11 +39,20 @@ export function TeamMultiplierController(content: TeamMultiplierContent) {
           accent="amber"
           playback={tour.playback}
           running={tour.running}
+          looking={tour.looking}
           wording={wording}
           onToggle={tour.toggle}
         />
       }
-      scene={<SceneCanvas load={loadScene} data={content.sceneData} step={tour.step} />}
+      scene={
+        <SceneCanvas
+          load={loadScene}
+          data={content.sceneData}
+          step={tour.step}
+          running={tour.running}
+          onSettle={() => setSettled(true)}
+        />
+      }
     />
   );
 }

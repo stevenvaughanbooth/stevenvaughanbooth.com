@@ -4,12 +4,12 @@ import { guidedTour, tourStatus } from './wording';
 describe('tourStatus', () => {
   const wording = guidedTour('Full loop');
 
-  it('offers Pause while playing, and says whether it is held', () => {
-    expect(tourStatus('playing', true, wording)).toEqual({
+  it('offers Pause while playing, and says it is held only while the visitor looks', () => {
+    expect(tourStatus('playing', false, wording)).toEqual({
       status: 'Auto-advancing',
       action: { label: 'Pause', icon: 'pause', name: 'Pause auto-advance' },
     });
-    expect(tourStatus('playing', false, wording).status).toBe('Paused while you look');
+    expect(tourStatus('playing', true, wording).status).toBe('Paused while you look');
   });
 
   it('offers Play before it starts, when paused or ready, and Replay at the end', () => {

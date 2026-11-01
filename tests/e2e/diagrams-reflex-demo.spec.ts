@@ -151,9 +151,10 @@ test.describe('the Adage replay in 3D', () => {
     const before = await printed();
     await expect.poll(printed).toBeGreaterThan(before);
 
-    // Out of sight, it holds where it was.
+    // Out of sight, it holds where it was, and says nothing new: nobody is looking at it.
     await page.evaluate(() => scrollTo(0, 0));
-    await expect(status).toHaveText('Paused while you look');
+    await page.waitForTimeout(300);
+    await expect(status).toHaveText('Replaying');
     const held = await printed();
     await page.waitForTimeout(1_500);
     expect(await printed()).toBe(held);

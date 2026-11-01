@@ -1,16 +1,12 @@
 import {
-  AdditiveBlending,
   type Blending,
   Color,
   CubicBezierCurve3,
-  DirectionalLight,
   Fog,
   Group,
-  HemisphereLight,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  NormalBlending,
   PlaneGeometry,
   SphereGeometry,
   Sprite,
@@ -19,8 +15,9 @@ import {
   Vector3,
 } from 'three';
 import { defineScene, type Theme } from '../shared/three/engine';
-import { damp } from '../shared/three/pose';
-import { panelGeometry, radialTexture, rimGeometry, slabGeometry } from '../shared/three/shapes';
+import { drawTubes, Eased, glowBlending, glowTextures, lightRig, mix } from '../shared/three/kit';
+import { boxCorners, type Vec3 } from '../shared/three/pose';
+import { panelGeometry, rimGeometry, slabGeometry } from '../shared/three/shapes';
 import { sceneBeats } from './scene-beats';
 import type { ReflexSceneData } from './scene-data';
 
@@ -58,29 +55,6 @@ const LIVE_ROWS = { z: [-0.22, -0.07, 0.31], widths: [0.86, 1.04, RECURRING], of
 /** Seconds: the history's read, the lift, a signal or a firing. */
 const TIME = { read: 0.14, light: 0.08, lift: 0.85, liftStagger: 0.1, form: 0.4, beam: 0.6 };
 
-/** A number that eases towards its target, optionally after a delay. */
-class Eased {
-  value: number;
-  target: number;
-  private from = 0;
-  constructor(value: number) {
-    this.value = value;
-    this.target = value;
-  }
-  set(target: number, instant: boolean, at = 0) {
-    this.target = target;
-    this.from = at;
-    if (instant) this.value = target;
-  }
-  /** True while it still moves. */
-  update(dt: number, now: number, tau = 0.24): boolean {
-    if (now < this.from) return true;
-    this.value = damp(this.value, this.target, dt, tau);
-    if (Math.abs(this.value - this.target) < 0.002) this.value = this.target;
-    return this.value !== this.target;
-  }
-}
-
 /** A connection drawn in as a stroke, optionally over a faint track. */
 interface Beam {
   curve: CubicBezierCurve3;
@@ -117,8 +91,6 @@ interface Card {
 
 type Phase = 'pending' | 'current' | 'passed';
 
-const mix = (a: Color, b: Color, t: number, out: Color) => out.copy(a).lerp(b, t);
-
 /** A bump from 0 up to 1 and back over `width` seconds, from `t` = 0. */
 const bump = (t: number, width: number) =>
   t <= 0 || t >= width ? 0 : Math.sin((t / width) * Math.PI) ** 2;
@@ -132,41 +104,64 @@ const arc = (start: Vector3, end: Vector3, lift: number, forward = 0) =>
     end,
   );
 
+/**
+ * The whole loop, which every step keeps in view so nothing is ever cut off: the history and its
+ * caption under it, the reflex and its caption over it, the live session and its caption, and the
+ * loop's arc in front.
+ */
+const whole: Vec3[] = [
+  ...boxCorners(
+    [
+      DECK.x - (DECK.count - 1) * DECK.fan - CARD.width / 2,
+      0,
+      DECK.z - (DECK.count - 1) * DECK.gap,
+    ],
+    [DECK.x + CARD.width / 2, CARD.height + 0.05, DECK.z + 0.1],
+  ),
+  ...boxCorners(
+    [REFLEX.x - REFLEX.width / 2, REFLEX.y - REFLEX.height / 2, REFLEX.z],
+    [REFLEX.x + REFLEX.width / 2, REFLEX.y + REFLEX.height / 2 + 0.3, REFLEX.z + 0.1],
+  ),
+  ...boxCorners(
+    [LIVE.x - CARD.width / 2, 0, LIVE.z],
+    [LIVE.x + CARD.width / 2, CARD.height + 0.05, LIVE.z + 0.1],
+  ),
+  // The captions hanging under the history and the session, and the loop between them.
+  [DECK.x - CARD.width / 2 - 0.3, -0.45, DECK.z],
+  [LIVE.x + 0.9, -0.45, LIVE.z],
+  [0, 0, 1.55],
+];
+
 export const scene = defineScene<ReflexSceneData>({
   fov: 30,
-  framedAspect: 1.45,
-  // Every pose frames the whole loop, so nothing is ever cut off; the camera only leans towards
-  // the part of the pipeline being shown.
-  poses: [
+  // The camera only leans towards the part of the pipeline being shown.
+  views: [
     // Reading the history, then the step it repeats: from the right, along the stack.
-    { target: [0.2, 1, 0.2], distance: 7.6, azimuth: 0.3, elevation: 0.26 },
-    { target: [0.2, 1, 0.2], distance: 7.6, azimuth: 0.3, elevation: 0.26 },
-    { target: [0.2, 1, 0.2], distance: 7.6, azimuth: 0.3, elevation: 0.26 },
+    { azimuth: 0.3, elevation: 0.26, fit: whole },
+    { azimuth: 0.3, elevation: 0.26, fit: whole },
+    { azimuth: 0.3, elevation: 0.26, fit: whole },
     // The reflex takes shape above the history.
-    { target: [0.1, 1, 0.2], distance: 7.5, azimuth: 0.2, elevation: 0.24 },
-    // The session's failures, the match and the firing: square on, a step back.
-    { target: [0.1, 0.9, 0.2], distance: 8.1, azimuth: 0.02, elevation: 0.24 },
-    { target: [0.1, 0.9, 0.2], distance: 8.1, azimuth: 0.02, elevation: 0.24 },
-    { target: [0.1, 0.9, 0.2], distance: 8.1, azimuth: 0.02, elevation: 0.24 },
+    { azimuth: 0.2, elevation: 0.24, fit: whole },
+    // The session's failures, the match and the firing: square on.
+    { azimuth: 0.02, elevation: 0.24, fit: whole },
+    { azimuth: 0.02, elevation: 0.24, fit: whole },
+    { azimuth: 0.02, elevation: 0.24, fit: whole },
     // The whole loop, from a little higher.
-    { target: [0.1, 1, 0.2], distance: 7.8, azimuth: 0.12, elevation: 0.28 },
+    { azimuth: 0.12, elevation: 0.28, fit: whole },
   ],
   build({ scene: root, label, own }, data) {
-    const glowTexture = own(radialTexture(2.4));
-    const shadowTexture = own(radialTexture(1.6));
+    const { glow: glowTexture, shadow: shadowTexture } = glowTextures(own);
     let theme: Theme | undefined;
 
-    const sky = new HemisphereLight(0xffffff, 0x000000, 2.1);
-    const sun = new DirectionalLight(0xffffff, 1.6);
-    sun.position.set(4, 9, 8);
-    root.add(sky, sun);
+    const light = lightRig(root, [4, 9, 8], {
+      light: { sky: 2.1, sun: 1.6 },
+      dark: { sky: 1.3, sun: 1.1 },
+    });
     root.fog = new Fog(0x000000, 7.5, 17);
 
-    /** A glow sprite. Its material is disposed with the scene: the engine disposes meshes only. */
+    /** A glow sprite; the engine disposes it, its material and texture with the scene. */
     const glowSprite = () =>
-      new Sprite(
-        own(new SpriteMaterial({ map: glowTexture, transparent: true, depthWrite: false })),
-      );
+      new Sprite(new SpriteMaterial({ map: glowTexture, transparent: true, depthWrite: false }));
 
     /** An upright card centred at `at`, drawn after anything with a lower `order`. */
     function addCard(at: Vector3, width: number, height: number, depth: number, order: number) {
@@ -644,9 +639,10 @@ export const scene = defineScene<ReflexSceneData>({
 
     function paintCard(card: Card, glass: number, edge: Color, edgeOpacity: number) {
       if (!theme) return;
-      const { color, dark } = theme;
+      const { color, dark, blueprint } = theme;
       card.body.material.color.copy(dark ? color.elevated : color.surface);
-      card.body.material.opacity = glass;
+      // On X-ray's blueprint, glass is thinner, so the paper's grid shows through.
+      card.body.material.opacity = glass * (blueprint ? 0.7 : 1);
       card.rim.material.color.copy(edge);
       card.rim.material.opacity = edgeOpacity;
       for (const dot of card.dots) {
@@ -711,13 +707,11 @@ export const scene = defineScene<ReflexSceneData>({
     function paint(dt: number, now: number): boolean {
       if (!theme) return false;
       const { color, dark } = theme;
-      const additive: Blending = dark ? AdditiveBlending : NormalBlending;
+      const additive = glowBlending(theme);
       let moving = false;
 
       root.fog?.color.copy(color.bg);
-      sky.groundColor.copy(color.bg);
-      sky.intensity = dark ? 1.3 : 2.1;
-      sun.intensity = dark ? 1.1 : 1.6;
+      light.paint(theme);
 
       // The history.
       for (const session of deck) {
@@ -842,11 +836,7 @@ export const scene = defineScene<ReflexSceneData>({
           beam.drawn = Math.min(beam.target, beam.drawn + dt / beam.seconds);
         }
         if (beam.drawn !== beam.target || now < beam.from) moving = true;
-        const segments = beam.trace.geometry.parameters.tubularSegments;
-        const radial = beam.trace.geometry.parameters.radialSegments;
-        const count = Math.round(beam.drawn * segments) * radial * 6;
-        beam.trace.geometry.setDrawRange(0, count);
-        beam.glow.geometry.setDrawRange(0, count);
+        drawTubes(beam.drawn, beam.trace, beam.glow);
         const tint = beam.tone === 'amber' ? color.amber : color.green;
         if (beam.track) {
           beam.track.material.color.copy(color.lineStrong);

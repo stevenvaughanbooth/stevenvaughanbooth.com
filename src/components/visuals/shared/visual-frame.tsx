@@ -3,7 +3,7 @@ import type { Accent } from '@/content/profile';
 import { visualAccent } from './accent';
 
 interface VisualFrameProps {
-  /** Base id; the title is `${id}-title` and names the group. */
+  /** Base id; the title is `${id}-title`. */
   id: string;
   title: string;
   accent: Accent;
@@ -29,17 +29,15 @@ export function VisualFrame({
   return (
     <div
       role="group"
-      aria-labelledby={`${id}-title`}
+      // A label of its own rather than one pointing into the title: a visually hidden span inside
+      // the title made screen readers say "Session replay , illustrative".
+      aria-label={`${title}, illustrative`}
       className="@container rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p id={`${id}-title`} className="label flex items-center gap-2">
           <span aria-hidden className={`size-1.5 rounded-full ${visualAccent[accent].dot}`} />
-          {/* One inline box, so the flex gap does not put a stray space before the comma. */}
-          <span>
-            {title}
-            <span className="sr-only">, illustrative</span>
-          </span>
+          {title}
         </p>
         <p aria-hidden className="label rounded-full border border-line px-2 py-0.5">
           Illustrative

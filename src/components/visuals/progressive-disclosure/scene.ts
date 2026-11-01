@@ -1,15 +1,10 @@
 import {
-  AdditiveBlending,
-  type Blending,
   Color,
   CubicBezierCurve3,
-  DirectionalLight,
   Fog,
-  HemisphereLight,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  NormalBlending,
   PlaneGeometry,
   SphereGeometry,
   Sprite,
@@ -19,15 +14,17 @@ import {
   Vector3,
 } from 'three';
 import { defineScene, type Theme } from '../shared/three/engine';
-import { damp } from '../shared/three/pose';
-import { panelGeometry, radialTexture, rimGeometry, slabGeometry } from '../shared/three/shapes';
+import { drawTubes, Eased, glowBlending, glowTextures, lightRig, mix } from '../shared/three/kit';
+import { boxCorners, type Vec3 } from '../shared/three/pose';
+import { panelGeometry, rimGeometry, slabGeometry } from '../shared/three/shapes';
 import type { DisclosureSceneData } from './scene-data';
 
 /*
  * Progressive disclosure in depth. Each step is a glass layer, stacked down and narrowing: the
  * map of what is available, then the search's matches, then the one record. The agent floats
  * above. As a step begins, a pulse leaves the agent and runs down the path followed so far; the
- * new step's branches draw in behind it, its layer lights, and the camera descends to it. What
+ * new step's branches draw in behind it, its layer lights, and the camera turns lower towards it,
+ * keeping the whole stack in view. What
  * the agent passed over dims, and what it has not reached waits as an outline below.
  */
 
@@ -55,29 +52,6 @@ const SEGMENT = 0.42;
 const top = (layer: number) => layerY(layer) + PLATE.height;
 
 type Phase = 'pending' | 'current' | 'followed' | 'passed';
-
-/** A number that eases towards its target, optionally after a delay. */
-class Eased {
-  value: number;
-  target: number;
-  private from = 0;
-  constructor(value: number) {
-    this.value = value;
-    this.target = value;
-  }
-  set(target: number, instant: boolean, at = 0) {
-    this.target = target;
-    this.from = at;
-    if (instant) this.value = target;
-  }
-  /** True while it still moves. */
-  update(dt: number, now: number, tau = 0.24): boolean {
-    if (now < this.from) return true;
-    this.value = damp(this.value, this.target, dt, tau);
-    if (Math.abs(this.value - this.target) < 0.002) this.value = this.target;
-    return this.value !== this.target;
-  }
-}
 
 /** A connection between two points, drawn in as a stroke, over a faint track. */
 interface Beam {
@@ -133,27 +107,38 @@ const bezier = (start: Vector3, end: Vector3) => {
   );
 };
 
-const mix = (a: Color, b: Color, t: number, out: Color) => out.copy(a).lerp(b, t);
+/**
+ * Everything the scene draws, for the camera to keep in view at every step: each layer, the agent
+ * in its ring, and its name beside it. Each step looks from its own angle.
+ */
+const whole: Vec3[] = [
+  ...plates.flatMap((size, layer) =>
+    boxCorners(
+      [-size.width / 2, layerY(layer), -size.depth / 2],
+      [size.width / 2, top(layer) + RECORD.height, size.depth / 2],
+    ),
+  ),
+  ...boxCorners([-0.55, AGENT.y - 0.55, -0.55], [0.55, AGENT.y + 0.55, 0.55]),
+  [AGENT.radius * 2.75 + 1.1, AGENT.y, 0],
+];
 
 export const scene = defineScene<DisclosureSceneData>({
   fov: 30,
-  framedAspect: 1.55,
-  poses: [
-    { target: [0, -0.55, 0], distance: 11.6, azimuth: -0.52, elevation: 0.6 },
-    { target: [0, layerY(1) + 0.3, 0], distance: 11, azimuth: -0.32, elevation: 0.56 },
-    { target: [0, layerY(2) + 0.7, 0], distance: 9, azimuth: -0.14, elevation: 0.68 },
+  views: [
+    { azimuth: -0.52, elevation: 0.6, fit: whole },
+    { azimuth: -0.32, elevation: 0.62, fit: whole },
+    { azimuth: -0.14, elevation: 0.74, fit: whole },
   ],
   build({ scene: root, label, own }, data) {
-    const glowTexture = own(radialTexture(2.4));
-    const shadowTexture = own(radialTexture(1.6));
+    const { glow: glowTexture, shadow: shadowTexture } = glowTextures(own);
     let theme: Theme | undefined;
     let current = data.layers.length - 1;
 
     // Light from above and in front, with a cool fill from below.
-    const sky = new HemisphereLight(0xffffff, 0x000000, 2.1);
-    const sun = new DirectionalLight(0xffffff, 1.7);
-    sun.position.set(5, 10, 7);
-    root.add(sky, sun);
+    const light = lightRig(root, [5, 10, 7], {
+      light: { sky: 2.1, sun: 1.7 },
+      dark: { sky: 1.25, sun: 1.15 },
+    });
     root.fog = new Fog(0x000000, 12, 34);
 
     // The glass layers.
@@ -435,14 +420,14 @@ export const scene = defineScene<DisclosureSceneData>({
 
     function paint(dt: number, now: number): boolean {
       if (!theme) return false;
-      const { color, dark } = theme;
-      const additive: Blending = dark ? AdditiveBlending : NormalBlending;
+      const { color, dark, blueprint } = theme;
+      const additive = glowBlending(theme);
+      // On X-ray's blueprint, glass is thinner, so the paper's grid shows through.
+      const glass = blueprint ? 0.6 : 1;
       let moving = false;
 
       root.fog?.color.copy(color.bg);
-      sky.groundColor.copy(color.bg);
-      sky.intensity = dark ? 1.25 : 2.1;
-      sun.intensity = dark ? 1.15 : 1.7;
+      light.paint(theme);
 
       for (const plate of plateList) {
         moving = plate.presence.update(dt, now) || moving;
@@ -451,7 +436,7 @@ export const scene = defineScene<DisclosureSceneData>({
         const lit = plate.lit.value;
         const body = plate.body.material;
         body.color.copy(dark ? color.elevated : color.surface);
-        body.opacity = (dark ? 0.62 : 0.72) * p;
+        body.opacity = (dark ? 0.62 : 0.72) * p * glass;
         mix(color.lineStrong, color.green, lit * (dark ? 0.55 : 0.45), plate.rim.material.color);
         plate.rim.material.opacity = (0.45 + 0.55 * lit) * (0.35 + 0.65 * p);
         plate.glow.material.color.copy(color.green);
@@ -477,8 +462,8 @@ export const scene = defineScene<DisclosureSceneData>({
         );
         body.emissive.copy(color.green);
         body.emissiveIntensity = dark ? lit * 0.08 : 0;
-        body.opacity = p;
-        body.depthWrite = p > 0.9;
+        body.opacity = p * (blueprint ? 0.75 : 1);
+        body.depthWrite = p > 0.9 && !blueprint;
         mix(color.lineStrong, color.green, Math.min(1, lit * 1.4), block.rim.material.color);
         block.rim.material.opacity = 0.5 + 0.5 * p;
         block.shadow.material.color.copy(dark ? color.bg : scratch.setRGB(0, 0, 0));
@@ -502,11 +487,7 @@ export const scene = defineScene<DisclosureSceneData>({
           beam.drawn = Math.min(beam.target, beam.drawn + dt / SEGMENT);
         }
         if (beam.drawn !== beam.target) moving = true;
-        const segments = beam.trace.geometry.parameters.tubularSegments;
-        const radial = beam.trace.geometry.parameters.radialSegments;
-        const count = Math.round(beam.drawn * segments) * radial * 6;
-        beam.trace.geometry.setDrawRange(0, count);
-        beam.glow.geometry.setDrawRange(0, count);
+        drawTubes(beam.drawn, beam.trace, beam.glow);
         beam.track.material.color.copy(color.lineStrong);
         beam.track.material.opacity = dark ? 0.75 : 0.9;
         beam.trace.material.color.copy(color.green);

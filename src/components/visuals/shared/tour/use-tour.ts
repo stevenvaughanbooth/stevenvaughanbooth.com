@@ -31,6 +31,8 @@ export interface Tour {
   playback: TourPlayback;
   /** Whether the current step's timer is counting down right now. */
   running: boolean;
+  /** Held by the visitor's attention: a mouse over the region, focus in it, or a press. */
+  looking: boolean;
   /** While playing; null otherwise. */
   progress: TourProgress | null;
   /** The visitor picked a step: show it and stop for good. */
@@ -44,16 +46,20 @@ export interface TourOptions {
   steps: number;
   /** How long a step stays on screen, in ms: one value, or one per step. */
   dwellMs?: number | ((step: number) => number);
-  /** Share of the region that must be on screen for it to count down. */
+  /** Share of the region that must be on screen for it to start and count down. */
   threshold?: number;
   /**
-   * enter: starts from the first step as any of the region scrolls into view (the guided tours).
-   * unseen: resets to the first step only while the region is out of sight, then starts once it
-   * is `threshold` on screen; if it is already on screen when the controller loads, it rests, so
-   * nothing vanishes under the reader (the Adage replay).
+   * While true the tour neither starts nor counts down: a diagram holds it until its 3D scene
+   * has swapped in (or will not), so the swap never lands mid-step. It lapses after
+   * `TOUR_HOLD_MAX_MS` of waiting, so a slow scene never stalls the tour.
    */
-  start?: 'enter' | 'unseen';
+  hold?: boolean;
 }
+
+/** How long a tour shows the overview it opened on before it starts from the first step. */
+export const TOUR_OVERVIEW_MS = 1500;
+/** The longest a tour waits on `hold` before it plays without it. */
+export const TOUR_HOLD_MAX_MS = 3000;
 
 /**
  * The one tour every diagram uses: a single pass from the first step to the last, following the
@@ -61,13 +67,20 @@ export interface TourOptions {
  * page can be seen; it holds while a mouse hovers the region, focus is inside it or a pointer is
  * pressed in it (a drag to orbit a scene); it stops for good when the visitor picks a step or
  * focuses a tab, and it never starts under reduced motion. Before it starts and after it ends it
- * shows the last step: the state the server renders.
+ * shows the last step: the state the server renders, the whole picture.
+ *
+ * Every tour starts the same way. If the region is out of sight when the controller loads (the
+ * usual scroll down the home page), it resets to the first step there, where nobody sees the
+ * change, and starts once it is `threshold` on screen. If it is already on screen (a case study's
+ * opening diagram, a jump to it, Back), the whole picture the visitor is looking at stays; once
+ * they have arrived (on screen, not held, and any 3D scene in) it shows for a beat more and then
+ * opens on the first step, so the start reads as a start rather than a glitch.
  */
 export function useTour({
   steps,
   dwellMs = TOUR_DWELL_MS,
   threshold = 0.5,
-  start = 'enter',
+  hold = false,
 }: TourOptions): Tour {
   const last = steps - 1;
   const ref = useRef<HTMLDivElement>(null);
@@ -78,35 +91,36 @@ export function useTour({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const [holdLapsed, setHoldLapsed] = useState(false);
   // Counts presses of the control, so a restarted step restarts its progress bar.
   const [runs, setRuns] = useState(0);
   // Time left on a step when the tour is held part-way through it.
   const remaining = useRef<{ step: number; ms: number } | null>(null);
-  // Whether the controller's first report has decided how an 'unseen' tour starts.
+  // Whether the observer's first report has decided how the tour starts.
   const decided = useRef(false);
+
+  const looking = hovered || focused || pressed;
+  const held = hold && !holdLapsed;
 
   const visible = useInView(ref, {
     threshold,
     onChange(enough) {
-      if (enough && playback === 'ready') setPlayback('playing');
+      // Reset out of sight: it starts as it comes far enough into view.
+      if (enough && playback === 'ready' && step === 0 && !held && !looking && pageVisible) {
+        setPlayback('playing');
+      }
     },
   });
   useInView(ref, {
     onChange(inView) {
+      if (decided.current) return;
+      decided.current = true;
       if (playback !== 'idle' || reducedMotion) return;
-      if (start === 'unseen') {
-        if (decided.current) return;
-        decided.current = true;
-        // On screen already: rest on the finished state rather than clear it under the reader.
-        if (inView) return;
-        setStep(0);
-        setPlayback('ready');
-        return;
-      }
       // Never move the selection under someone who is already using the tabs.
-      if (!inView || ref.current?.contains(document.activeElement)) return;
-      setStep(0);
-      setPlayback('playing');
+      if (ref.current?.contains(document.activeElement)) return;
+      // Out of sight, start from the first step; on screen, from the whole picture on show.
+      if (!inView) setStep(0);
+      setPlayback('ready');
     },
   });
 
@@ -122,15 +136,32 @@ export function useTour({
     };
   }, [pressed]);
 
-  const running =
-    playback === 'playing' &&
-    visible &&
-    pageVisible &&
-    !hovered &&
-    !focused &&
-    !pressed &&
-    !reducedMotion;
+  // Everything but the visitor's own choice allows it to move now.
+  const free = visible && pageVisible && !looking && !reducedMotion;
+  const running = playback === 'playing' && free && !held;
   const duration = typeof dwellMs === 'number' ? dwellMs : dwellMs(step);
+
+  // A hold waits only so long once the tour could otherwise move.
+  useEffect(() => {
+    if (!hold || holdLapsed || !free || (playback !== 'ready' && playback !== 'playing')) return;
+    const timer = window.setTimeout(() => setHoldLapsed(true), TOUR_HOLD_MAX_MS);
+    return () => window.clearTimeout(timer);
+  }, [hold, holdLapsed, free, playback]);
+
+  // Ready: start once the visitor has arrived (or the hold or their look has ended). A tour reset
+  // out of sight starts at once; one still showing the whole picture keeps it a beat first.
+  useEffect(() => {
+    if (playback !== 'ready' || !free || held) return;
+    const overview = step === last && last > 0;
+    const timer = window.setTimeout(
+      () => {
+        if (overview) setStep(0);
+        setPlayback('playing');
+      },
+      overview ? TOUR_OVERVIEW_MS : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [playback, free, held, step, last]);
 
   useEffect(() => {
     if (!running) return;
@@ -178,6 +209,7 @@ export function useTour({
     step,
     playback,
     running,
+    looking,
     progress:
       playback === 'playing' ? { key: `${step}-${runs}`, durationMs: duration, running } : null,
     select,

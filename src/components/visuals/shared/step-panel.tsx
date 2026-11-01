@@ -11,8 +11,9 @@ interface StepPanelProps {
   /** Step-specific copy below the diagram, usually StepStacks. */
   children?: ReactNode;
   /**
-   * The controller's 3D scene (SceneCanvas), laid over the diagram. While it is live the
-   * diagram beneath fades out but keeps its place, so the stage never changes size.
+   * The controller's 3D scene (SceneCanvas), laid over the diagram. As it goes live the diagram
+   * beneath fades out quickly, before the scene fades in, and keeps its place, so the stage never
+   * changes size.
    */
   scene?: ReactNode;
 }
@@ -41,7 +42,7 @@ export function StepPanel({ id, step, description, diagram, children, scene }: S
             absolutely positioned, so it still draws above the diagram; but the faded diagram's
             opacity puts it above the scene for the pointer, so it lets drags through. */}
         {scene}
-        <div className="transition-opacity duration-700 peer-data-[scene=live]:pointer-events-none peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
+        <div className="transition-opacity duration-150 peer-data-[scene=live]:pointer-events-none peer-data-[scene=live]:opacity-0 motion-reduce:transition-none">
           {diagram}
         </div>
       </div>
@@ -62,7 +63,9 @@ interface StepStackProps {
  */
 export function StepStack({ step, items, className = '' }: StepStackProps) {
   return (
-    <div className={`grid ${className}`}>
+    // One column that may shrink below its content: a hidden step's unbreakable line must not
+    // widen the card (WCAG text spacing at 320px).
+    <div className={`grid grid-cols-[minmax(0,1fr)] ${className}`}>
       {items.map((item, index) => (
         <div
           key={index}

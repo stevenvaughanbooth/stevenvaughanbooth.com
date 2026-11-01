@@ -56,7 +56,7 @@ export const stories: readonly Story[] = [
     id: 'schema',
     project: 'schema',
     short: 'Schema Evolution',
-    title: 'Evolving schemas. Shared meaning.',
+    title: 'Schemas evolve, and their meaning stays shared.',
     phases: [
       {
         label: 'A change',
@@ -71,7 +71,7 @@ export const stories: readonly Story[] = [
         copy: 'The new field is now reflected in both illustrated schemas, preserving shared meaning as the product evolves.',
       },
     ],
-    result: 'One change. A shared understanding.',
+    result: 'One change, understood the same way in both schemas.',
     description:
       'A new field is added to an illustrative schema on the Core Metadata Platform. Schema Evolution coordinates the change, and the matching schema in Marketing Cloud Next gains the same field, so both schemas stay aligned. The sequence is simplified.',
   },
@@ -79,7 +79,7 @@ export const stories: readonly Story[] = [
     id: 'migration',
     project: 'migration',
     short: 'Metadata migration',
-    title: 'A new foundation. Room to grow.',
+    title: 'Room to grow, on a new foundation.',
     phases: [
       {
         label: 'Prepare',
@@ -94,7 +94,7 @@ export const stories: readonly Story[] = [
         copy: 'A larger structured foundation gives Data 360 room to grow, with familiar object and field semantics.',
       },
     ],
-    result: 'Shared structure. More room to build.',
+    result: 'The same structure, with more room to build.',
     description:
       'In an illustrative metadata migration, object, field, and relationship definitions move onto the next-generation Core Metadata Platform, where a larger grid of the same shapes gives Data 360 room to grow.',
   },
