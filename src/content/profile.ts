@@ -263,9 +263,9 @@ export const projects = [
   {
     id: 'schema',
     title: 'Schema Evolution for Marketing Cloud Next',
-    status: 'Framework development',
+    status: 'Shipped',
     summary:
-      'I built the Schema Evolution framework to help keep schemas aligned with Marketing Cloud Next as products evolve. The work gives teams a shared foundation for coordinating schema changes.',
+      'I built the Schema Evolution framework to help keep schemas aligned with Marketing Cloud Next as products evolve. It has shipped and is generally available as an internal platform framework, giving teams a shared foundation for coordinating schema changes.',
     about:
       'Built the Schema Evolution framework to help keep schemas aligned with Marketing Cloud Next as products evolve. The work gives teams a shared foundation for coordinating schema changes.',
   },
@@ -290,7 +290,7 @@ export const awards: Award[] = [
   },
   {
     id: 'all-star',
-    name: 'All-Star Award',
+    name: 'TMP All-Star Award',
     year: 'FY21',
     detail: '',
     reason: 'Recognized for contributions to Customer 360 Data Manager’s launch.',

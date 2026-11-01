@@ -332,7 +332,7 @@ describe('matchQuestion', () => {
     expect(text).toContain(`${person.role} at ${person.company}`);
     expect(text).toContain(`${current?.title} since ${current?.start}`);
     expect(text).toContain(current?.focus);
-    expect(text).toMatch(/engineering role/);
+    expect(text).toMatch(/metadata migration/);
     expect(text).not.toMatch(/\bmanag(e|es|er|ing)\b/);
     expect(topicById('role').actions).toEqual(['role-principal-engineer']);
   });

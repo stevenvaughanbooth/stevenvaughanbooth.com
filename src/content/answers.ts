@@ -295,7 +295,7 @@ export const topics: Topic[] = [
     heading: `${person.role} at ${person.company}`,
     paragraphs: [
       `Steven is a ${person.role} at ${person.company}${currentRole ? ` (${currentRole.title} since ${currentRole.start})` : ''}.${currentRole?.focus ? ` His focus is the ${currentRole.focus}` : ''}`,
-      'It is an engineering role, and the leadership this site describes is technical: he led a major metadata migration, and as a Productivity Champion he helps other engineers adopt better ways of working.',
+      'He led a major metadata migration, and as a Productivity Champion he helps other engineers adopt better ways of working.',
     ],
     actions: currentRole ? [targetId(roleAnchor(currentRole))] : [targetId('experience')],
     followUps: ['platform', 'mcp', 'devtools'],
