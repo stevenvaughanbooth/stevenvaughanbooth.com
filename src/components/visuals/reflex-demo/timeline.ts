@@ -21,6 +21,9 @@ export type Step =
       command: string;
     };
 
+/** The parts of a reflex, as the terminal and the 3D scene name them. */
+export const reflexParts = ['Condition', 'Response', 'Evidence'] as const;
+
 /** A point in the replay: every step before `step` is complete; `step` shows `beat` beats. */
 export interface Frame {
   step: number;

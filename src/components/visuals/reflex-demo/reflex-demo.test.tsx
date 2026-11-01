@@ -8,7 +8,9 @@ import {
 } from '@/test/browser-mocks';
 import { ReflexDemo } from '../reflex-demo';
 import { knownCommand, steps, transcript } from './script';
-import { beatsShown, buildFrames, finalFrame, runProgress, type Step } from './timeline';
+import { reflexSceneData } from './scene-data';
+import { sceneBeat, sceneBeats } from './scene-beats';
+import { beatCount, beatsShown, buildFrames, finalFrame, runProgress, type Step } from './timeline';
 
 // The controller's first dynamic import is transformed on demand, which can take over a second
 // when the whole suite runs in parallel.
@@ -109,12 +111,50 @@ describe('replay timeline', () => {
   });
 });
 
+describe('the 3D scene’s beats', () => {
+  const frames = buildFrames(steps);
+  const beats = frames.map((frame) => sceneBeat(steps, frame));
+
+  it('starts on the history and ends on the loop, never stepping back', () => {
+    expect(beats[0]).toBe(0);
+    expect(beats.at(-1)).toBe(sceneBeats.length - 1);
+    expect(sceneBeat(steps, finalFrame(steps))).toBe(sceneBeats.length - 1);
+    beats.slice(1).forEach((beat, i) => expect(beat).toBeGreaterThanOrEqual(beats[i]!));
+  });
+
+  it('reaches every beat, one at a time', () => {
+    expect([...new Set(beats)]).toEqual(sceneBeats.map((_, index) => index));
+  });
+
+  it('marks a run only once its result is in, and offers the reflex as the terminal does', () => {
+    const reflex = steps.findIndex((step) => step.kind === 'reflex');
+    frames.forEach((frame, index) => {
+      const beat = sceneBeats[beats[index]!]!;
+      const results = steps.filter(
+        (step, i) => step.kind === 'run' && beatsShown(frame, i) >= beatCount(step),
+      ).length;
+      expect(beat.runs).toBe(results);
+      expect(beat.offered).toBe(beatsShown(frame, reflex) >= 1);
+    });
+  });
+
+  it('draws only plain strings from the content', () => {
+    const data = reflexSceneData();
+    expect(data.stages).toEqual(adage.pipeline);
+    expect(data.parts).toEqual(['Condition', 'Response', 'Evidence']);
+    expect(data.command).toBe(knownCommand);
+    expect(data.runs).toEqual([false, false, true]);
+    expect(JSON.parse(JSON.stringify(data))).toEqual(data);
+  });
+});
+
 describe('<ReflexDemo />', () => {
   it('server-renders the finished session, its transcript and the pipeline', () => {
     mockReducedMotion(false);
     render(<ReflexDemo />);
 
-    const [story, pipeline] = within(card()).getAllByRole('list');
+    // The pipeline's stage comes first, above the terminal; the transcript follows the terminal.
+    const [pipeline, story] = within(card()).getAllByRole('list');
     expect(
       within(story!)
         .getAllByRole('listitem')
@@ -125,7 +165,7 @@ describe('<ReflexDemo />', () => {
       .getAllByRole('listitem')
       .forEach((li, i) => expect(li).toHaveTextContent(adage.pipeline[i]!));
     // The terminal is hidden from AT, and nothing in it is waiting to be revealed.
-    expect(card().querySelector('[aria-hidden="true"].font-mono')).toHaveTextContent(
+    expect(card().querySelector('div[aria-hidden="true"].font-mono')).toHaveTextContent(
       'reflex matched',
     );
     expect(pendingText()).toBe('');
