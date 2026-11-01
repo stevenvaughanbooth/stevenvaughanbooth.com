@@ -2,8 +2,9 @@
 
 Every interactive diagram on the page is built from the pieces in this folder, so they look and
 behave as one system and ship as little JavaScript as possible. ProgressiveDisclosure is the
-reference implementation (the shared tour and a 3D scene); TeamMultiplier is the same pattern in
-2D; MetadataPlatform shows a tour with sub-steps; ReflexDemo plays a replay on the same tour.
+reference implementation (the shared tour and a 3D scene); TeamMultiplier draws its network in 3D
+on the same engine; MetadataPlatform shows a tour with sub-steps, and one 3D scene that follows
+story × phase from outside its per-story diagram; ReflexDemo plays a replay on the same tour.
 
 ## The pattern
 
@@ -144,7 +145,10 @@ post-processing.
 which covers the stage. It compiles every shader with `compileAsync` before the first frame, then
 sets `data-scene="live"`: the box fades in and the SVG after it, its `peer`, fades out (it keeps
 its place, so nothing moves). A failed import, a WebGL error or a lost context leaves or puts the
-2D card back; a restored context brings the scene back.
+2D card back; a restored context brings the scene back. While the scene is live the diagram also
+stops taking the pointer (`peer-data-[scene=live]:pointer-events-none`): its opacity puts it above
+the canvas in paint order. On a software renderer (SwiftShader, llvmpipe) the engine draws at 1x
+and cuts between steps, as under reduced motion.
 
 **A scene** is `defineScene<Data>({ poses, fov?, framedAspect?, build })`:
 
