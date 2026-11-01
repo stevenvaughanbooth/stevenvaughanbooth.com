@@ -1,6 +1,7 @@
 import { projects, themes } from '@/content/profile';
 import { tablistLabel, wording } from './metadata-platform/controls';
 import { PhaseSteps } from './metadata-platform/phase-steps';
+import { platformSceneData } from './metadata-platform/scene-data';
 import { Scene } from './metadata-platform/scenes';
 import { MetadataPlatformShell } from './metadata-platform/shell';
 import { type Story, stories } from './metadata-platform/stories';
@@ -38,7 +39,8 @@ function Contribution({ story }: { story: Story }) {
  * Work theme 03: three stories on the Core Metadata Platform, each a conceptual flow in three
  * phases. The server renders every story's diagram and copy, and an inert card resting on the
  * last story's outcome; a controller, loaded as the card nears view, brings the tabs and phases
- * to life and tours every phase once.
+ * to life, tours every phase once and, where the device can draw it, stages the stories in 3D
+ * on the platform.
  */
 export function MetadataPlatform() {
   const names = stories.map((story) => story.short);
@@ -75,6 +77,7 @@ export function MetadataPlatform() {
         contributions={stories.map((story) => (
           <Contribution key={story.id} story={story} />
         ))}
+        sceneData={platformSceneData()}
         staticControls={
           <TourControls
             accent="lilac"

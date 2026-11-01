@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { agentsLabels, migrationLabels, schemaLabels } from './labels';
 import styles from './metadata-platform.module.css';
 import type { StoryId } from './stories';
 
@@ -254,21 +255,17 @@ function Result({ text }: { text: string }) {
 /** Where traveler i rests in the hub: three slots at the right of a hub row. */
 const hubSlot = (i: number, y: number = hubY[1]): Point => [right(hub) - 8 - (2 - i) * 22, y];
 
-const metadata = [
-  { letter: 'O', label: 'Object', value: 'Account' },
-  { letter: 'F', label: 'Field', value: 'Industry' },
-  { letter: 'R', label: 'Relationship', value: 'Owner' },
-] as const;
+const metadata = agentsLabels.metadata;
 
 function AgentsScene() {
-  const tools = ['Discover', 'Understand', 'Use'];
+  const tools = agentsLabels.steps;
   const pill = { w: 84, h: 17 };
   const empty = { x: target.x + 10, y: target.y + 33, w: target.w - 20, h: 50 };
 
   return (
     <>
       <Connectors />
-      <Card box={source} at="0" title="Salesforce Core">
+      <Card box={source} at="0" title={agentsLabels.source}>
         {metadata.map((item, i) => (
           <Row key={item.letter} box={source} row={i} typed {...item} />
         ))}
@@ -277,7 +274,7 @@ function AgentsScene() {
       <g data-at="1">
         <Frame box={hub} />
         <text className={styles.title} x={hub.x + inset} y={hubY[0]} dy={middle}>
-          Core Metadata Platform
+          {agentsLabels.hub}
         </text>
         <rect
           className={styles.highlight}
@@ -294,7 +291,7 @@ function AgentsScene() {
           dy={middle}
           textAnchor="middle"
         >
-          MCP tools
+          {agentsLabels.tools}
         </text>
         <text className={styles.body} x={hub.x + inset} y={hubY[1]} dy={middle}>
           {tools.map((tool, i) => (
@@ -309,7 +306,7 @@ function AgentsScene() {
         ))}
       </g>
 
-      <Card box={target} at="2" title="Agent context">
+      <Card box={target} at="2" title={agentsLabels.target}>
         <g {...timing({ pending: true })}>
           <rect
             className={styles.placeholder}
@@ -326,7 +323,7 @@ function AgentsScene() {
             dy={middle}
             textAnchor="middle"
           >
-            Ready for product context
+            {agentsLabels.pending}
           </text>
         </g>
         {metadata.map((item, i) => (
@@ -334,7 +331,7 @@ function AgentsScene() {
             <Row box={target} row={i} typed {...item} />
           </g>
         ))}
-        <Outcome box={target}>Usable context</Outcome>
+        <Outcome box={target}>{agentsLabels.outcome}</Outcome>
       </Card>
 
       {metadata.map((item, i) => (
@@ -349,10 +346,7 @@ function AgentsScene() {
   );
 }
 
-const schemaRows = [
-  { label: 'Record ID', value: 'id' },
-  { label: 'Name', value: 'text' },
-] as const;
+const schemaRows = schemaLabels.rows;
 
 function NewField({ box }: { box: Box }) {
   const y = rowY(box, 2);
@@ -368,10 +362,10 @@ function NewField({ box }: { box: Box }) {
       />
       <Slot x={badgeX(box)} y={y} letter="+" />
       <text className={styles.value} x={box.x + 38} y={y} dy={middle}>
-        New field
+        {schemaLabels.added.label}
       </text>
       <text className={styles.mono} x={right(box)} y={y} dy={middle} textAnchor="end">
-        text
+        {schemaLabels.added.value}
       </text>
     </g>
   );
@@ -385,7 +379,7 @@ function SchemaScene() {
   return (
     <>
       <Connectors />
-      <Card box={source} at="0" title="Core Metadata Platform">
+      <Card box={source} at="0" title={schemaLabels.source}>
         {schemaRows.map((row, i) => (
           <Row key={row.label} box={source} row={i} bullet {...row} />
         ))}
@@ -398,17 +392,17 @@ function SchemaScene() {
         <circle className={styles.ring} cx={ring[0]} cy={ring[1]} r={13} pathLength={1} />
         <path className={styles.mark} d={`M${ring[0]} ${ring[1] - 5}l5 5-5 5-5-5z`} />
         <text className={styles.title} x={textX} y={hubY[0]} dy={middle}>
-          Schema Evolution
+          {schemaLabels.hub}
         </text>
         <text className={styles.body} x={textX} y={hubY[1]} dy={middle}>
-          Coordinates changes
+          {schemaLabels.hubBody}
         </text>
         {pips.map(([x, y], k) => (
           <circle key={x} className={styles.pip} cx={x} cy={y} r={3} style={after(700 + k * 450)} />
         ))}
       </g>
 
-      <Card box={target} at="2" title="Marketing Cloud Next">
+      <Card box={target} at="2" title={schemaLabels.target}>
         {schemaRows.map((row, i) => (
           <Row key={row.label} box={target} row={i} bullet {...row} />
         ))}
@@ -428,13 +422,13 @@ function SchemaScene() {
             dy={middle}
             textAnchor="middle"
           >
-            Awaiting coordinated change
+            {schemaLabels.pending}
           </text>
         </g>
         <g {...timing({ outcome: true, delay: 650, from: '0 4px' })}>
           <NewField box={target} />
         </g>
-        <Outcome box={target}>Schema aligned</Outcome>
+        <Outcome box={target}>{schemaLabels.outcome}</Outcome>
       </Card>
 
       <Traveler
@@ -445,11 +439,7 @@ function SchemaScene() {
   );
 }
 
-const definitions = [
-  { letter: 'O', label: 'Object' },
-  { letter: 'F', label: 'Fields' },
-  { letter: 'R', label: 'Relationships' },
-] as const;
+const definitions = migrationLabels.definitions;
 
 function MigrationScene() {
   const cols = 12;
@@ -468,7 +458,7 @@ function MigrationScene() {
   return (
     <>
       <Connectors />
-      <Card box={source} at="0" title="Metadata definitions">
+      <Card box={source} at="0" title={migrationLabels.source}>
         {definitions.map((item, i) => {
           const y = rowY(source, i);
           const end = right(source);
@@ -499,7 +489,7 @@ function MigrationScene() {
       <g data-at="1">
         <Frame box={hub} />
         <text className={styles.title} x={hub.x + inset} y={hubY[0]} dy={middle}>
-          Metadata migration
+          {migrationLabels.hub}
         </text>
         {definitions.map((item, i) => (
           <Slot key={item.letter} {...xy(hubSlot(i, hubY[0]))} />
@@ -513,7 +503,7 @@ function MigrationScene() {
         />
       </g>
 
-      <Card box={target} at="2" title="Core Metadata Platform">
+      <Card box={target} at="2" title={migrationLabels.target}>
         {Array.from({ length: 2 * cols }, (_, n) => {
           const col = n % cols;
           const row = Math.floor(n / cols);
@@ -533,7 +523,7 @@ function MigrationScene() {
           );
         })}
         <text className={styles.body} x={target.x + inset} y={rowY(target, 2)} dy={middle}>
-          Next-generation foundation
+          {migrationLabels.foundation}
         </text>
       </Card>
 
