@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import styles from './terminal.module.css';
-import { beatsShown, type Frame, runProgress, type Step } from './timeline';
+import { beatsShown, type Frame, reflexParts, runProgress, type Step } from './timeline';
 
 type RunStep = Extract<Step, { kind: 'run' }>;
 type ReflexStep = Extract<Step, { kind: 'reflex' }>;
@@ -113,10 +113,11 @@ function Run({ step, beats, live }: { step: RunStep; beats: number; live: boolea
 }
 
 function Reflex({ step, shown, flash }: { step: ReflexStep; shown: boolean; flash: boolean }) {
+  const [condition, response, evidence] = reflexParts;
   const rows: [string, ReactNode][] = [
-    ['Condition', step.condition],
-    ['Response', highlight(step.response, step.command)],
-    ['Evidence', highlight(step.evidence, step.command)],
+    [condition, step.condition],
+    [response, highlight(step.response, step.command)],
+    [evidence, highlight(step.evidence, step.command)],
   ];
 
   return (

@@ -1,3 +1,5 @@
+import { pipelineLabelId } from './view';
+
 const lit = 'transition-colors duration-500 group-data-looping/reflex:text-green';
 const loopLine = `border-line-strong text-line-strong group-data-looping/reflex:border-green/60 ${lit}`;
 
@@ -9,27 +11,27 @@ const arrowProps = {
   strokeLinejoin: 'round',
 } as const;
 
+/** Where later sessions loop back to, as the pipeline and the 3D scene label it. */
+export const laterSessions = 'later sessions';
+
 /**
  * Adage's pipeline from the README, with the loop from step 4 back to step 2: a row of four on
- * a wide card, two by two on a narrow one. Rendered once, on the server. The card's
- * `data-matched` lights the last step while the reflex shows, and `data-looping` lights the
- * loop once the session is over (see ReflexDemoView).
+ * a wide card, two by two on a narrow one. Rendered once, on the server, inside the stage the 3D
+ * scene draws over (see ReflexDemoView). The card's `data-matched` lights the last step while
+ * the reflex shows, and `data-looping` lights the loop once the session is over.
  */
 export function Pipeline({ id, stages }: { id: string; stages: readonly string[] }) {
-  const labelId = `${id}-pipeline`;
+  const labelId = pipelineLabelId(id);
   return (
-    <div className="mt-5">
-      <p id={labelId} className="label">
-        From history to reuse
-      </p>
-      <div className="relative mt-3 pr-6 @sm:pr-0 @sm:pb-9">
+    <div className="w-full">
+      <div className="relative pr-6 @sm:pr-0 @sm:pb-9">
         <ol aria-labelledby={labelId} className="grid grid-cols-2 gap-3 @sm:grid-cols-4">
           {stages.map((stage, i) => {
             const last = i === stages.length - 1;
             return (
               <li
                 key={stage}
-                className={`relative rounded-lg border border-line bg-bg px-2.5 py-2 text-muted transition-colors duration-500 @sm:px-2 @md:px-2.5 ${last ? 'group-data-matched/reflex:border-green/50 group-data-matched/reflex:bg-green/[0.07] group-data-matched/reflex:text-fg' : ''}`}
+                className={`relative rounded-lg border border-line bg-surface px-2.5 py-2 text-muted transition-colors duration-500 @sm:px-2 @md:px-2.5 ${last ? 'group-data-matched/reflex:border-green/50 group-data-matched/reflex:bg-green/[0.07] group-data-matched/reflex:text-fg' : ''}`}
               >
                 <span
                   aria-hidden
@@ -87,9 +89,9 @@ export function Pipeline({ id, stages }: { id: string; stages: readonly string[]
             <path d="M1 5.5 5 1l4 4.5" />
           </svg>
           <span
-            className={`absolute -bottom-2 left-1/2 -translate-x-1/2 bg-surface px-2 font-mono text-micro whitespace-nowrap text-subtle ${lit}`}
+            className={`absolute -bottom-2 left-1/2 -translate-x-1/2 bg-bg px-2 font-mono text-micro whitespace-nowrap text-subtle ${lit}`}
           >
-            ↺ later sessions
+            ↺ {laterSessions}
           </span>
         </div>
       </div>
@@ -97,7 +99,7 @@ export function Pipeline({ id, stages }: { id: string; stages: readonly string[]
         aria-hidden
         className={`mt-1.5 text-right font-mono text-micro text-subtle @sm:hidden ${lit}`}
       >
-        ↺ later sessions
+        ↺ {laterSessions}
       </p>
     </div>
   );
