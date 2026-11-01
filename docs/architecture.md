@@ -108,8 +108,8 @@ on intent, meaning a hover, focus or use of the hero's ask bar or any Ask button
 palette throws, the loader's boundary keeps the page up and shows "Ask Steven couldn’t load." with
 Try again and Email Steven.
 
-**X-ray mode** peels the page back into a blueprint of its components. The header's "Under the
-hood" button (a Server Component), the `X` key or any `<button data-xray-toggle>` turns it on; the
+**X-ray mode** peels the page back into a blueprint of its components. The header's "X-ray this
+page" button (a Server Component), the `X` key or any `<button data-xray-toggle>` turns it on; the
 always-loaded part is a few listeners in `shortcuts.tsx` and a small INP recorder, and
 `xray/xray.tsx` with its stylesheet downloads on hover, focus or press of a toggle, or on `X`. The
 peel is one typed view transition in which the page's top-right corner is pulled across the screen:
@@ -121,9 +121,13 @@ replaces the keyframes of paused animations on the transition's pseudo-elements,
 the page peels away (pulled a quarter of the diagonal, or flicked) or springs back with nothing
 changed. The toggle and `X` pull the corner along a scripted path with the same engine. The
 dog-ear repeats the toggle, so it is hidden from assistive technology; under reduced motion there
-is no dog-ear and X-ray switches at once.
+is no dog-ear and X-ray switches at once. Pressed without intent first (`X`, or a finger straight
+onto the dog-ear), the overlay renders hidden before the peel starts, so the peel's frames only
+restyle the page.
 Every element with `data-component` is outlined and labelled from `components.ts`, and a HUD shows
 this visit's FCP, LCP, CLS and INP, the JavaScript transferred, and the build's measured results.
+Labels keep clear of the page's text where they can (`xray/layout.ts`), and while X-ray is on the
+root keeps room at the page's foot for the HUD.
 
 [`src/content/components.ts`](../src/content/components.ts) describes each of these components and
 the server ones around them: its kind, when its code loads, the React and platform features it

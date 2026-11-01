@@ -72,6 +72,14 @@
     24px 24px;
 }
 
+/*
+ * A bar that sticks under the header (Under the hood's section nav) sticks under the header's
+ * labels too, which hang on a rail one label deep below it.
+ */
+.on :global(.sticky.top-16) {
+  top: 6rem;
+}
+
 /* Dialogs and popovers sit over the page in the top layer, so their panels stay solid. */
 .on :global(:is(dialog, [popover])) {
   --surface: var(--xr-panel);
