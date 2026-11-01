@@ -244,14 +244,17 @@ async function mountScene<Data>(
   }
   // Shader errors are a development concern; checking them stalls on every program link.
   renderer.debug.checkShaderErrors = process.env.NODE_ENV !== 'production';
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
+  // A software renderer (no GPU, or a blocked one) draws a frame in tens of milliseconds: there the
+  // scene draws at 1x and cuts between steps, as under reduced motion, instead of flying.
+  const software = isSoftwareRenderer(renderer);
+  renderer.setPixelRatio(software ? 1 : Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
   renderer.setClearColor(0x000000, 0);
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(definition.fov ?? 30, 1, 0.1, 200);
   const owned: { dispose(): void }[] = [];
   const labels: PlacedLabel[] = [];
-  let reducedMotion = options.reducedMotion;
+  let reducedMotion = options.reducedMotion || software;
   let theme = readTheme(probe);
   let size = { width: 0, height: 0 };
 
@@ -558,7 +561,7 @@ async function mountScene<Data>(
       invalidate();
     },
     setReducedMotion(reduce) {
-      reducedMotion = reduce;
+      reducedMotion = reduce || software;
       if (reduce) flight = null;
       invalidate();
     },
@@ -587,3 +590,18 @@ async function mountScene<Data>(
 }
 
 const clamp = (value: number, limit: number) => Math.min(limit, Math.max(-limit, value));
+
+/** SwiftShader, llvmpipe and the like: WebGL drawn on the CPU. */
+const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software|basic render driver/i;
+
+/** Whether this context draws without a GPU, from the renderer string the browser exposes. */
+export function isSoftwareRenderer(renderer: WebGLRenderer): boolean {
+  try {
+    const gl = renderer.getContext();
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name: unknown = gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+    return typeof name === 'string' && SOFTWARE_RENDERER.test(name);
+  } catch {
+    return false;
+  }
+}
