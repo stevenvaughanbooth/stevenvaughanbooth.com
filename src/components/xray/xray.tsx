@@ -95,6 +95,8 @@ function remember(on: boolean) {
   window.history.replaceState(window.history.state, '', url);
 }
 
+const isOn = () => document.documentElement.hasAttribute('data-xray');
+
 /**
  * Renders the overlay hidden, under <Activity>, once a visitor shows intent: turning X-ray on
  * then only reveals it, so the peel, and above all a drag, starts without a pause.
@@ -103,8 +105,20 @@ export function prepare(show: (view: XrayView) => void): void {
   if (prepared) return;
   prepared = true;
   shown = show;
-  if (!busy && !document.documentElement.hasAttribute('data-xray')) {
-    show({ Overlay: XrayOverlay, on: false });
+  if (!busy && !isOn()) show({ Overlay: XrayOverlay, on: false });
+}
+
+/**
+ * Without intent first (X pressed, or a finger straight onto the dog-ear), the overlay is
+ * rendered hidden before the peel starts, so its first render, which React does in small slices
+ * while hidden, stays out of the peel's frames. A few frames at most: after that the reveal
+ * renders whatever is left.
+ */
+async function ready(show: (view: XrayView) => void): Promise<void> {
+  if (prepared) return;
+  prepare(show);
+  for (let frame = 0; frame < 8 && !document.querySelector(`.${styles.overlay}`); frame++) {
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
   }
 }
 
@@ -185,6 +199,7 @@ export async function drag(down: PointerEvent, show: (view: XrayView) => void = 
   window.addEventListener('keydown', onKey, true);
 
   try {
+    await ready(show);
     // The blueprint is rendered underneath at once; it only stays if the page peels away.
     curl = await startCurl({ lifting: true, update: () => render(true, show), from: point });
     if (!curl) return render(false, show);
@@ -248,9 +263,10 @@ export async function toggle(show: (view: XrayView) => void = shown): Promise<vo
     return;
   }
   busy = true;
-  const on = !document.documentElement.hasAttribute('data-xray');
+  const on = !isOn();
   remember(on);
   try {
+    if (on) await ready(show);
     await peel({
       lifting: on,
       update() {
@@ -348,6 +364,57 @@ function somethingOnTop(): boolean {
   }
 }
 
+const meets = (a: Box, b: Box) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/**
+ * The lines of the page's text near a component, in viewport coordinates, for its label to keep
+ * clear of: those in the component itself or, for one inside another, in the block around it, that
+ * reach the places its label could go (layout.ts), from a line above it to a line below it.
+ */
+function linesNear(target: Target, box: Box, label: { width: number; height: number }): Box[] {
+  const context = target.nested
+    ? (target.element.parentElement?.parentElement ?? target.element)
+    : target.element;
+  const reach = label.height + 8;
+  const area: Box = {
+    x: box.x - 8,
+    y: box.y - reach,
+    width: document.documentElement.clientWidth - box.x + 8,
+    height: box.height + 2 * reach,
+  };
+  // A big component's label stays by its corners: only bands along its top and bottom matter.
+  const bands: Box[] = isSmall(box)
+    ? [area]
+    : [
+        { ...area, height: 2 * reach + 6 },
+        { ...area, y: box.y + box.height - reach - 6, height: 2 * reach + 6 },
+      ];
+  const near = (rect: Box) => bands.some((band) => meets(rect, band));
+  const lines: Box[] = [];
+  const range = document.createRange();
+  // Down the tree, skipping any element whose box misses the bands (display: contents has no box
+  // of its own, so its children are looked at instead).
+  const visit = (element: Element) => {
+    for (const node of element.childNodes) {
+      if (node instanceof Element) {
+        const rect = node.getBoundingClientRect();
+        if (!hasBox(rect) || near(rect)) visit(node);
+      } else if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+        range.selectNodeContents(node);
+        for (const rect of range.getClientRects()) {
+          // Visually hidden text is a pixel square.
+          if (rect.width > 1 && rect.height > 1 && near(rect)) {
+            lines.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+          }
+        }
+      }
+    }
+  };
+  visit(context);
+  return lines;
+}
+
 /** The parts of one label that the layout pass moves. */
 interface LabelParts {
   item: HTMLLIElement;
@@ -367,6 +434,12 @@ function XrayOverlay() {
   const focusBox = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
   const focusSize = useRef<HTMLSpanElement>(null);
+  const hud = useRef<HTMLElement>(null);
+  // Whether the labels have been placed clear of the page's text since X-ray last came on.
+  const refined = useRef(false);
+  // The HUD folded to a bar of vitals. Opened, the stats would cover the components they describe,
+  // so it starts folded until the visitor asks for more; the choice holds for the rest of the visit.
+  const [collapsed, setCollapsed] = useState(() => !hudOpened());
   // Why a card is open: pinned by a press, held by focus, or by the mouse over its label or card.
   const pinned = useRef<string | null>(null);
   const focused = useRef<string | null>(null);
@@ -378,7 +451,12 @@ function XrayOverlay() {
 
   function sync(delay = 0) {
     window.clearTimeout(closing.current);
-    const apply = () => setActive(pinned.current ?? focused.current ?? hovered.current);
+    const apply = () => {
+      const next = pinned.current ?? focused.current ?? hovered.current;
+      // On phones the opened HUD would cover the card: it folds as one opens.
+      if (next && matchMedia('(width < 48rem)').matches) setCollapsed(true);
+      setActive(next);
+    };
     if (delay) closing.current = window.setTimeout(apply, delay);
     else apply();
   }
@@ -421,11 +499,21 @@ function XrayOverlay() {
     };
   }, []);
 
+  // Hidden under <Activity>, the overlay starts over: the next first pass is a rough one again.
+  useLayoutEffect(
+    () => () => {
+      refined.current = false;
+    },
+    [],
+  );
+
   // Places the labels before the first paint, then follows the page while it moves: client
   // navigations, controllers swapping in, scroll-driven reveals, the viewport changing. Most
   // labels live in page coordinates, so they only move when the layout does. Once nothing has
   // moved for half a second it stops, until a resize, a scroll, a change to the page's DOM or an
-  // animation starting wakes it again; an idle page costs nothing.
+  // animation starting wakes it again; an idle page costs nothing. The first pass, inside the
+  // peel's first frame, places them without reading the page's text; the next frame moves those
+  // that cover it, while the peel has barely begun.
   useLayoutEffect(() => {
     let last = '';
     let frame = 0;
@@ -461,9 +549,12 @@ function XrayOverlay() {
         active,
         open && !open.target.fixed ? Math.round(scrollY) : 0,
         ...shown.map(({ box }) => `${box.x | 0},${box.y | 0},${box.width | 0},${box.height | 0}`),
+        refined.current,
       ].join(';');
       if (signature === last) return true;
       last = signature;
+      const rough = !refined.current;
+      refined.current = true;
 
       // A tall, narrow component's label runs down its side. Then reads, then writes, so the
       // browser lays out once more at most.
@@ -471,19 +562,41 @@ function XrayOverlay() {
         piece.item.toggleAttribute('data-vertical', runsDown(box));
         piece.item.toggleAttribute('data-compact', isSmall(box));
       }
-      const sizes = shown.map(({ piece }) => ({
+      const measure = ({ piece }: (typeof shown)[number]) => ({
         width: piece.label.offsetWidth,
         height: piece.label.offsetHeight,
-      }));
+      });
+      const sizes = shown.map(measure);
+      // A label wider than its component (a small one's aside) drops its load time to stay on it.
+      const wide = shown.flatMap((item, i) => {
+        const inset = item.target.nested ? 0 : 6;
+        const tooWide = sizes[i]!.width > item.box.width - 2 * inset;
+        return !isSmall(item.box) && !runsDown(item.box) && tooWide ? [i] : [];
+      });
+      for (const i of wide) shown[i]!.piece.item.toggleAttribute('data-compact', true);
+      for (const i of wide) sizes[i] = measure(shown[i]!);
       const cardSize = open?.piece.card
         ? { width: open.piece.card.offsetWidth, height: open.piece.card.offsetHeight }
         : null;
-      const request = (index: number): LabelRequest => ({
-        box: shown[index]!.box,
-        ...sizes[index]!,
-        inset: shown[index]!.target.nested ? 0 : 6,
-        vertical: runsDown(shown[index]!.box),
-      });
+      const request = (index: number): LabelRequest => {
+        const { target, box } = shown[index]!;
+        const size = sizes[index]!;
+        // The page's text, which its label keeps clear of where it can. The header's labels
+        // hang on their own rail.
+        const obstacles =
+          target.fixed || rough
+            ? undefined
+            : linesNear(target, { ...box, x: box.x - scrollX, y: box.y - scrollY }, size).map(
+                (line) => ({ ...line, x: line.x + scrollX, y: line.y + scrollY }),
+              );
+        return {
+          box,
+          ...size,
+          inset: target.nested ? 0 : 6,
+          vertical: runsDown(box),
+          obstacles,
+        };
+      };
       const labels = new Map<string, Box>();
       let railBottom = header;
       for (const fixed of [true, false]) {
@@ -532,7 +645,9 @@ function XrayOverlay() {
         const onScreen = open.target.fixed
           ? label
           : { ...label, x: label.x - scrollX, y: label.y - scrollY };
-        const offset = placeCard(onScreen, cardSize, { width, height, top: header });
+        // Clear of the HUD, too, where it reaches across the screen's foot.
+        const foot = Math.min(height, hud.current?.getBoundingClientRect().top ?? height);
+        const offset = placeCard(onScreen, cardSize, { width, height: foot, top: header });
         open.piece.card.style.translate = `${offset.x}px ${offset.y}px`;
         if (open.piece.size) {
           open.piece.size.textContent = `${Math.round(open.box.width)} × ${Math.round(open.box.height)} px`;
@@ -574,9 +689,20 @@ function XrayOverlay() {
     const resized = new ResizeObserver(wake);
     resized.observe(document.body);
     for (const target of targets) resized.observe(target.element);
-    // The overlay's own writes (every label it moves) are left out.
+    // The overlay's own writes (every label it moves) are left out, as are the peel's helpers.
+    const peeling = (nodes: NodeList) =>
+      [...nodes].every((node) => node instanceof HTMLElement && node.dataset.xrayPeel);
     const changed = new MutationObserver((records) => {
-      if (records.some((record) => !root?.contains(record.target))) wake();
+      const others = records.filter(
+        (record) =>
+          !root?.contains(record.target) &&
+          !(
+            record.type === 'childList' &&
+            peeling(record.addedNodes) &&
+            peeling(record.removedNodes)
+          ),
+      );
+      if (others.length > 0) wake();
     });
     changed.observe(document.body, {
       subtree: true,
@@ -628,7 +754,14 @@ function XrayOverlay() {
       <style href="xray-kinds" precedence="medium">
         {kindRules}
       </style>
-      <Hud targets={targets} overlay={overlay} path={path} />
+      <Hud
+        targets={targets}
+        overlay={overlay}
+        path={path}
+        panel={hud}
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+      />
       {/* The header's labels hang on a rail below it, which the page's pass under. */}
       <div ref={rail} aria-hidden className={styles.rail} />
       <section aria-label="Components on this page">
@@ -963,17 +1096,18 @@ interface HudProps {
   targets: readonly Target[];
   overlay: RefObject<HTMLDivElement | null>;
   path: string;
+  panel: RefObject<HTMLElement | null>;
+  /** Folded to a bar of the four vitals. */
+  collapsed: boolean;
+  onCollapse: (collapsed: boolean) => void;
 }
 
-function Hud({ targets, overlay, path }: HudProps) {
+function Hud({ targets, overlay, path, panel, collapsed, onCollapse }: HudProps) {
   const titleId = useId();
   const bodyId = useId();
   const build = useBuild();
   const [vitals, setVitals] = useState<Vitals>({ cls: 0, interactions: 0 });
   const [stats, setStats] = useState(() => pageStats(null));
-  // A bar of the four vitals until the visitor asks for more: open, the stats would cover the
-  // components they describe. The choice holds for the rest of the visit.
-  const [collapsed, setCollapsed] = useState(() => !hudOpened());
   const [landing] = useState(landingPath);
 
   useEffect(() => observeVitals(setVitals), []);
@@ -988,8 +1122,32 @@ function Hud({ targets, overlay, path }: HudProps) {
     return () => window.clearInterval(timer);
   }, [overlay]);
 
+  // The page keeps room at its foot for the HUD, so its last controls can scroll clear of it and
+  // focus brings them into view above it. The room is the root's, so the body, which the labels
+  // watch for changes, keeps its size; and it is set as plain properties: a custom property
+  // changed on the root would restyle every element.
+  useLayoutEffect(() => {
+    const element = panel.current;
+    if (!element) return;
+    const root = document.documentElement;
+    const reserve = () => {
+      const room = `${Math.ceil(innerHeight - element.getBoundingClientRect().top) + 8}px`;
+      root.style.paddingBottom = room;
+      root.style.scrollPaddingBottom = room;
+    };
+    const resized = new ResizeObserver(reserve);
+    resized.observe(element);
+    window.addEventListener('resize', reserve);
+    return () => {
+      resized.disconnect();
+      window.removeEventListener('resize', reserve);
+      root.style.removeProperty('padding-bottom');
+      root.style.removeProperty('scroll-padding-bottom');
+    };
+  }, [panel]);
+
   function expand(open: boolean) {
-    setCollapsed(!open);
+    onCollapse(!open);
     try {
       if (open) sessionStorage.setItem(hudStorageKey, 'open');
       else sessionStorage.removeItem(hudStorageKey);
@@ -1042,22 +1200,24 @@ function Hud({ targets, overlay, path }: HudProps) {
           : `${vitals.interactions} interaction${vitals.interactions === 1 ? '' : 's'}`,
     },
   ];
-  // A non-breaking hyphen keeps X-ray whole in the narrow cells.
+  // Non-breaking spaces and hyphen keep each "since X-ray" note whole in the narrow cells.
   const later = stats.laterScriptBytes
-    ? ` · +${formatKilobytes(stats.laterScriptBytes)} since X‑ray`
+    ? ` · +${formatKilobytes(stats.laterScriptBytes).replace(' ', '\u00a0')}\u00a0since\u00a0X‑ray`
     : '';
 
   return (
     <section
+      ref={panel}
       aria-labelledby={titleId}
       className={styles.hud}
       data-collapsed={collapsed || undefined}
     >
       <div className={styles.hudHead}>
         <p id={titleId} className={styles.hudTitle}>
-          Under the hood
+          X-ray
         </p>
-        <p className={styles.path}>{path}</p>
+        {/* A bare / after the title would read as a separator. */}
+        <p className={styles.path}>{path === '/' ? '/ (home)' : path}</p>
         {collapsed ? (
           // Folded, the bar still reports the visit; phones have room only for the title.
           <dl className={styles.inline}>
@@ -1129,7 +1289,7 @@ function Hud({ targets, overlay, path }: HudProps) {
           <Cell
             term="Requests"
             note={[
-              stats.laterRequests ? `+${stats.laterRequests} since X‑ray` : '',
+              stats.laterRequests ? `+${stats.laterRequests}\u00a0since\u00a0X‑ray` : '',
               stats.opaque ? `${stats.opaque} cross-origin report 0 B` : '',
             ]
               .filter(Boolean)
@@ -1155,7 +1315,7 @@ function Hud({ targets, overlay, path }: HudProps) {
           <Cell
             term="Lighthouse"
             wide
-            note={`Performance, accessibility, best practices, SEO: ${lighthouse.path} on mobile, ${measuredOn()}`}
+            note={`Performance, accessibility, best practices and SEO for ${lighthouse.path === '/' ? 'the home page' : lighthouse.path} on mobile, ${measuredOn()}`}
           >
             {scores}
           </Cell>

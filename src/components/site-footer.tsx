@@ -47,10 +47,10 @@ export function SiteFooter() {
           </ul>
         </nav>
       </div>
-      <div className="page flex items-center justify-between gap-4 border-t border-line py-6 text-xs text-subtle">
+      <div className="page flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line py-6 text-xs text-subtle">
         <span>© {person.name}</span>
-        <span className="flex items-center gap-5">
-          <ShortcutsButton className="group hidden min-h-6 items-center gap-2 transition-colors hover:text-fg sm:inline-flex">
+        <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <ShortcutsButton className="group inline-flex min-h-6 items-center gap-2 transition-colors hover:text-fg">
             Keyboard shortcuts
             <kbd
               aria-hidden

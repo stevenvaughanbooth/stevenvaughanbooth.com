@@ -42,7 +42,8 @@ export default function NotFound() {
           page, and Ask Steven can point you to what you were looking for.
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-3">
-          <Link href="/" className="pill pill-solid">
+          {/* No prefetch: the home page's payload would preload its portrait and stylesheet here. */}
+          <Link href="/" prefetch={false} className="pill pill-solid">
             Back to home
           </Link>
           <AskButton className="pill pill-outline">

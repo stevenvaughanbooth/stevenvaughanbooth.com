@@ -3,8 +3,8 @@ import { siteComponents } from '@/content/components';
 import { axeViolations, hydrated } from './helpers';
 
 const toggle = (page: Page) =>
-  page.getByRole('banner').getByRole('button', { name: 'Under the hood', exact: true });
-const hud = (page: Page) => page.getByRole('region', { name: 'Under the hood' });
+  page.getByRole('banner').getByRole('button', { name: 'X-ray this page', exact: true });
+const hud = (page: Page) => page.getByRole('region', { name: 'X-ray', exact: true });
 const labels = (page: Page) => page.getByRole('region', { name: 'Components on this page' });
 const labelFor = (page: Page, name: string) =>
   labels(page).getByRole('button', { name: new RegExp(`^${name},`) });
@@ -203,8 +203,8 @@ test('the HUD reports this visit and the build in numbers', async ({ page, isMob
   // The X just pressed is an interaction.
   await expect(value('INP')).toHaveText(/^\d+ ms/);
   // The page's own downloads, with X-ray's (and anything after it) apart.
-  await expect(value('JavaScript')).toHaveText(/^\d+ KB\d+ files.* · \+\d+ KB since X.ray/);
-  await expect(value('Requests')).toHaveText(/^\d+\+\d+ since X.ray/);
+  await expect(value('JavaScript')).toHaveText(/^\d+ KB\d+ files.* · \+\d+\sKB\ssince\sX.ray/);
+  await expect(value('Requests')).toHaveText(/^\d+\+\d+\ssince\sX.ray/);
   // No input before X-ray but the X: the LCP is final.
   await expect(value('LCP')).not.toContainText('provisional');
   await expect(value('DOM elements')).toHaveText(/^\d[\d,]*/);
@@ -401,11 +401,17 @@ test('labels open their details with a tap, and the HUD is a sheet on phones', a
   await expect(hud(page).locator('dt', { hasText: 'LCP' })).toBeVisible();
   await stats.tap();
 
+  // Opened, the HUD folds again when a card opens, so it never covers the card.
+  await stats.tap();
+  await expect(stats).toHaveAttribute('aria-expanded', 'true');
   const label = labelFor(page, 'HeroAskBar');
   await label.tap();
   const card = page.getByRole('group', { name: 'HeroAskBar', exact: true });
   await expect(card).toBeVisible();
   await expect(card).toBeInViewport();
+  await expect(stats).toHaveAttribute('aria-expanded', 'false');
+  const [cardBox, hudBox] = [await card.boundingBox(), await hud(page).boundingBox()];
+  expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(hudBox!.y);
   // A tap elsewhere puts it away.
   await page.locator('h1').tap();
   await expect(card).toBeHidden();
@@ -566,6 +572,18 @@ test.describe('the dog-ear', () => {
     await transitionOver(page);
     expect(await xrayOn(page)).toBe(false);
     await expect(ear(page)).toBeVisible();
+  });
+
+  test('stays clear of the Sections button on phones, so a tap on the menu never peels', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'Phones only');
+    // After the once-a-visit lift.
+    await page.waitForTimeout(3000);
+    const corner = (await ear(page).boundingBox())!;
+    const menu = (await page.getByRole('button', { name: 'Sections' }).boundingBox())!;
+    expect(corner.x).toBeGreaterThanOrEqual(menu.x + menu.width);
   });
 
   test('takes no focus and stays out of the keyboard’s way', async ({ page }) => {

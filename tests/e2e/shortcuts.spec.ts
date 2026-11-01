@@ -25,7 +25,7 @@ test('? opens the shortcuts sheet, and Escape closes it and returns focus', asyn
     'Ask Steven',
     'Type a question',
     'Switch theme',
-    'Under the hood',
+    'X-ray this page',
     'Show these shortcuts',
     'Close a dialog or menu',
   ]);
@@ -120,7 +120,7 @@ test('single-key shortcuts can be turned off, and the footer button still opens 
   await page.keyboard.press('Shift+Slash');
   const toggle = sheet(page).getByRole('switch', { name: 'Single-key shortcuts' });
   await expect(toggle).toBeChecked();
-  const xray = page.getByRole('banner').getByRole('button', { name: 'Under the hood' });
+  const xray = page.getByRole('banner').getByRole('button', { name: 'X-ray this page' });
   await expect(xray).toHaveAttribute('aria-keyshortcuts', 'X');
   await toggle.click();
   await expect(toggle).not.toBeChecked();
@@ -140,9 +140,9 @@ test('single-key shortcuts can be turned off, and the footer button still opens 
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
   expect(await page.evaluate(() => document.documentElement.hasAttribute('data-xray'))).toBe(false);
 
-  // The footer button shows from the sm breakpoint, where a keyboard is likely.
-  if (isMobile) return;
-  await footerButton(page).click();
+  // The footer button shows at every width: a phone or tablet can have a keyboard too.
+  if (isMobile) await footerButton(page).tap();
+  else await footerButton(page).click();
   await expect(sheet(page)).toBeVisible();
   await sheet(page).getByRole('switch', { name: 'Single-key shortcuts' }).click();
   await page.keyboard.press('Escape');
@@ -166,3 +166,28 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(await axeViolations(page, (axe) => axe.include('dialog[open]'))).toEqual([]);
   });
 }
+
+test('Ask Steven’s Keyboard shortcuts command opens the sheet', async ({ page }) => {
+  await page.goto('/');
+  await hydrated(page);
+  await askTrigger(page).click();
+  await expect(palette(page)).toBeVisible();
+  await page.keyboard.type('keyboard');
+  await page.getByRole('option', { name: /Keyboard shortcuts/ }).click();
+  await expect(palette(page)).toBeHidden();
+  await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page).getByRole('switch', { name: 'Single-key shortcuts' })).toBeVisible();
+});
+
+test('T and X say what they did, for screen readers', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await hydrated(page);
+  const status = page.getByRole('status').filter({ hasText: /theme|X-ray/ });
+  await page.keyboard.press('t');
+  await expect(status).toHaveText(/^(Dark|Light) theme$/);
+  await page.keyboard.press('x');
+  await expect(status).toHaveText('X-ray on. Escape turns it off.');
+  await page.keyboard.press('x');
+  await expect(status).toHaveText('X-ray off');
+});

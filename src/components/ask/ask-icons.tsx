@@ -35,3 +35,12 @@ export function Retry(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function Keyboard(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.75" y="6" width="18.5" height="12" rx="2" />
+      <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
+    </svg>
+  );
+}

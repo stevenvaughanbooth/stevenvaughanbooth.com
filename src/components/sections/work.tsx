@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AskButton } from '@/components/ask/ask-button';
 import { caseStudyLinkId, workAnchor } from '@/components/case-study/ids';
-import { FadeThrough } from '@/components/case-study/morph';
+import { caseStudyTransition, FadeThrough } from '@/components/case-study/morph';
 import { ThemeIntro } from '@/components/case-study/theme-intro';
 import { ThemeVisual } from '@/components/case-study/theme-visual';
 import { ArrowRight, Sparkle } from '@/components/ui/icons';
@@ -44,6 +44,7 @@ export function Work() {
                     <Link
                       id={caseStudyLinkId(theme.id)}
                       href={caseStudyPath(theme.id)}
+                      transitionTypes={[caseStudyTransition]}
                       // Names each of the three links apart; it starts with the visible label.
                       aria-label={`Read the case study: ${theme.title}`}
                       className="group pill pill-outline pill-sm"

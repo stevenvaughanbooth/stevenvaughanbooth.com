@@ -18,7 +18,7 @@ interface Row {
 }
 
 const kbd =
-  'inline-grid h-6 min-w-6 place-items-center rounded-md border border-line bg-elevated px-1.5 font-mono text-micro text-muted';
+  'inline-grid h-6 min-w-6 place-items-center rounded-md border border-line px-1.5 font-mono text-micro';
 
 /**
  * The keyboard shortcuts, as a modal dialog. Loaded on demand by the listener in shortcuts.tsx,
@@ -57,7 +57,7 @@ export function ShortcutsSheet({ request, onClose }: ShortcutsSheetProps) {
     { label: 'Ask Steven', keys: ask },
     { label: 'Type a question', keys: '/', single: true },
     { label: 'Switch theme', keys: 'T', single: true },
-    { label: 'Under the hood', keys: 'X', single: true },
+    { label: 'X-ray this page', keys: 'X', single: true },
     { label: 'Show these shortcuts', keys: '?', single: true },
     { label: 'Close a dialog or menu', keys: 'Esc' },
   ];
@@ -106,7 +106,12 @@ export function ShortcutsSheet({ request, onClose }: ShortcutsSheetProps) {
                   {off ? <span className="sr-only"> (off)</span> : null}
                 </dt>
                 <dd>
-                  <kbd className={`${kbd} ${off ? 'opacity-60' : ''}`}>{row.keys}</kbd>
+                  {/* Struck through when off, in text that still reads at 4.5:1. */}
+                  <kbd
+                    className={`${kbd} ${off ? 'bg-transparent text-subtle line-through' : 'bg-elevated text-muted'}`}
+                  >
+                    {row.keys}
+                  </kbd>
                 </dd>
               </div>
             );

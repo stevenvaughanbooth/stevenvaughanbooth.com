@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+// The router's context, which next/navigation's useRouter reads: importing that hook here would
+// regroup the shared chunks and add half a kilobyte to every page's initial JavaScript.
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
 
 const subscribe = () => () => {};
 
@@ -80,8 +83,13 @@ function afterScrolling(callback: () => void) {
  * study return to where the visitor was on it, so focus goes to the link they left by, such as
  * the Next card, or to the heading when the page is back at the top. A visitor who loads the page
  * directly starts at the top, as on any page load.
+ *
+ * It also readies the way back. The Back to Work links don't prefetch the home page as they come
+ * into view: its payload carries the hint to preload the hero's portrait, which the browser would
+ * apply here and then report unused. A pointer or focus on one fetches it in time for the morph.
  */
 export function CaseStudyFocus({ heading, opener, anchor }: CaseStudyFocusProps) {
+  const router = useContext(AppRouterContext);
   // Hydrating the server's HTML means a page load; rendering on the client from the start means
   // a client navigation. The first render's answer is the one kept.
   const client = useSyncExternalStore(
@@ -131,6 +139,13 @@ export function CaseStudyFocus({ heading, opener, anchor }: CaseStudyFocusProps)
     };
     document.addEventListener('click', onClick, true);
 
+    const onIntent = (event: Event) => {
+      const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (link?.getAttribute('href') === `/#${anchor}`) router?.prefetch('/');
+    };
+    document.addEventListener('pointerover', onIntent);
+    document.addEventListener('focusin', onIntent);
+
     // The browser's Back and Forward buttons fire popstate. When the page they return to is
     // cached, the router renders it synchronously inside its own popstate listener, which was
     // added first, so this cleanup runs during that event, before this listener's turn. That
@@ -144,6 +159,8 @@ export function CaseStudyFocus({ heading, opener, anchor }: CaseStudyFocusProps)
     return () => {
       stopWaiting?.();
       document.removeEventListener('click', onClick, true);
+      document.removeEventListener('pointerover', onIntent);
+      document.removeEventListener('focusin', onIntent);
       window.removeEventListener('popstate', onPopState);
       traversed ||= window.event?.type === 'popstate';
       // Cleanup runs once the next page has replaced this one. Still on this page, nothing left.
@@ -169,7 +186,7 @@ export function CaseStudyFocus({ heading, opener, anchor }: CaseStudyFocusProps)
         );
       }
     };
-  }, [navigated, heading, opener, anchor]);
+  }, [navigated, heading, opener, anchor, router]);
 
   return null;
 }

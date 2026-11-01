@@ -2,7 +2,7 @@
  * The dog-ear (xray-toggle.tsx): the page's top-right corner turned down along its diagonal. The
  * corner that lifted shows the blueprint underneath; the half below the fold is the back of the
  * sheet, lit at the crease like the peel's flap, casting a soft shadow on the page. It sits in the
- * screen's corner, clear of the header's buttons at every width (their edge is 20px in).
+ * screen's corner, clear of the header's buttons at every width (their edge is 20px in on phones).
  */
 .ear {
   --ear-paper-crease: light-dark(#ffffff, #7a8494);
@@ -25,6 +25,17 @@
   filter: drop-shadow(-1px 1.5px 1.5px light-dark(rgb(18 20 23 / 0.24), rgb(0 0 0 / 0.6)));
   transform-origin: top right;
   transition: scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Where the header has its Sections button, 20px in from the edge, a smaller corner keeps clear
+ * of it: a press on the menu never starts a peel.
+ */
+@media (width < 48rem) {
+  .ear {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
 }
 
 /* Only where the peel can run: typed view transitions, and motion welcome. */

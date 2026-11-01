@@ -4,6 +4,12 @@ import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { CaseStudyFocus } from './focus';
 
+const prefetch = vi.hoisted(() => vi.fn());
+vi.mock('next/dist/shared/lib/app-router-context.shared-runtime', async () => {
+  const { createContext } = await import('react');
+  return { AppRouterContext: createContext({ prefetch }) };
+});
+
 /** The home page's opener, and the case study while it is on screen. */
 function Page({ caseStudy = true }: { caseStudy?: boolean }) {
   return (
@@ -48,6 +54,25 @@ describe('CaseStudyFocus', () => {
     go('/colophon');
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it('prefetches the home page only when the way back is pointed at or focused', () => {
+    prefetch.mockClear();
+    render(
+      <>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a href="/#work-mcp">Back to Work</a>
+        <Page />
+      </>,
+    );
+    fireEvent.pointerOver(next());
+    expect(prefetch).not.toHaveBeenCalled();
+    const back = screen.getByRole('link', { name: 'Back to Work' });
+    fireEvent.pointerOver(back);
+    expect(prefetch).toHaveBeenCalledWith('/');
+    prefetch.mockClear();
+    back.focus();
+    expect(prefetch).toHaveBeenCalledWith('/');
   });
 
   it('focuses the heading when a client navigation renders the case study', () => {

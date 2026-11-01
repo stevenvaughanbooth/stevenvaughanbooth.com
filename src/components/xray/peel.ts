@@ -207,6 +207,8 @@ export async function startCurl({ lifting, update, from }: CurlOptions): Promise
   const transition = document.startViewTransition({
     update() {
       document.body.append(shade, flap);
+      // No transitions start with the change (xray.module.css), until the peel is over.
+      root.toggleAttribute('data-xray-switching', true);
       update();
     },
     types: ['xray', lifting ? 'xray-lift' : 'xray-lay'],
@@ -220,6 +222,7 @@ export async function startCurl({ lifting, update, from }: CurlOptions): Promise
     () => {},
   );
   void lost.then(() => {
+    root.removeAttribute('data-xray-switching');
     shade.remove();
     flap.remove();
     for (const animation of animations) animation.cancel();

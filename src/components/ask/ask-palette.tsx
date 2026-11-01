@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { openShortcuts } from '@/components/shortcuts/shortcuts';
 import { accentText } from '@/components/ui/accent';
 import { ArrowUpRight, Copy, GitHub, LinkedIn, Mail, Sparkle } from '@/components/ui/icons';
 import type { AskMode } from '@/content/answers';
@@ -18,7 +19,7 @@ import { QUESTION_MAX } from '@/lib/ask-contract';
 import { showOnPage } from '@/lib/page-actions';
 import type { PageTargetId } from '@/lib/page-targets';
 import type { AskOpenDetail } from './ask-events';
-import { Close, Hash } from './ask-icons';
+import { Close, Hash, Keyboard } from './ask-icons';
 import { Conversation } from './conversation';
 import type { LinkItem } from './palette-items';
 import { type Option, search } from './search';
@@ -36,6 +37,7 @@ const linkIcons: Record<LinkItem['id'], ReactNode> = {
   github: <GitHub width={16} height={16} />,
   linkedin: <LinkedIn width={16} height={16} />,
   adage: <GitHub width={16} height={16} />,
+  shortcuts: <Keyboard width={16} height={16} />,
 };
 
 function statusLine(mode: AskMode, quota: { remaining: number; limit: number | null } | null) {
@@ -228,7 +230,11 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
         return;
       case 'link':
         if (option.item.href) openLink(option.item.href);
-        else void copyEmail();
+        else if (option.item.id === 'shortcuts') {
+          // The sheet is a dialog of its own: the palette closes first, handing focus back.
+          close();
+          openShortcuts();
+        } else void copyEmail();
         return;
     }
   }
@@ -351,7 +357,7 @@ export function AskPalette({ ref, announce, children }: AskPaletteProps) {
       className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-surface p-0 text-fg transition-[opacity,translate,scale] duration-300 ease-out-expo backdrop:bg-bg/70 backdrop:backdrop-blur-[3px] motion-reduce:transition-none sm:mx-auto sm:mt-[min(12vh,7rem)] sm:h-[min(38rem,calc(100dvh-min(12vh,7rem)-2rem))] sm:w-[min(42rem,calc(100%-2rem))] sm:rounded-2xl sm:border sm:border-line-strong sm:shadow-card starting:translate-y-4 starting:opacity-0 sm:starting:translate-y-0 sm:starting:scale-[0.98]"
     >
       <div className="flex h-full flex-col">
-        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line px-4 focus-within:shadow-[inset_0_-1px_0_color-mix(in_oklab,var(--green)_55%,transparent)] sm:px-5 forced-colors:focus-within:outline-2 forced-colors:focus-within:-outline-offset-2 forced-colors:focus-within:outline-[Highlight]">
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line px-4 focus-within:shadow-[inset_0_-2px_0_var(--green)] sm:px-5 forced-colors:focus-within:outline-2 forced-colors:focus-within:-outline-offset-2 forced-colors:focus-within:outline-[Highlight]">
           <Sparkle width={18} height={18} className="shrink-0 text-green" />
           <input
             ref={input}

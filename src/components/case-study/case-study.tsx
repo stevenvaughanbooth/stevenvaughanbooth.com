@@ -16,7 +16,8 @@ import { type Accent, workIntro } from '@/content/profile';
 import { caseStudyAnchors } from '@/lib/page-targets';
 import { CaseStudyFocus } from './focus';
 import { caseStudyLinkId, workAnchor } from './ids';
-import { FadeThrough, Morph, morphName, pagerTransition } from './morph';
+import { Kicker } from './kicker';
+import { caseStudyTransition, FadeThrough, Morph, morphName, pagerTransition } from './morph';
 import { ThemeIntro } from './theme-intro';
 import { ThemeVisual } from './theme-visual';
 
@@ -61,8 +62,15 @@ export function CaseStudyArticle({ study }: { study: CaseStudy }) {
 
         <header className="page grid gap-10 pt-24 md:pt-32 lg:grid-cols-[1fr_1.25fr] lg:gap-14">
           <div>
-            {/* A client navigation, unlike the header's section links, so the theme morphs back. */}
-            <Link href={backHref(study.id)} className="mb-8 -ml-3 pill pill-ghost pill-sm">
+            {/* A client navigation, unlike the header's section links, so the theme morphs back.
+                Prefetched on intent only (focus.tsx): in view, it would preload the home page's
+                portrait on every case study. */}
+            <Link
+              href={backHref(study.id)}
+              prefetch={false}
+              transitionTypes={[caseStudyTransition]}
+              className="mb-8 -ml-3 pill pill-ghost pill-sm"
+            >
               <ArrowRight width={16} height={16} className="rotate-180" /> Back to Work
             </Link>
             <ThemeIntro
@@ -257,7 +265,12 @@ function Part({ id, label, index, accent, part }: PartProps) {
 function Pager({ study }: { study: CaseStudy }) {
   const { previous, next } = adjacentCaseStudies(study.id);
   const back = (
-    <Link href={backHref(study.id)} className={card}>
+    <Link
+      href={backHref(study.id)}
+      prefetch={false}
+      transitionTypes={[caseStudyTransition]}
+      className={card}
+    >
       <span className="label flex items-center gap-2">
         <ArrowRight width={14} height={14} className="rotate-180" /> Back to Work
       </span>
@@ -305,7 +318,9 @@ function PagerLink({ study, rel }: { study: CaseStudy; rel: 'prev' | 'next' }) {
       </span>
       <span className="label mt-6 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className={accentText[theme.accent]}>{theme.index}</span>
-        <span>{theme.kicker}</span>
+        <span>
+          <Kicker text={theme.kicker} />
+        </span>
       </span>
       <Morph name={morphName.title(study.id)}>
         <span className="mt-2 block text-xl font-semibold tracking-tight text-balance md:text-2xl">

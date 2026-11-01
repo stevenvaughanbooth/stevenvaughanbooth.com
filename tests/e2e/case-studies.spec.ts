@@ -266,3 +266,27 @@ test.describe('moving between the Work section and a case study', () => {
     await expect(link).toBeFocused();
   });
 });
+
+test('case studies and the 404 preload nothing of the home page until the way back is pointed at', async ({
+  page,
+  isMobile,
+}) => {
+  const warnings: string[] = [];
+  page.on('console', (message) => {
+    if (message.text().includes('preloaded using link preload')) warnings.push(message.text());
+  });
+  for (const path of [...paths, '/this-page-does-not-exist']) {
+    await page.goto(path);
+    await hydrated(page);
+  }
+  // The browser reports an unused preload a few seconds after the load event.
+  await page.waitForTimeout(4000);
+  expect(warnings).toEqual([]);
+
+  test.skip(isMobile, 'Pointing needs a mouse');
+  await page.goto(paths[0]!);
+  await hydrated(page);
+  const home = page.waitForRequest((request) => new URL(request.url()).pathname === '/');
+  await page.getByRole('link', { name: 'Back to Work' }).first().hover();
+  await home;
+});

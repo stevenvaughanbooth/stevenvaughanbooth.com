@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { accentText } from '@/components/ui/accent';
 import type { Theme } from '@/content/profile';
+import { Kicker } from './kicker';
 import { Morph, morphName } from './morph';
 
 interface ThemeIntroProps {
@@ -30,7 +31,9 @@ export function ThemeIntro({
     <Morph name={morphName.kicker(theme.id)}>
       <p className="label flex w-fit flex-wrap items-center gap-x-3 gap-y-1">
         <span className={accentText[theme.accent]}>{theme.index}</span>
-        <span>{theme.kicker}</span>
+        <span>
+          <Kicker text={theme.kicker} />
+        </span>
       </p>
     </Morph>
   );

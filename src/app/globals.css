@@ -13,6 +13,8 @@
   --elevated: light-dark(#efefea, #181c23);
   --line: light-dark(#e2e2dc, #232934);
   --line-strong: light-dark(#cbcbc3, #353d4b);
+  /* A text field's resting border: 3:1 against the page and the field (WCAG 1.4.11). */
+  --field-border: light-dark(#878780, #666e7c);
   --fg: light-dark(#121417, #eceef1);
   --muted: light-dark(#4f5662, #a7aebb);
   --subtle: light-dark(#676e7a, #808896);
@@ -58,6 +60,7 @@
   --color-elevated: var(--elevated);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-field-border: var(--field-border);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
@@ -282,12 +285,14 @@
 
 /*
  * The case-study transition (morph.tsx). The shared elements glide between the home page and a
- * case study while the rest of the page fades through: out quickly, then in, so the two pages
- * never sit on top of each other. The easing is --ease-out-expo, written out because these
+ * case study while the rest of the page fades through: out at once, then in, so the two pages
+ * never sit on top of each other and nothing glides over words on their way out. The glide waits
+ * for the fade to all but finish. The easing is --ease-out-expo, written out because these
  * pseudo-elements sit outside @theme.
  */
 ::view-transition-group(.case-study-morph) {
   animation-duration: 0.5s;
+  animation-delay: 0.06s;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -306,7 +311,36 @@
 }
 
 ::view-transition-old(.case-study-fade) {
-  animation: case-study-fade-out 0.15s ease-in both;
+  animation: case-study-fade-out 0.08s ease-out both;
+}
+
+/* Whatever else of the two pages is on screen swaps at once, under the gliding and fading parts. */
+:root:active-view-transition-type(case-study)::view-transition-old(root) {
+  animation: none;
+  opacity: 0;
+}
+
+:root:active-view-transition-type(case-study)::view-transition-new(root) {
+  animation: none;
+}
+
+/* Another theme's named parts, with no partner on the other page, fade with the page. */
+:root:active-view-transition-type(case-study)::view-transition-old(*):only-child {
+  animation: case-study-fade-out 0.08s ease-out both;
+}
+
+:root:active-view-transition-type(case-study)::view-transition-new(*):only-child {
+  animation: case-study-fade-in 0.3s ease-out 0.1s both;
+}
+
+/* A diagram's card (theme-visual.tsx): the arriving card replaces the leaving one outright. */
+::view-transition-old(.case-study-swap) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(.case-study-swap) {
+  animation: none;
 }
 
 ::view-transition-new(.case-study-fade) {

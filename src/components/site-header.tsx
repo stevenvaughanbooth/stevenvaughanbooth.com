@@ -66,7 +66,7 @@ export function SiteHeader() {
           <div className="ml-auto flex items-center gap-1.5">
             <AskButton
               aria-keyshortcuts="Meta+K Control+K"
-              className="group inline-flex h-9 items-center gap-2 rounded-full border border-line bg-surface pr-3.5 pl-3.5 text-sm text-muted shadow-card transition-colors hover:border-line-strong hover:text-fg sm:pr-1.5"
+              className="group inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-surface pr-3.5 pl-3.5 text-sm text-muted shadow-card transition-colors hover:border-line-strong hover:text-fg sm:pr-1.5"
             >
               Ask Steven
               <kbd

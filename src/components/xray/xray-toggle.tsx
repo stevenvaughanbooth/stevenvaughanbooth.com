@@ -14,7 +14,7 @@ const build = JSON.stringify({
 });
 
 /**
- * Under the hood: turns X-ray mode on and off, peeling the page back into a blueprint of its
+ * X-ray this page: turns X-ray mode on and off, peeling the page back into a blueprint of its
  * components. A Server Component with no JavaScript of its own: like any <button
  * data-xray-toggle>, its presses reach the shortcuts listener (shortcuts/shortcuts.tsx), which
  * loads X-ray on intent, and X-ray keeps its aria-pressed in step. The page starts unpeeled.
@@ -27,12 +27,12 @@ export function XrayToggle() {
       data-xray-toggle
       data-component="xray-toggle"
       data-xray-build={build}
-      aria-label="Under the hood"
+      aria-label="X-ray this page"
       aria-pressed="false"
       // Dropped while single keys are off (shortcuts/keys.ts).
       data-keyshortcut="X"
       aria-keyshortcuts="X"
-      title="Under the hood"
+      title="X-ray this page"
       className="group grid size-9 place-items-center rounded-full text-muted transition-colors hover:bg-elevated hover:text-fg aria-pressed:text-fg"
     >
       {/* A page with its corner folded back over code; the corner lifts a little on hover. */}

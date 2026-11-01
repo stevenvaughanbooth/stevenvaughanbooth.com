@@ -9,7 +9,7 @@ export interface GoToItem {
 }
 
 export interface LinkItem {
-  id: 'email' | 'copy-email' | 'github' | 'linkedin' | 'adage';
+  id: 'email' | 'copy-email' | 'github' | 'linkedin' | 'adage' | 'shortcuts';
   label: string;
   hint: string;
   /** Absent for actions that stay in the palette. */
@@ -79,5 +79,12 @@ export const linkItems: LinkItem[] = [
     hint: shortUrl(adage.links.repo).replace(/^github\.com\//, ''),
     href: adage.links.repo,
     keywords: ['repo', 'open', 'source', 'rust'],
+  },
+  {
+    // The way to the sheet, and its switch for single-key shortcuts, without the ? key.
+    id: 'shortcuts',
+    label: 'Keyboard shortcuts',
+    hint: '?',
+    keywords: ['keys', 'hotkeys', 'single-key', 'accessibility'],
   },
 ];

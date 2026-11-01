@@ -4,7 +4,11 @@ import type { CaseStudyId } from '@/content/case-studies';
 /*
  * The case-study transition. A Work theme's kicker, title, lede and diagram appear both on the
  * home page and at the head of its case study, in the same columns. Navigating between the two,
- * each glides from one place to the other while the rest of the page fades through. Navigations
+ * each glides from one place to the other while the rest of the page fades through: out at once,
+ * so nothing that glides passes over words on their way out. The text is identical on both
+ * pages, so its two snapshots cross-fade unseen. The diagram's card is the same frame, but what
+ * it shows can differ (a step, Play or Pause), so its new snapshot replaces the old one outright
+ * and glides alone (globals.css). Navigations
  * are transitions, so React runs all of it with no client code here. The browser's Back and
  * Forward buttons swap pages instantly: React renders history traversals synchronously, so the
  * browser can restore the scroll position, and a synchronous update starts no view transition.
@@ -23,6 +27,13 @@ export const morphName = {
 };
 
 /**
+ * The transition type of a navigation between a Work theme on the home page and its case study.
+ * The rest of the leaving page, outside the morphing and fading parts, goes at once rather than
+ * cross-fading under them (globals.css).
+ */
+export const caseStudyTransition = 'case-study';
+
+/**
  * The transition type of a navigation by the case studies' pager. Its card titles become the next
  * page's heading at a larger size and with new line breaks, so for this type the old text leaves
  * before the new arrives, and the two never show at once.
@@ -32,15 +43,26 @@ export const pagerTransition = 'case-study-pager';
 /**
  * Morphs its child into the element with the same name on the next page, and back again. It
  * animates only as one of a pair: `default="none"` keeps other transitions, such as a diagram's
- * controller swapping in, from animating it on its own, so `share` has to be set explicitly.
+ * controller swapping in, from animating it on its own, so `share` has to be set explicitly. One
+ * with no partner on the next page (another theme on the home page) fades with the page
+ * (globals.css).
+ * `swap` is for a child whose content may differ between the two pages: the new one shows at once.
  */
-export function Morph({ name, children }: { name: string; children: ReactNode }) {
+export function Morph({
+  name,
+  swap = false,
+  children,
+}: {
+  name: string;
+  swap?: boolean;
+  children: ReactNode;
+}) {
   return (
     <ViewTransition
       name={name}
       share={{
         [pagerTransition]: 'case-study-morph case-study-resize',
-        default: 'case-study-morph',
+        default: swap ? 'case-study-morph case-study-swap' : 'case-study-morph',
       }}
       default="none"
     >

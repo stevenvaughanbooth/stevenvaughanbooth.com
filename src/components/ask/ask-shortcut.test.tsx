@@ -17,7 +17,7 @@ describe('AskShortcut', () => {
     expect(screen.getByTestId('hint')).toHaveTextContent('⌘K');
   });
 
-  it('shows Ctrl K elsewhere', () => {
+  it('shows Ctrl+K elsewhere', () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32');
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Windows NT 10.0)');
     render(
@@ -25,6 +25,6 @@ describe('AskShortcut', () => {
         <AskShortcut />
       </kbd>,
     );
-    expect(screen.getByTestId('hint')).toHaveTextContent('Ctrl K');
+    expect(screen.getByTestId('hint')).toHaveTextContent('Ctrl+K');
   });
 });

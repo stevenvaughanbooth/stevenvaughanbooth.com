@@ -13,12 +13,14 @@ const visuals: Record<CaseStudyId, ComponentType> = {
 
 /**
  * A Work theme's diagram, named for the morph: the same card sits beside the theme on the home
- * page and heads its case study, so it glides from one to the other.
+ * page and heads its case study, so it glides from one to the other. Its step or controls may
+ * differ between the two, so the arriving card replaces the leaving one rather than showing
+ * through it.
  */
 export function ThemeVisual({ id }: { id: CaseStudyId }) {
   const Visual = visuals[id];
   return (
-    <Morph name={morphName.visual(id)}>
+    <Morph name={morphName.visual(id)} swap>
       <Visual />
     </Morph>
   );

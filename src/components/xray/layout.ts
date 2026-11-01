@@ -6,9 +6,11 @@
  * inside its top-left corner. One inside another sits on its own top edge, like a folder's tab,
  * so it covers none of its content. A small one (a button, a phone's avatar) hangs its label just
  * below, and a tall, narrow one (the signal line) runs it down its side, to its left, since the
- * page's text runs to its right. A label that would cover one already
- * placed moves along, and anything moved off its component gets a leader line back to it, as
- * callouts do on a drawing.
+ * page's text runs to its right. A label that would cover the page's text tries the other
+ * places that still read as its component's: a section's other corners, the far end of a card's
+ * top edge, above a small component or at the end of its line, over a figure. A label that would
+ * cover one already placed moves along, and anything moved off its component gets a leader line
+ * back to it, as callouts do on a drawing.
  */
 
 export interface Box {
@@ -28,6 +30,8 @@ export interface LabelRequest {
   inset: number;
   /** Whether the label runs down the component's side (it is then `width` wide, `height` tall). */
   vertical?: boolean;
+  /** The page's text around the component (its lines' boxes), which the label should not cover. */
+  obstacles?: readonly Box[];
 }
 
 export interface Placement {
@@ -51,11 +55,11 @@ export interface Bounds {
 const GAP = 3;
 const MARGIN = 4;
 
-const overlaps = (a: Box, b: Box) =>
-  a.x < b.x + b.width + GAP &&
-  b.x < a.x + a.width + GAP &&
-  a.y < b.y + b.height + GAP &&
-  b.y < a.y + a.height + GAP;
+const overlaps = (a: Box, b: Box, gap = GAP) =>
+  a.x < b.x + b.width + gap &&
+  b.x < a.x + a.width + gap &&
+  a.y < b.y + b.height + gap &&
+  b.y < a.y + a.height + gap;
 
 /** Whether a label runs down a component's side: the box is narrow and very tall. */
 export const runsDown = (box: Box) => box.width < 64 && box.height > 400;
@@ -64,6 +68,13 @@ export const runsDown = (box: Box) => box.width < 64 && box.height > 400;
 export const isSmall = (box: Box) => box.height < 50;
 
 type Shape = 'tab' | 'top' | 'hang' | 'side';
+
+/** A place a label could go, and where its leader ends if it is off its component's corner. */
+interface Spot {
+  x: number;
+  y: number;
+  anchor?: { x: number; y: number };
+}
 
 /**
  * Where a side label goes: to the left of its box, clear of the text beside it, or at the page's
@@ -82,6 +93,39 @@ function shapeOf(request: LabelRequest, bounds: Bounds): Shape {
   const smallSquare = inset === 0 && box.width <= 120 && box.height <= 120;
   if (vertical || isSmall(box) || smallSquare || bounds.hang !== undefined) return 'hang';
   return inset > 0 ? 'tab' : 'top';
+}
+
+/**
+ * The other places a label can go when its first one covers text, best first: still on its
+ * component's corners and edges, or beside a small one on its own line.
+ */
+function alternatives(request: LabelRequest, shape: Shape, first: Spot): Spot[] {
+  const { box, width, height, inset, obstacles = [] } = request;
+  const right = box.x + box.width;
+  const bottom = box.y + box.height;
+  if (shape === 'tab') {
+    const low = bottom - inset - height;
+    return [
+      { x: right - inset - width, y: first.y },
+      { x: box.x + inset, y: low },
+      { x: right - inset - width, y: low },
+    ].filter((spot) => spot.y >= first.y);
+  }
+  if (shape === 'top') return [{ x: right - width, y: first.y }];
+  if (shape !== 'hang') return [];
+  // At the end of its line: past the text that follows it, the label's foot on the line's.
+  const row: Spot = { x: right + GAP + 4, y: bottom - height, anchor: { x: right, y: bottom } };
+  for (let tries = 0; tries < 12; tries++) {
+    const hit = obstacles.find((other) => overlaps(other, { ...row, width, height }, 0));
+    if (!hit) break;
+    row.x = hit.x + hit.width + 6;
+  }
+  return [
+    { x: box.x, y: box.y - height - GAP },
+    row,
+    // Over a figure with no words of its own, inside its corner.
+    ...(width <= box.width && height <= box.height ? [{ x: box.x + 2, y: box.y + 2 }] : []),
+  ];
 }
 
 export function placeLabels(requests: readonly LabelRequest[], bounds: Bounds): Placement[] {
@@ -113,6 +157,25 @@ export function placeLabels(requests: readonly LabelRequest[], bounds: Bounds): 
     x = Math.max(MARGIN, Math.min(x, bounds.width - width - MARGIN));
     y = Math.max(y, bounds.top + GAP);
 
+    // Text under the first place: the first other place that is clear of it, on the page.
+    const obstacles = request.obstacles ?? [];
+    const covers = (spot: Spot) =>
+      obstacles.some((other) => overlaps(other, { ...spot, width, height }, 0));
+    let moved: Spot | undefined;
+    if (covers({ x, y })) {
+      moved = alternatives(request, shape, { x, y }).find(
+        (spot) =>
+          spot.x >= MARGIN &&
+          spot.x + width <= bounds.width - MARGIN &&
+          spot.y >= bounds.top + GAP &&
+          !covers(spot),
+      );
+      if (moved) {
+        x = moved.x;
+        y = moved.y;
+      }
+    }
+
     const label: Box = { x, y, width, height };
     for (let tries = 0; tries < 40; tries++) {
       const hit = placed.find((other) => overlaps(other, label));
@@ -126,7 +189,11 @@ export function placeLabels(requests: readonly LabelRequest[], bounds: Bounds): 
     // A label moved along by another points back to where it would have been; a hung one points
     // up to its component whenever there is a gap to bridge.
     let anchor: Placement['anchor'] = null;
-    if (shape === 'hang') {
+    if (moved?.anchor) {
+      anchor = moved.anchor;
+    } else if (moved && Math.abs(label.y - y) <= 1 && Math.abs(label.x - x) <= 1) {
+      // Moved to another of its own corners or edges, it needs no leader.
+    } else if (shape === 'hang') {
       const bridged =
         label.y - corner.y > GAP + 4 || corner.x < label.x || corner.x > label.x + width;
       if (bridged) anchor = corner;

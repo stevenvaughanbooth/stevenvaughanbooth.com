@@ -104,7 +104,7 @@ test('“Peel back this page” turns X-ray on and off, and says whether it is o
     name: 'Peel back this page',
   });
   const header = page.getByRole('banner').getByRole('button', {
-    name: 'Under the hood',
+    name: 'X-ray this page',
     exact: true,
   });
   await expect(button).toBeVisible();

@@ -12,11 +12,11 @@ function isApple(): boolean {
   return /mac|iphone|ipad|ipod/i.test(platform || navigator.userAgent);
 }
 
-/** "⌘K" on Apple platforms, "Ctrl K" elsewhere. Renders "⌘K" on the server. */
+/** "⌘K" on Apple platforms, "Ctrl+K" elsewhere. Renders "⌘K" on the server. */
 export function useAskShortcutLabel(): string {
   return useSyncExternalStore(
     subscribe,
-    () => (isApple() ? '⌘K' : 'Ctrl K'),
+    () => (isApple() ? '⌘K' : 'Ctrl+K'),
     () => '⌘K',
   );
 }

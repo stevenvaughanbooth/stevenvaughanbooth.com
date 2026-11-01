@@ -100,12 +100,12 @@ describe('Shortcuts', () => {
     press('?');
     const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
     const rows = [...dialog.querySelectorAll('dl > div')].map((row) => row.textContent);
-    // jsdom is not an Apple platform, so the palette's shortcut reads Ctrl K.
+    // jsdom is not an Apple platform, so the palette's shortcut reads Ctrl+K.
     expect(rows).toEqual([
-      'Ask StevenCtrl K',
+      'Ask StevenCtrl+K',
       'Type a question/',
       'Switch themeT',
-      'Under the hoodX',
+      'X-ray this pageX',
       'Show these shortcuts?',
       'Close a dialog or menuEsc',
     ]);
@@ -234,7 +234,7 @@ describe('X-ray', () => {
     renderPage();
     const toggle = document.createElement('button');
     toggle.id = 'xray-toggle';
-    toggle.textContent = 'Under the hood';
+    toggle.textContent = 'X-ray this page';
     toggle.setAttribute('data-xray-toggle', '');
     toggle.setAttribute('aria-pressed', 'false');
     document.body.prepend(toggle);
@@ -246,7 +246,7 @@ describe('X-ray', () => {
     press('x');
     await waitFor(() => expect(xray()).toBe(true));
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(await screen.findByRole('region', { name: 'Under the hood' })).toBeVisible();
+    expect(await screen.findByRole('region', { name: 'X-ray' })).toBeVisible();
 
     press('X');
     await waitFor(() => expect(xray()).toBe(false));

@@ -165,7 +165,7 @@ export const siteComponents: readonly SiteComponent[] = [
     kind: 'client',
     loads: 'On intent',
     features: ['<dialog>', 'Activity', 'useLayoutEffect', 'React Compiler'],
-    why: 'It loads on the first ? or press of Shortcuts, then waits under <Activity> with its state kept. A modal <dialog> makes the page inert while it is open, and its switch turns single keys off.',
+    why: 'It loads on the first ? or press of Keyboard shortcuts, then waits under <Activity> with its state kept. A modal <dialog> makes the page inert while it is open, and its switch turns single keys off.',
     onPage: false,
   },
   {
@@ -477,7 +477,7 @@ export const siteComponents: readonly SiteComponent[] = [
     kind: 'client',
     loads: 'With the case studies',
     features: ['useSyncExternalStore', 'React Compiler'],
-    why: 'Next.js leaves focus on a link the new page lacks; this moves it to the heading on arrival, and back to the opening link after Back.',
+    why: 'Next.js leaves focus on a link the new page lacks; this moves it to the heading on arrival, and back to the opening link after Back. It prefetches the home page only when a way back is pointed at or focused.',
     onPage: false,
   },
   {

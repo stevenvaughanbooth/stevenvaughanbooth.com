@@ -28,6 +28,7 @@
   --elevated: rgb(176 216 255 / 0.1);
   --line: rgb(176 216 255 / 0.42);
   --line-strong: rgb(196 228 255 / 0.68);
+  --field-border: var(--line-strong);
   --fg: var(--xr-ink);
   --muted: #c6def5;
   --subtle: var(--xr-dim);
@@ -549,7 +550,8 @@
   transition: rotate 0.2s;
 }
 
-.hud[data-collapsed] .chevron {
+/* The panel opens upwards: the chevron points the way it will move. */
+.hud:not([data-collapsed]) .chevron {
   rotate: 180deg;
 }
 
@@ -749,7 +751,11 @@
   transform-origin: 0 0;
 }
 
-/* Colours change at once underneath, so the new snapshot is the finished blueprint. */
-:global(:root:active-view-transition-type(xray) *) {
+/*
+ * Colours change at once underneath, so the new snapshot is the finished blueprint. peel.ts sets
+ * the attribute with the change and clears it when the transition ends: a rule keyed on the
+ * transition's type instead would restyle every element as the peel starts, in its first frame.
+ */
+:global(:root[data-xray-switching] *) {
   transition: none !important;
 }

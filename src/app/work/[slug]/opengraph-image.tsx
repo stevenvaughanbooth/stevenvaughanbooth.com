@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { ogFonts } from '@/assets/fonts';
+import { kickerParts } from '@/components/case-study/kicker';
 import { caseStudyPath, findCaseStudy } from '@/content/case-studies';
 import { person, site } from '@/content/profile';
 import { darkTokens as c } from '@/lib/tokens';
@@ -115,7 +116,15 @@ export default async function CaseStudyImage({ params }: { params: Promise<{ slu
               }}
             />
             <span style={{ color: accent }}>{theme.index}</span>
-            {theme.kicker}
+            {kickerParts(theme.kicker).map((part) =>
+              part.asWritten ? (
+                <span key={part.text} style={{ textTransform: 'none' }}>
+                  {part.text}
+                </span>
+              ) : (
+                part.text
+              ),
+            )}
           </div>
           <div
             style={{

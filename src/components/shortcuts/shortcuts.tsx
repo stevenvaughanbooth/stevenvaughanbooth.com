@@ -72,6 +72,8 @@ export function Shortcuts() {
   const [request, setRequest] = useState(0);
   // X-ray's overlay, rendered here once loaded, and whether it is showing.
   const [xray, setXray] = useState<XrayView | null>(null);
+  // What T and X just did, for screen readers: a key press moves no focus that would say so.
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
     // The dialog itself says whether it is open: its close event reaches React a task later.
@@ -100,9 +102,18 @@ export function Shortcuts() {
       if ((action === 'ask' || action === 'xray') && anyModalOpen()) return;
       event.preventDefault();
       if (action === 'ask') startQuestion();
-      else if (action === 'theme') switchTheme(document.getElementById(themeToggleId));
-      else if (action === 'xray') void toggleXray();
-      else if (sheetElement()?.open) sheetElement()?.close();
+      else if (action === 'theme') {
+        const theme = switchTheme(document.getElementById(themeToggleId));
+        setStatus(theme === 'dark' ? 'Dark theme' : 'Light theme');
+      } else if (action === 'xray') {
+        void toggleXray().then(() =>
+          setStatus(
+            document.documentElement.hasAttribute('data-xray')
+              ? 'X-ray on. Escape turns it off.'
+              : 'X-ray off',
+          ),
+        );
+      } else if (sheetElement()?.open) sheetElement()?.close();
       else show();
     }
 
@@ -171,6 +182,9 @@ export function Shortcuts() {
 
   return (
     <>
+      <p role="status" className="sr-only">
+        {status}
+      </p>
       {xray ? (
         <Activity mode={xray.on ? 'visible' : 'hidden'}>
           <xray.Overlay />

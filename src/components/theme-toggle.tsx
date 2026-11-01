@@ -44,8 +44,9 @@ let latest: ViewTransition | null = null;
  * Flips light/dark and remembers the choice. Where View Transitions are supported, the new theme
  * is revealed in a circle that grows from `origin` (globals.css animates ::view-transition-new
  * for transitions of type "theme"); otherwise, or under reduced motion, it switches at once.
+ * Returns the theme it switches to.
  */
-export function switchTheme(origin?: Element | null) {
+export function switchTheme(origin?: Element | null): Theme {
   const next: Theme = currentTheme() === 'dark' ? 'light' : 'dark';
   const root = document.documentElement;
   const apply = () => {
@@ -58,7 +59,7 @@ export function switchTheme(origin?: Element | null) {
   };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || !canReveal()) {
     apply();
-    return;
+    return next;
   }
   const box = origin?.getBoundingClientRect();
   root.style.setProperty('--reveal-x', `${box ? box.left + box.width / 2 : innerWidth / 2}px`);
@@ -73,6 +74,7 @@ export function switchTheme(origin?: Element | null) {
     root.style.removeProperty('--reveal-y');
   };
   transition.finished.then(clear, clear);
+  return next;
 }
 
 /**
