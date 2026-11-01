@@ -29,20 +29,20 @@ export interface PageMeasurement {
 
 export const measured = {
   /** ISO date of the run. */
-  date: '2026-10-30',
+  date: '2026-10-31',
   lighthouse: '12.6.1',
   pages: [
     {
       path: '/',
-      performance: 95,
+      performance: 94,
       accessibility: 100,
       bestPractices: 100,
       seo: 100,
       fcp: 1.2,
-      lcp: 2.93,
-      tbt: 12,
+      lcp: 3.08,
+      tbt: 23,
       cls: 0,
-      script: 166_873,
+      script: 168_705,
     },
     {
       path: '/colophon',
@@ -52,9 +52,9 @@ export const measured = {
       seo: 100,
       fcp: 1.05,
       lcp: 2.63,
-      tbt: 19,
+      tbt: 20,
       cls: 0,
-      script: 156_811,
+      script: 158_306,
     },
     {
       path: '/work/mcp',
@@ -64,9 +64,9 @@ export const measured = {
       seo: 100,
       fcp: 1.05,
       lcp: 2.78,
-      tbt: 19,
+      tbt: 52,
       cls: 0,
-      script: 177_190,
+      script: 336_213,
     },
   ] satisfies readonly PageMeasurement[],
   /** What the home page's largest contentful paint was in that run. */
@@ -82,7 +82,7 @@ export const measured = {
   /** The performance score the site aims for on mobile. A goal, not a measurement. */
   performanceTarget: 95,
   /** Playwright's are per project: the tests that ran and passed, and the ones a project skips. */
-  tests: { unit: 543, e2e: { passed: 292, skipped: 28 } },
+  tests: { unit: 576, e2e: { passed: 357, skipped: 31 } },
 } as const;
 
 function measurementOf(path: PageMeasurement['path']): PageMeasurement {

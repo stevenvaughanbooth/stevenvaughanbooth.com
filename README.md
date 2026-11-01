@@ -290,16 +290,16 @@ framework scripts to LCP when they finish before the first paint, and slower run
 for them. Cutting initial JavaScript is the way to raise it back.
 
 The targets above the floors are, on mobile, 95 for performance and 100 in the other three
-categories, CLS 0 and total blocking time under 100 ms. Last measured on 2026-10-30 with the
+categories, CLS 0 and total blocking time under 100 ms. Last measured on 2026-10-31 with the
 Lighthouse 12.6.1 CLI and this config's settings (emulated mobile, simulated throttling, 3 runs per
 page, the median of each figure shown) against a local production build. Every figure is within
 the budgets:
 
 | Page        | Performance | Accessibility | Best practices | SEO | LCP    | TBT   | CLS | JavaScript | Total     |
 | ----------- | ----------- | ------------- | -------------- | --- | ------ | ----- | --- | ---------- | --------- |
-| `/`         | 95          | 100           | 100            | 100 | 2.93 s | 12 ms | 0   | 166,873 B  | 324,674 B |
-| `/colophon` | 97          | 100           | 100            | 100 | 2.63 s | 19 ms | 0   | 156,811 B  | 265,402 B |
-| `/work/mcp` | 96          | 100           | 100            | 100 | 2.78 s | 19 ms | 0   | 177,190 B  | 310,807 B |
+| `/`         | 94          | 100           | 100            | 100 | 3.08 s | 23 ms | 0   | 168,705 B  | 302,612 B |
+| `/colophon` | 97          | 100           | 100            | 100 | 2.63 s | 20 ms | 0   | 158,306 B  | 270,493 B |
+| `/work/mcp` | 96          | 100           | 100            | 100 | 2.78 s | 52 ms | 0   | 336,213 B  | 471,548 B |
 
 The home page's LCP element is the hero's tagline paragraph; why its score turns on the size of
 the two app chunks is in [architecture](docs/architecture.md#performance). On the same day, with
