@@ -22,7 +22,7 @@ Where it states a limit, a header or a load order, the code it names is the sour
 | Styling      | Tailwind CSS v4 over CSS custom properties                                | Each colour is defined once with `light-dark()`; utilities are generated from use.     |
 | Compiler     | React Compiler (`reactCompiler: true`)                                    | Memoizes client components automatically, with no hand-written `useMemo`.              |
 | Fonts        | `next/font` (DM Sans variable, IBM Plex Mono 500)                         | Self-hosted from this origin, subset, preloaded, with metric-matched fallbacks.        |
-| 3D           | Three.js 0.186, named imports, loaded on demand                           | Lit diagram scenes; one engine, one chunk, never in the initial page.                  |
+| 3D           | Three.js 0.187, named imports, loaded on demand                           | Lit diagram scenes; one engine, one chunk, never in the initial page.                  |
 | Images       | `next/image`'s `getImageProps()` in Server Components                     | AVIF/WebP `srcset` as a plain `<img>`; no image component in client JavaScript.        |
 | Live answers | Route Handler → Anthropic Messages API, `claude-haiku-5-5`, NDJSON stream | The key stays server-side; see [Ask Steven](#ask-steven-security-model).               |
 | Abuse limits | Upstash Redis (`@upstash/ratelimit`) and Vercel BotID                     | Per-visitor, per-network, per-minute and per-day limits; bot filtering.                |
@@ -152,7 +152,7 @@ A controller may also lay a **3D scene** over its SVG (today all three Work diag
 `prefers-reduced-data`, at least 4 GB of device memory where the browser reports it, and WebGL 2
 drawn on a GPU: a software renderer such as SwiftShader keeps the 2D card),
 then waits for the load event, an idle period and a pause in scrolling before it imports the
-scene's chunk: three.js 0.186 (named imports, about 146 KB compressed), the shared engine in
+scene's chunk: three.js 0.187 (named imports, about 146 KB compressed), the shared engine in
 `visuals/shared/three/` and the scene. The home page therefore never fetches three.js until a diagram's controller has loaded near
 the viewport, and a case study, whose diagram is above the fold, fetches it only after its page
 has loaded. The canvas is `aria-hidden` and fades in over the SVG, which keeps its place, so the

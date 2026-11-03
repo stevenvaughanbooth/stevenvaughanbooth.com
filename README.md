@@ -25,7 +25,7 @@ of the same material: every component, when its code loads, and why it is built 
 | Language     | TypeScript (`strict`, `noUncheckedIndexedAccess`, `typedRoutes`)                     |
 | Styling      | Tailwind CSS v4 over CSS custom properties, each colour set once with `light-dark()` |
 | Fonts/images | `next/font` (DM Sans, IBM Plex Mono); `next/image`'s `getImageProps()`               |
-| 3D           | Three.js 0.186 (named imports, loaded on demand), one shared engine for the diagrams |
+| 3D           | Three.js 0.187 (named imports, loaded on demand), one shared engine for the diagrams |
 | Live answers | Route Handler → Anthropic Messages API (`claude-haiku-5-5`), streaming NDJSON        |
 | Abuse limits | Upstash Redis (`@upstash/ratelimit`), Vercel BotID                                   |
 | Tests        | Vitest + Testing Library, Playwright + axe-core, Lighthouse CI                       |
